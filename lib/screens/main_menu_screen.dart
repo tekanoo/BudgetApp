@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
@@ -87,7 +88,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     // Si l'utilisateur est connecté, charger ses données
     if (_isConnected && AuthService.currentUser != null) {
       await StorageService.loadUserData();
-      print('📱 Données utilisateur rechargées automatiquement');
+      if (kDebugMode) {
+        debugPrint('📱 Données utilisateur rechargées automatiquement');
+      }
     }
   }
 
@@ -114,7 +117,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       
       // Charger les données utilisateur
       await StorageService.loadUserData();
-      print('🔄 Utilisateur Firebase restauré: ${currentUser.email}');
+      if (kDebugMode) {
+        debugPrint('🔄 Utilisateur Firebase restauré: ${currentUser.email}');
+      }
       
     } else {
       // Pas d'utilisateur Firebase, vérifier SharedPreferences
@@ -134,7 +139,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             _userName = null;
           });
         }
-        print('🧹 État nettoyé - utilisateur non connecté');
+        if (kDebugMode) {
+          debugPrint('🧹 État nettoyé - utilisateur non connecté');
+        }
       }
     }
   }
@@ -329,12 +336,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         // Tracker la conversion
         await AnalyticsService.logConversion('user_signup');
         
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Bienvenue ${_userName ?? _userEmail} ! Données synchronisées.'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Bienvenue ${_userName ?? _userEmail} ! Données synchronisées.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -609,7 +618,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     required DateTime date,
   }) async {
     try {
-      print('💾 Sauvegarde ${isSalaire ? 'salaire' : 'charge'}: $description - €$montant');
+      if (kDebugMode) {
+        debugPrint('💾 Sauvegarde ${isSalaire ? 'salaire' : 'charge'}: $description - €$montant');
+      }
       
       await StorageService.addTransaction(
         description: description,
@@ -620,7 +631,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       );
       
       // Vérifier la sauvegarde
-      final transactions = await StorageService.getTransactions();
       final stats = await StorageService.getStatistics();
       
       if (mounted) {
@@ -647,10 +657,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         );
       }
       
-      print('📊 Nouveau solde: €${stats['solde']?.toStringAsFixed(2)}');
+      if (kDebugMode) {
+        debugPrint('📊 Nouveau solde: €${stats['solde']?.toStringAsFixed(2)}');
+      }
       
     } catch (e) {
-      print('❌ Erreur sauvegarde: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur sauvegarde: $e');
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

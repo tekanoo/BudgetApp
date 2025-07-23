@@ -30,22 +30,32 @@ class AuthService {
   // Connexion avec Google
   static Future<UserCredential?> signInWithGoogle() async {
     try {
-      print('🔄 Initialisation Google Sign-In...');
+      if (kDebugMode) {
+        debugPrint('🔄 Initialisation Google Sign-In...');
+      }
       _initGoogleSignIn();
       
-      print('🔄 Tentative de connexion Google...');
+      if (kDebugMode) {
+        debugPrint('🔄 Tentative de connexion Google...');
+      }
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
-        print('❌ L\'utilisateur a annulé la connexion');
+        if (kDebugMode) {
+          debugPrint('❌ L\'utilisateur a annulé la connexion');
+        }
         return null;
       }
 
-      print('✅ Compte Google récupéré: ${googleUser.email}');
+      if (kDebugMode) {
+        debugPrint('✅ Compte Google récupéré: ${googleUser.email}');
+      }
 
       // Obtenir les détails d'authentification
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      print('✅ Token d\'authentification récupéré');
+      if (kDebugMode) {
+        debugPrint('✅ Token d\'authentification récupéré');
+      }
 
       // Créer une nouvelle credential
       final credential = GoogleAuthProvider.credential(
@@ -53,20 +63,26 @@ class AuthService {
         idToken: googleAuth.idToken,
       );
 
-      print('✅ Credential Firebase créée');
+      if (kDebugMode) {
+        debugPrint('✅ Credential Firebase créée');
+      }
 
       // Se connecter à Firebase
       final UserCredential userCredential = await _auth.signInWithCredential(credential);
       
-      print('✅ Connexion Firebase réussie: ${userCredential.user?.email}');
+      if (kDebugMode) {
+        debugPrint('✅ Connexion Firebase réussie: ${userCredential.user?.email}');
+      }
       
       // Sauvegarder l'état de connexion
       await _saveAuthState(true, userCredential.user);
       
       return userCredential;
     } catch (e) {
-      print('❌ Erreur lors de la connexion Google: $e');
-      print('❌ Type d\'erreur: ${e.runtimeType}');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de la connexion Google: $e');
+        debugPrint('❌ Type d\'erreur: ${e.runtimeType}');
+      }
       return null;
     }
   }
@@ -81,9 +97,13 @@ class AuthService {
       
       // Supprimer l'état de connexion
       await _saveAuthState(false, null);
-      print('✅ Déconnexion réussie');
+      if (kDebugMode) {
+        debugPrint('✅ Déconnexion réussie');
+      }
     } catch (e) {
-      print('❌ Erreur lors de la déconnexion: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de la déconnexion: $e');
+      }
     }
   }
 

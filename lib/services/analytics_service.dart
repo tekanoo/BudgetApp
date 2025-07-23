@@ -1,4 +1,5 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
 
 class AnalyticsService {
@@ -7,7 +8,9 @@ class AnalyticsService {
   // Initialiser Analytics
   static Future<void> initialize() async {
     await _analytics.setAnalyticsCollectionEnabled(true);
-    print('📊 Firebase Analytics initialisé');
+    if (kDebugMode) {
+      debugPrint('📊 Firebase Analytics initialisé');
+    }
   }
 
   // Définir l'utilisateur
@@ -19,7 +22,9 @@ class AnalyticsService {
         name: 'user_type',
         value: 'authenticated',
       );
-      print('👤 Utilisateur défini dans Analytics: ${user.email}');
+      if (kDebugMode) {
+        debugPrint('👤 Utilisateur défini dans Analytics: ${user.email}');
+      }
     } else {
       await _analytics.setUserProperty(
         name: 'user_type',
@@ -31,17 +36,23 @@ class AnalyticsService {
   // Événements d'authentification
   static Future<void> logLogin() async {
     await _analytics.logLogin(loginMethod: 'google');
-    print('🔐 Événement: Connexion Google');
+    if (kDebugMode) {
+      debugPrint('🔐 Événement: Connexion Google');
+    }
   }
 
   static Future<void> logSignUp() async {
     await _analytics.logSignUp(signUpMethod: 'google');
-    print('📝 Événement: Inscription Google');
+    if (kDebugMode) {
+      debugPrint('📝 Événement: Inscription Google');
+    }
   }
 
   static Future<void> logLogout() async {
     await _analytics.logEvent(name: 'logout');
-    print('🚪 Événement: Déconnexion');
+    if (kDebugMode) {
+      debugPrint('🚪 Événement: Déconnexion');
+    }
   }
 
   // Événements de navigation avec noms personnalisés
@@ -61,7 +72,9 @@ class AnalyticsService {
     // Aussi envoyer l'événement screen_view standard
     await _analytics.logScreenView(screenName: screenName);
     
-    print('📱 Écran visité: $screenName (événement: $customEventName)');
+    if (kDebugMode) {
+      debugPrint('📱 Écran visité: $screenName (événement: $customEventName)');
+    }
   }
 
   // Événements financiers personnalisés
@@ -72,7 +85,7 @@ class AnalyticsService {
   }) async {
     // Événement principal
     await _analytics.logEvent(
-      name: 'budget_add_${type}',
+      name: 'budget_add_$type',
       parameters: {
         'transaction_type': type,
         'amount': amount,
@@ -93,7 +106,9 @@ class AnalyticsService {
       },
     );
     
-    print('💰 Événement: Transaction ajoutée (budget_add_$type: €$amount)');
+    if (kDebugMode) {
+      debugPrint('💰 Événement: Transaction ajoutée (budget_add_$type: €$amount)');
+    }
   }
 
   static Future<void> logDeleteTransaction({
@@ -108,7 +123,9 @@ class AnalyticsService {
         'currency': 'EUR',
       },
     );
-    print('🗑️ Événement: Transaction supprimée');
+    if (kDebugMode) {
+      debugPrint('🗑️ Événement: Transaction supprimée');
+    }
   }
 
   // Événements d'objectifs
@@ -124,7 +141,9 @@ class AnalyticsService {
         'currency': 'EUR',
       },
     );
-    print('🎯 Événement: Objectif ajouté ($goalName: €$targetAmount)');
+    if (kDebugMode) {
+      debugPrint('🎯 Événement: Objectif ajouté ($goalName: €$targetAmount)');
+    }
   }
 
   // Événements d'engagement
@@ -135,7 +154,9 @@ class AnalyticsService {
         'feature_name': featureName,
       },
     );
-    print('⚡ Événement: Fonctionnalité utilisée ($featureName)');
+    if (kDebugMode) {
+      debugPrint('⚡ Événement: Fonctionnalité utilisée ($featureName)');
+    }
   }
 
   // Événements de performance utilisateur
@@ -150,7 +171,9 @@ class AnalyticsService {
         'time_spent': timeSpent,
       },
     );
-    print('⏱️ Événement: Engagement utilisateur ($action: ${timeSpent}s)');
+    if (kDebugMode) {
+      debugPrint('⏱️ Événement: Engagement utilisateur ($action: ${timeSpent}s)');
+    }
   }
 
   // Méthode générique pour envoyer des événements personnalisés
@@ -162,7 +185,9 @@ class AnalyticsService {
       name: name,
       parameters: parameters,
     );
-    print('📊 Événement personnalisé: $name');
+    if (kDebugMode) {
+      debugPrint('📊 Événement personnalisé: $name');
+    }
   }
 
   // Événements spécifiques pour chaque section de l'app
@@ -174,7 +199,9 @@ class AnalyticsService {
         'feature': 'dashboard',
       },
     );
-    print('🏠 Page d\'accueil visitée');
+    if (kDebugMode) {
+      debugPrint('🏠 Page d\'accueil visitée');
+    }
   }
 
   static Future<void> logPlaisirsVisit() async {
@@ -185,7 +212,9 @@ class AnalyticsService {
         'feature': 'goals_management',
       },
     );
-    print('🎉 Section Plaisirs visitée');
+    if (kDebugMode) {
+      debugPrint('🎉 Section Plaisirs visitée');
+    }
   }
 
   static Future<void> logEntreesVisit() async {
@@ -196,7 +225,9 @@ class AnalyticsService {
         'feature': 'income_tracking',
       },
     );
-    print('💰 Section Entrées visitée');
+    if (kDebugMode) {
+      debugPrint('💰 Section Entrées visitée');
+    }
   }
 
   static Future<void> logSortiesVisit() async {
@@ -207,7 +238,9 @@ class AnalyticsService {
         'feature': 'expense_tracking',
       },
     );
-    print('💸 Section Sorties visitée');
+    if (kDebugMode) {
+      debugPrint('💸 Section Sorties visitée');
+    }
   }
 
   static Future<void> logAnalyseVisit() async {
@@ -218,7 +251,9 @@ class AnalyticsService {
         'feature': 'analytics_dashboard',
       },
     );
-    print('📊 Section Analyse visitée');
+    if (kDebugMode) {
+      debugPrint('📊 Section Analyse visitée');
+    }
   }
 
   static Future<void> logCategoryUsage(String category) async {
@@ -228,7 +263,9 @@ class AnalyticsService {
         'category': category,
       },
     );
-    print('🏷️ Événement: Catégorie utilisée ($category)');
+    if (kDebugMode) {
+      debugPrint('🏷️ Événement: Catégorie utilisée ($category)');
+    }
   }
 
   // Événements d'erreur (optionnel)
@@ -243,7 +280,9 @@ class AnalyticsService {
         'error_message': errorMessage,
       },
     );
-    print('❌ Événement: Erreur ($errorType)');
+    if (kDebugMode) {
+      debugPrint('❌ Événement: Erreur ($errorType)');
+    }
   }
 
   // Métriques de conversion
@@ -255,6 +294,8 @@ class AnalyticsService {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       },
     );
-    print('🎯 Événement: Conversion ($conversionType)');
+    if (kDebugMode) {
+      debugPrint('🎯 Événement: Conversion ($conversionType)');
+    }
   }
 }

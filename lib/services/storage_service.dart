@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'auth_service.dart';
 import 'analytics_service.dart';
 
@@ -37,7 +38,9 @@ class StorageService {
         
         if (existingFirebaseTransactions == '[]') {
           await prefs.setString('${firebaseKey}_$_transactionsKey', localTransactions);
-          print('📦 Migration des transactions vers le compte Firebase');
+          if (kDebugMode) {
+            debugPrint('📦 Migration des transactions vers le compte Firebase');
+          }
         }
       }
 
@@ -48,7 +51,9 @@ class StorageService {
         
         if (existingFirebasePlaisirs == '[]') {
           await prefs.setString('${firebaseKey}_$_plaisirsKey', localPlaisirs);
-          print('📦 Migration des objectifs vers le compte Firebase');
+          if (kDebugMode) {
+            debugPrint('📦 Migration des objectifs vers le compte Firebase');
+          }
         }
       }
 
@@ -57,7 +62,9 @@ class StorageService {
       await prefs.remove('${localKey}_$_plaisirsKey');
       
     } catch (e) {
-      print('❌ Erreur lors de la migration: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de la migration: $e');
+      }
     }
   }
 
@@ -107,13 +114,19 @@ class StorageService {
       
       // Confirmer selon le statut de connexion
       if (AuthService.currentUser != null) {
-        print('✅ Transaction sauvegardée et synchronisée (utilisateur: ${AuthService.currentUser?.email})');
+        if (kDebugMode) {
+          debugPrint('✅ Transaction sauvegardée et synchronisée (utilisateur: ${AuthService.currentUser?.email})');
+        }
       } else {
-        print('✅ Transaction sauvegardée localement');
+        if (kDebugMode) {
+          debugPrint('✅ Transaction sauvegardée localement');
+        }
       }
       
     } catch (e) {
-      print('❌ Erreur lors de l\'ajout de la transaction: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de l\'ajout de la transaction: $e');
+      }
       rethrow;
     }
   }
@@ -135,7 +148,9 @@ class StorageService {
       
       return result;
     } catch (e) {
-      print('❌ Erreur lors de la récupération des transactions: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de la récupération des transactions: $e');
+      }
       return [];
     }
   }
@@ -177,10 +192,14 @@ class StorageService {
         targetAmount: montantCible,
       );
       
-      print('✅ Objectif plaisir ajouté avec succès');
+      if (kDebugMode) {
+        debugPrint('✅ Objectif plaisir ajouté avec succès');
+      }
       
     } catch (e) {
-      print('❌ Erreur lors de l\'ajout de l\'objectif: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de l\'ajout de l\'objectif: $e');
+      }
       rethrow;
     }
   }
@@ -196,7 +215,9 @@ class StorageService {
       
       return plaisirs.cast<Map<String, dynamic>>();
     } catch (e) {
-      print('❌ Erreur lors de la récupération des objectifs: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de la récupération des objectifs: $e');
+      }
       return [];
     }
   }
@@ -216,9 +237,13 @@ class StorageService {
       // Sauvegarder
       await prefs.setString(key, json.encode(transactions));
       
-      print('✅ Transaction supprimée avec succès');
+      if (kDebugMode) {
+        debugPrint('✅ Transaction supprimée avec succès');
+      }
     } catch (e) {
-      print('❌ Erreur lors de la suppression: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors de la suppression: $e');
+      }
       rethrow;
     }
   }
@@ -248,7 +273,9 @@ class StorageService {
         'solde': totalRevenus - totalDepenses,
       };
     } catch (e) {
-      print('❌ Erreur lors du calcul des statistiques: $e');
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors du calcul des statistiques: $e');
+      }
       return {
         'totalRevenus': 0.0,
         'totalDepenses': 0.0,
@@ -261,13 +288,17 @@ class StorageService {
   static Future<void> loadUserData() async {
     final user = AuthService.currentUser;
     if (user != null) {
-      print('📱 Chargement des données pour l\'utilisateur: ${user.email}');
+      if (kDebugMode) {
+        debugPrint('📱 Chargement des données pour l\'utilisateur: ${user.email}');
+      }
       
       // Vérifier si l'utilisateur a des données
       final transactions = await getTransactions();
       final plaisirs = await getPlaisirGoals();
       
-      print('💾 Données chargées: ${transactions.length} transactions, ${plaisirs.length} objectifs');
+      if (kDebugMode) {
+        debugPrint('💾 Données chargées: ${transactions.length} transactions, ${plaisirs.length} objectifs');
+      }
       
       // Tracker le chargement des données
       await AnalyticsService.logFeatureUsed('user_data_loaded');
@@ -278,8 +309,10 @@ class StorageService {
   static Future<void> _syncToCloud(String dataType, Map<String, dynamic> data) async {
     final user = AuthService.currentUser;
     if (user != null) {
-      // TODO: Implémenter la vraie synchronisation Firebase
-      print('☁️ [SIMULATION] Sync vers Firebase: $dataType pour ${user.email}');
+     
+      if (kDebugMode) {
+        debugPrint('☁️ [SIMULATION] Sync vers Firebase: $dataType pour ${user.email}');
+      }
       
       // Tracker la synchronisation
       await AnalyticsService.logFeatureUsed('data_sync_$dataType');

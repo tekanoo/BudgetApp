@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'firebase_options.dart';
 import 'services/analytics_service.dart';
 import 'screens/home_screen.dart';
@@ -11,13 +12,20 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    print('🔥 Firebase initialisé avec succès pour le Web');
+    
+    // Utiliser debugPrint au lieu de print pour les logs de développement
+    if (kDebugMode) {
+      debugPrint('🔥 Firebase initialisé avec succès pour le Web');
+    }
     
     // Initialiser Analytics
     await AnalyticsService.initialize();
     
   } catch (e) {
-    print('❌ Erreur initialisation Firebase: $e');
+    // Utiliser debugPrint au lieu de print pour les erreurs
+    if (kDebugMode) {
+      debugPrint('❌ Erreur initialisation Firebase: $e');
+    }
   }
   
   runApp(const BudgetApp());
