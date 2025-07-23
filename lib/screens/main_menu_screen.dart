@@ -33,9 +33,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   final List<NavigationDestination> _destinations = const [
     NavigationDestination(
-      icon: Icon(Icons.home_outlined),
-      selectedIcon: Icon(Icons.home),
-      label: 'Home',
+      icon: Icon(Icons.dashboard_outlined),
+      selectedIcon: Icon(Icons.dashboard),
+      label: 'Dashboard',
     ),
     NavigationDestination(
       icon: Icon(Icons.celebration_outlined),
@@ -43,14 +43,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       label: 'Plaisirs',
     ),
     NavigationDestination(
-      icon: Icon(Icons.trending_up_outlined),
-      selectedIcon: Icon(Icons.trending_up),
-      label: 'Entrées',
+      icon: Icon(Icons.attach_money_outlined),
+      selectedIcon: Icon(Icons.attach_money),
+      label: 'Salaires',
     ),
     NavigationDestination(
-      icon: Icon(Icons.trending_down_outlined),
-      selectedIcon: Icon(Icons.trending_down),
-      label: 'Sorties',
+      icon: Icon(Icons.receipt_long_outlined),
+      selectedIcon: Icon(Icons.receipt_long),
+      label: 'Charges',
     ),
     NavigationDestination(
       icon: Icon(Icons.analytics_outlined),
@@ -62,28 +62,80 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   void initState() {
     super.initState();
-    _loadConnectionStatus();
-    
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
     // Tracker l'ouverture de l'app
     AnalyticsService.logScreenView('MainMenu');
     AnalyticsService.logFeatureUsed('app_opened');
+    
+    // Charger le statut de connexion et les données
+    await _loadConnectionStatus();
+    
+    // Vérification de sécurité : si pas d'utilisateur Firebase, rediriger
+    if (AuthService.currentUser == null) {
+      if (mounted) {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/', 
+          (Route<dynamic> route) => false,
+        );
+      }
+      return;
+    }
+    
+    // Si l'utilisateur est connecté, charger ses données
+    if (_isConnected && AuthService.currentUser != null) {
+      await StorageService.loadUserData();
+      print('📱 Données utilisateur rechargées automatiquement');
+    }
   }
 
   Future<void> _loadConnectionStatus() async {
     final prefs = await SharedPreferences.getInstance();
-    final isConnected = prefs.getBool('isConnected') ?? false;
-    final userEmail = prefs.getString('userEmail');
-    final userName = prefs.getString('userName');
     
-    // Vérifier aussi Firebase Auth
+    // Vérifier l'état Firebase en premier
     final currentUser = AuthService.currentUser;
     
-    if (mounted) {
-      setState(() {
-        _isConnected = isConnected || currentUser != null;
-        _userEmail = userEmail ?? currentUser?.email;
-        _userName = userName ?? currentUser?.displayName;
-      });
+    if (currentUser != null) {
+      // Utilisateur connecté à Firebase
+      if (mounted) {
+        setState(() {
+          _isConnected = true;
+          _userEmail = currentUser.email;
+          _userName = currentUser.displayName;
+        });
+      }
+      
+      // Sauvegarder l'état dans SharedPreferences
+      await prefs.setBool('isConnected', true);
+      await prefs.setString('userEmail', currentUser.email ?? '');
+      await prefs.setString('userName', currentUser.displayName ?? '');
+      
+      // Charger les données utilisateur
+      await StorageService.loadUserData();
+      print('🔄 Utilisateur Firebase restauré: ${currentUser.email}');
+      
+    } else {
+      // Pas d'utilisateur Firebase, vérifier SharedPreferences
+      final isConnected = prefs.getBool('isConnected') ?? false;
+      
+      if (isConnected) {
+        // État incohérent : connecté dans SharedPreferences mais pas dans Firebase
+        // Nettoyer les données
+        await prefs.setBool('isConnected', false);
+        await prefs.remove('userEmail');
+        await prefs.remove('userName');
+        
+        if (mounted) {
+          setState(() {
+            _isConnected = false;
+            _userEmail = null;
+            _userName = null;
+          });
+        }
+        print('🧹 État nettoyé - utilisateur non connecté');
+      }
     }
   }
 
@@ -102,7 +154,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _trackScreenVisit(int index) {
-    final screenNames = ['Home', 'Plaisirs', 'Entrees', 'Sorties', 'Analyse'];
+    final screenNames = ['Dashboard', 'Plaisirs', 'Salaires', 'Charges', 'Analyse'];
     
     // Événement général
     AnalyticsService.logScreenView(screenNames[index]);
@@ -116,10 +168,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         AnalyticsService.logPlaisirsVisit();
         break;
       case 2:
-        AnalyticsService.logEntreesVisit();
+        AnalyticsService.logEvent(name: 'budget_salaires_visited', parameters: {'section': 'salaires'});
         break;
       case 3:
-        AnalyticsService.logSortiesVisit();
+        AnalyticsService.logEvent(name: 'budget_charges_visited', parameters: {'section': 'charges'});
         break;
       case 4:
         AnalyticsService.logAnalyseVisit();
@@ -166,6 +218,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 'Connectez-vous pour synchroniser vos données avec Firebase.',
               ),
             ],
+            const SizedBox(height: 16),
+            // Bouton pour voir les données sauvegardées
+            ElevatedButton.icon(
+              onPressed: _showSavedData,
+              icon: const Icon(Icons.storage),
+              label: const Text('Voir données sauvegardées'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+            ),
           ],
         ),
         actions: [
@@ -201,10 +264,62 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
+  // Nouvelle méthode pour afficher les données sauvegardées
+  Future<void> _showSavedData() async {
+    final transactions = await StorageService.getTransactions();
+    final plaisirs = await StorageService.getPlaisirGoals();
+    final stats = await StorageService.getStatistics();
+    
+    if (!mounted) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('📊 Données sauvegardées'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('💰 Transactions: ${transactions.length}'),
+              Text('🎯 Objectifs: ${plaisirs.length}'),
+              Text('💵 Total revenus: €${stats['totalRevenus']?.toStringAsFixed(2)}'),
+              Text('💸 Total dépenses: €${stats['totalDepenses']?.toStringAsFixed(2)}'),
+              Text('📈 Solde: €${stats['solde']?.toStringAsFixed(2)}'),
+              const SizedBox(height: 16),
+              if (transactions.isNotEmpty) ...[
+                const Text('📝 Dernières transactions:', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                ...transactions.take(3).map((t) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    '• ${t['description']}: €${t['montant']} (${t['isRevenu'] ? 'Revenu' : 'Dépense'})',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                )),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _signInWithGoogle() async {
     try {
       final result = await AuthService.signInWithGoogle();
       if (result != null && mounted) {
+        // Migrer les données locales vers le compte Firebase
+        await StorageService.migrateLocalDataToUser();
+        await StorageService.loadUserData();
+        
         setState(() {
           _isConnected = true;
           _userEmail = result.user?.email;
@@ -216,7 +331,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Bienvenue ${_userName ?? _userEmail} !'),
+            content: Text('Bienvenue ${_userName ?? _userEmail} ! Données synchronisées.'),
             backgroundColor: Colors.green,
           ),
         );
@@ -284,7 +399,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           tooltip: _isConnected ? 'Compte connecté' : 'Se connecter',
         ),
         title: Text(
-          ['Nouvelle dépense', 'Mes Plaisirs', 'Entrées', 'Sorties', 'Analyse'][_selectedIndex],
+          ['Dashboard', 'Mes Plaisirs', 'Salaires', 'Charges', 'Analyse'][_selectedIndex],
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -309,130 +424,237 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       floatingActionButton: (_selectedIndex == 2 || _selectedIndex == 3) ? FloatingActionButton.extended(
         onPressed: () {
           // Tracker l'utilisation du FAB
-          final isEntree = _selectedIndex == 2;
-          AnalyticsService.logFeatureUsed(isEntree ? 'fab_add_income' : 'fab_add_expense');
-          _showQuickAddDialog(context);
+          final isSalaire = _selectedIndex == 2;
+          AnalyticsService.logFeatureUsed(isSalaire ? 'fab_add_salaire' : 'fab_add_charge');
+          _showTransactionDialog(context, isSalaire);
         },
         icon: const Icon(Icons.add),
-        label: Text(_selectedIndex == 2 ? 'Entrée' : 'Sortie'),
+        label: Text(_selectedIndex == 2 ? 'Salaire' : 'Charge'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Theme.of(context).colorScheme.onPrimary,
       ) : null,
     );
   }
 
-  void _showQuickAddDialog(BuildContext context) {
+  void _showTransactionDialog(BuildContext context, bool isSalaire) {
     final descController = TextEditingController();
     final montantController = TextEditingController();
-    final isEntree = _selectedIndex == 2;
+    String selectedCategory = isSalaire ? 'Salaire Net' : 'Logement';
+    DateTime selectedDate = DateTime.now();
+
+    // Catégories prédéfinies
+    final salaireCategories = [
+      'Salaire Net',
+      'Salaire Brut',
+      'Prime',
+      'Bonus',
+      'Freelance',
+      'Investissements',
+      'Autre Revenu',
+    ];
+
+    final chargeCategories = [
+      'Logement',
+      'Transport',
+      'Alimentation',
+      'Santé',
+      'Assurances',
+      'Téléphone/Internet',
+      'Énergie (Électricité/Gaz)',
+      'Impôts',
+      'Éducation',
+      'Loisirs',
+      'Vêtements',
+      'Cadeaux',
+      'Divers',
+    ];
+
+    final categories = isSalaire ? salaireCategories : chargeCategories;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isEntree ? Icons.trending_up : Icons.trending_down,
-              color: isEntree ? Colors.green : Colors.red,
-            ),
-            const SizedBox(width: 8),
-            Text('Ajouter ${isEntree ? 'une entrée' : 'une sortie'}'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: descController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.description),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                isSalaire ? Icons.attach_money : Icons.receipt_long,
+                color: isSalaire ? Colors.green : Colors.orange,
+                size: 28,
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: montantController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Montant',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.euro),
-                suffixText: '€',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
+              const SizedBox(width: 12),
+              Text('Ajouter ${isSalaire ? 'un salaire' : 'une charge'}'),
+            ],
           ),
-          FilledButton(
-            onPressed: () {
-              final desc = descController.text.trim();
-              final montant = montantController.text.trim();
-              
-              if (desc.isNotEmpty && montant.isNotEmpty && double.tryParse(montant) != null) {
-                // Tracker l'utilisation de la fonctionnalité
-                AnalyticsService.logFeatureUsed('quick_add_transaction');
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Description
+                TextField(
+                  controller: descController,
+                  decoration: InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.description),
+                    hintText: isSalaire ? 'Ex: Salaire janvier 2025' : 'Ex: Loyer appartement',
+                  ),
+                ),
+                const SizedBox(height: 16),
                 
-                _saveTransaction(desc, double.parse(montant), isEntree);
-                Navigator.pop(context);
+                // Montant
+                TextField(
+                  controller: montantController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Montant',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.euro),
+                    suffixText: '€',
+                    hintText: isSalaire ? 'Ex: 2500' : 'Ex: 850',
+                  ),
+                ),
+                const SizedBox(height: 16),
                 
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('${isEntree ? 'Entrée' : 'Sortie'} ajoutée avec succès'),
-                      backgroundColor: isEntree ? Colors.green : Colors.orange,
+                // Catégorie
+                DropdownButtonFormField<String>(
+                  value: selectedCategory,
+                  decoration: InputDecoration(
+                    labelText: 'Catégorie',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    prefixIcon: const Icon(Icons.category),
+                  ),
+                  items: categories.map((String category) {
+                    return DropdownMenuItem<String>(
+                      value: category,
+                      child: Text(category),
+                    );
+                  }).toList(),
+                  onChanged: (String? newValue) {
+                    if (newValue != null) {
+                      setState(() {
+                        selectedCategory = newValue;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                
+                // Date
+                InkWell(
+                  onTap: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate,
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (date != null) {
+                      setState(() {
+                        selectedDate = date;
+                      });
+                    }
+                  },
+                  child: InputDecorator(
+                    decoration: InputDecoration(
+                      labelText: 'Date',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      prefixIcon: const Icon(Icons.calendar_today),
                     ),
-                  );
-                }
-              }
-            },
-            child: const Text('Ajouter'),
+                    child: Text(
+                      '${selectedDate.day}/${selectedDate.month}/${selectedDate.year}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final desc = descController.text.trim();
+                final montant = montantController.text.trim();
+                
+                if (desc.isNotEmpty && montant.isNotEmpty && double.tryParse(montant) != null) {
+                  _saveDetailedTransaction(
+                    description: desc,
+                    montant: double.parse(montant),
+                    category: selectedCategory,
+                    isSalaire: isSalaire,
+                    date: selectedDate,
+                  );
+                  Navigator.pop(context);
+                }
+              },
+              icon: const Icon(Icons.save),
+              label: const Text('Enregistrer'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Future<void> _saveTransaction(String description, double montant, bool isEntree) async {
+  Future<void> _saveDetailedTransaction({
+    required String description,
+    required double montant,
+    required String category,
+    required bool isSalaire,
+    required DateTime date,
+  }) async {
     try {
+      print('💾 Sauvegarde ${isSalaire ? 'salaire' : 'charge'}: $description - €$montant');
+      
       await StorageService.addTransaction(
         description: description,
         montant: montant,
-        categorie: isEntree ? 'Revenu' : 'Dépense',
-        isRevenu: isEntree,
+        categorie: category,
+        isRevenu: isSalaire,
+        date: date,
       );
+      
+      // Vérifier la sauvegarde
+      final transactions = await StorageService.getTransactions();
+      final stats = await StorageService.getStatistics();
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${isEntree ? 'Entrée' : 'Sortie'} sauvegardée !'),
-            backgroundColor: Colors.green,
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${isSalaire ? '💰 Salaire' : '💸 Charge'} enregistré !'),
+                Text('€$montant - $category', style: const TextStyle(fontSize: 12)),
+                Text('Solde: €${stats['solde']?.toStringAsFixed(2)}', 
+                     style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            backgroundColor: isSalaire ? Colors.green : Colors.orange,
+            duration: const Duration(seconds: 4),
             action: SnackBarAction(
-              label: 'Voir',
+              label: 'Voir tout',
               textColor: Colors.white,
-              onPressed: () {
-                setState(() {
-                  _selectedIndex = isEntree ? 2 : 3;
-                });
-                _pageController.animateToPage(
-                  isEntree ? 2 : 3,
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              },
+              onPressed: _showSavedData,
             ),
           ),
         );
       }
+      
+      print('📊 Nouveau solde: €${stats['solde']?.toStringAsFixed(2)}');
+      
     } catch (e) {
+      print('❌ Erreur sauvegarde: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur: $e'),
+            content: Text('Erreur lors de la sauvegarde: $e'),
             backgroundColor: Colors.red,
           ),
         );

@@ -153,6 +153,18 @@ class AnalyticsService {
     print('⏱️ Événement: Engagement utilisateur ($action: ${timeSpent}s)');
   }
 
+  // Méthode générique pour envoyer des événements personnalisés
+  static Future<void> logEvent({
+    required String name,
+    Map<String, Object>? parameters,
+  }) async {
+    await _analytics.logEvent(
+      name: name,
+      parameters: parameters,
+    );
+    print('📊 Événement personnalisé: $name');
+  }
+
   // Événements spécifiques pour chaque section de l'app
   static Future<void> logHomeVisit() async {
     await _analytics.logEvent(

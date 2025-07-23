@@ -7,35 +7,64 @@ class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   Future<void> _handleStart(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    final bool? isConnected = prefs.getBool('isConnected');
+    // Vérifier si l'utilisateur est connecté à Firebase
+    final currentUser = AuthService.currentUser;
 
     if (!context.mounted) return;
 
-    if (isConnected == true) {
+    if (currentUser != null) {
+      // Utilisateur connecté, aller au menu principal
       _goToMainMenu(context);
     } else {
-      _showLoginDialog(context);
+      // Utilisateur non connecté, forcer la connexion
+      _showLoginRequiredDialog(context);
     }
   }
 
-  void _showLoginDialog(BuildContext context) {
+  void _showLoginRequiredDialog(BuildContext context) {
     showDialog(
       context: context,
+      barrierDismissible: false, // L'utilisateur ne peut pas fermer sans se connecter
       builder: (ctx) => AlertDialog(
-        title: const Text('Connexion requise'),
-        content: const Text('Souhaitez-vous vous connecter ou continuer sans compte ?'),
+        title: Row(
+          children: [
+            Icon(Icons.security, color: Theme.of(context).primaryColor),
+            const SizedBox(width: 12),
+            const Text('Connexion requise'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.account_circle_outlined,
+              size: 64,
+              color: Colors.grey,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Cette application nécessite une connexion Google pour fonctionner.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Vos données seront sécurisées et synchronisées.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ],
+        ),
         actions: [
-          TextButton(
+          FilledButton.icon(
             onPressed: () async {
-              Navigator.of(ctx).pop();
-              
-              // Utiliser le nouveau service d'authentification
+              // Tenter la connexion Google
               final result = await AuthService.signInWithGoogle();
               
               if (!context.mounted) return;
               
               if (result != null) {
+                Navigator.of(ctx).pop(); // Fermer la dialog
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('Bienvenue ${result.user?.displayName ?? result.user?.email} !'),
@@ -46,26 +75,14 @@ class HomeScreen extends StatelessWidget {
               } else {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('La connexion a échoué'),
+                    content: Text('Connexion échouée. Veuillez réessayer.'),
                     backgroundColor: Colors.red,
                   ),
                 );
               }
             },
-            child: const Text('Se connecter avec Google'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.setBool('isConnected', false);
-              if (ctx.mounted) {
-                Navigator.of(ctx).pop();
-              }
-              if (context.mounted) {
-                _goToMainMenu(context);
-              }
-            },
-            child: const Text('Continuer en local'),
+            icon: const Icon(Icons.login),
+            label: const Text('Se connecter avec Google'),
           ),
         ],
       ),
@@ -83,40 +100,114 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bienvenue'),
-        centerTitle: true,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.account_balance_wallet,
-              size: 80,
-              color: Theme.of(context).primaryColor,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Gestion Budget Pro',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Gérez vos finances en toute simplicité',
-              style: Theme.of(context).textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 40),
-            ElevatedButton.icon(
-              onPressed: () => _handleStart(context),
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('Démarrer'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Theme.of(context).primaryColor.withOpacity(0.8),
+              Theme.of(context).primaryColor.withOpacity(0.6),
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Logo de l'app
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.account_balance_wallet,
+                  size: 60,
+                  color: Theme.of(context).primaryColor,
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 40),
+              
+              // Titre
+              Text(
+                'Gestion Budget Pro',
+                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              
+              // Sous-titre
+              Text(
+                'Gérez vos finances en toute simplicité',
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: Colors.white.withOpacity(0.9),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 60),
+              
+              // Bouton de démarrage
+              ElevatedButton.icon(
+                onPressed: () => _handleStart(context),
+                icon: const Icon(Icons.rocket_launch),
+                label: const Text('Commencer'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Theme.of(context).primaryColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                  textStyle: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 40),
+              
+              // Informations de sécurité
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 40),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.security,
+                      color: Colors.white.withOpacity(0.8),
+                      size: 24,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Vos données sont sécurisées et synchronisées avec votre compte Google',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

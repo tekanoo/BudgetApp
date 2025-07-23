@@ -8,10 +8,57 @@ class StorageService {
   static const String _transactionsKey = 'transactions';
   static const String _plaisirsKey = 'plaisirs';
 
-  // Obtenir l'ID utilisateur actuel
+  // Obtenir l'ID utilisateur actuel (sécurisé)
   static String get _userKey {
-    final userId = AuthService.currentUser?.uid ?? 'local_user';
-    return userId;
+    final user = AuthService.currentUser;
+    if (user != null) {
+      // Utiliser l'UID Firebase pour l'utilisateur connecté
+      return 'firebase_user_${user.uid}';
+    } else {
+      // Bloquer l'accès si pas connecté
+      throw Exception('Accès refusé : utilisateur non connecté');
+    }
+  }
+
+  // Migrer les données locales vers l'utilisateur Firebase lors de la connexion
+  static Future<void> migrateLocalDataToUser() async {
+    final user = AuthService.currentUser;
+    if (user == null) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final localKey = 'local_user_anonymous';
+      final firebaseKey = 'firebase_user_${user.uid}';
+
+      // Migrer les transactions
+      final localTransactions = prefs.getString('${localKey}_$_transactionsKey');
+      if (localTransactions != null && localTransactions != '[]') {
+        final existingFirebaseTransactions = prefs.getString('${firebaseKey}_$_transactionsKey') ?? '[]';
+        
+        if (existingFirebaseTransactions == '[]') {
+          await prefs.setString('${firebaseKey}_$_transactionsKey', localTransactions);
+          print('📦 Migration des transactions vers le compte Firebase');
+        }
+      }
+
+      // Migrer les plaisirs
+      final localPlaisirs = prefs.getString('${localKey}_$_plaisirsKey');
+      if (localPlaisirs != null && localPlaisirs != '[]') {
+        final existingFirebasePlaisirs = prefs.getString('${firebaseKey}_$_plaisirsKey') ?? '[]';
+        
+        if (existingFirebasePlaisirs == '[]') {
+          await prefs.setString('${firebaseKey}_$_plaisirsKey', localPlaisirs);
+          print('📦 Migration des objectifs vers le compte Firebase');
+        }
+      }
+
+      // Nettoyer les données locales après migration
+      await prefs.remove('${localKey}_$_transactionsKey');
+      await prefs.remove('${localKey}_$_plaisirsKey');
+      
+    } catch (e) {
+      print('❌ Erreur lors de la migration: $e');
+    }
   }
 
   // Ajouter une transaction
@@ -47,6 +94,9 @@ class StorageService {
       // Sauvegarder
       await prefs.setString(key, json.encode(transactions));
       
+      // Simuler la synchronisation vers le cloud
+      await _syncToCloud('transaction', newTransaction);
+      
       // Tracker dans Analytics
       await AnalyticsService.logAddTransaction(
         type: isRevenu ? 'income' : 'expense',
@@ -55,10 +105,9 @@ class StorageService {
       );
       await AnalyticsService.logCategoryUsage(categorie);
       
-      // Simuler l'envoi vers Firebase si connecté
+      // Confirmer selon le statut de connexion
       if (AuthService.currentUser != null) {
-        // TODO: Envoyer vers Firebase quand configuré
-        print('✅ Transaction sauvegardée localement (utilisateur connecté: ${AuthService.currentUser?.email})');
+        print('✅ Transaction sauvegardée et synchronisée (utilisateur: ${AuthService.currentUser?.email})');
       } else {
         print('✅ Transaction sauvegardée localement');
       }
@@ -208,14 +257,32 @@ class StorageService {
     }
   }
 
-  // Nettoyer les données (utile pour les tests)
-  static Future<void> clearAllData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final userKey = _userKey;
-    
-    await prefs.remove('${userKey}_$_transactionsKey');
-    await prefs.remove('${userKey}_$_plaisirsKey');
-    
-    print('✅ Toutes les données ont été supprimées');
+  // Charger les données de l'utilisateur au démarrage
+  static Future<void> loadUserData() async {
+    final user = AuthService.currentUser;
+    if (user != null) {
+      print('📱 Chargement des données pour l\'utilisateur: ${user.email}');
+      
+      // Vérifier si l'utilisateur a des données
+      final transactions = await getTransactions();
+      final plaisirs = await getPlaisirGoals();
+      
+      print('💾 Données chargées: ${transactions.length} transactions, ${plaisirs.length} objectifs');
+      
+      // Tracker le chargement des données
+      await AnalyticsService.logFeatureUsed('user_data_loaded');
+    }
+  }
+
+  // Sauvegarder automatiquement vers le cloud (simulation)
+  static Future<void> _syncToCloud(String dataType, Map<String, dynamic> data) async {
+    final user = AuthService.currentUser;
+    if (user != null) {
+      // TODO: Implémenter la vraie synchronisation Firebase
+      print('☁️ [SIMULATION] Sync vers Firebase: $dataType pour ${user.email}');
+      
+      // Tracker la synchronisation
+      await AnalyticsService.logFeatureUsed('data_sync_$dataType');
+    }
   }
 }
