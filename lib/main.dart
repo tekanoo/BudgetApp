@@ -5,12 +5,12 @@ import 'screens/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialisation Firebase
   try {
     await Firebase.initializeApp();
+    print('Firebase initialisé avec succès');
   } catch (e) {
-    // Log l'erreur d'initialisation Firebase
-    debugPrint('Erreur initialisation Firebase: $e');
+    print('Erreur initialisation Firebase: $e');
+    // L'app peut quand même démarrer en mode local
   }
   
   runApp(const BudgetApp());

@@ -12,7 +12,20 @@
           "package_name": "com.example.budget_app"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "320883807207-j8njfjigf07gl3e54b807hc0k8079pkn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.budget_app",
+            "certificate_hash": "5dd1da68ac3288d233c080e7c3059a3ea242750c"
+          }
+        },
+        {
+          "client_id": "320883807207-lciefpmpnte8u0o1cvqtd8i5p6fl4v44.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBIU3gJwizb5mc3ida_nmVLk2_-VhJ17kc"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "320883807207-lciefpmpnte8u0o1cvqtd8i5p6fl4v44.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
