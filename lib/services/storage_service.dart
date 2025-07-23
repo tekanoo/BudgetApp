@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'auth_service.dart';
+import 'analytics_service.dart';
 
 class StorageService {
   // Clés pour SharedPreferences
@@ -45,6 +46,14 @@ class StorageService {
       
       // Sauvegarder
       await prefs.setString(key, json.encode(transactions));
+      
+      // Tracker dans Analytics
+      await AnalyticsService.logAddTransaction(
+        type: isRevenu ? 'income' : 'expense',
+        amount: montant,
+        category: categorie,
+      );
+      await AnalyticsService.logCategoryUsage(categorie);
       
       // Simuler l'envoi vers Firebase si connecté
       if (AuthService.currentUser != null) {
@@ -112,6 +121,12 @@ class StorageService {
       
       // Sauvegarder
       await prefs.setString(key, json.encode(plaisirs));
+      
+      // Tracker dans Analytics
+      await AnalyticsService.logAddGoal(
+        goalName: nom,
+        targetAmount: montantCible,
+      );
       
       print('✅ Objectif plaisir ajouté avec succès');
       

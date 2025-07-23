@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'services/analytics_service.dart';
 import 'screens/home_screen.dart';
 
 void main() async {
@@ -11,6 +12,10 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     print('🔥 Firebase initialisé avec succès pour le Web');
+    
+    // Initialiser Analytics
+    await AnalyticsService.initialize();
+    
   } catch (e) {
     print('❌ Erreur initialisation Firebase: $e');
   }

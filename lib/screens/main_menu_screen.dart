@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/storage_service.dart';
+import '../services/analytics_service.dart';
 import 'home_tab.dart';
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
@@ -62,6 +63,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void initState() {
     super.initState();
     _loadConnectionStatus();
+    
+    // Tracker l'ouverture de l'app
+    AnalyticsService.logScreenView('MainMenu');
+    AnalyticsService.logFeatureUsed('app_opened');
   }
 
   Future<void> _loadConnectionStatus() async {
@@ -91,6 +96,35 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
+    
+    // Tracker la navigation avec des événements spécifiques
+    _trackScreenVisit(index);
+  }
+
+  void _trackScreenVisit(int index) {
+    final screenNames = ['Home', 'Plaisirs', 'Entrees', 'Sorties', 'Analyse'];
+    
+    // Événement général
+    AnalyticsService.logScreenView(screenNames[index]);
+    
+    // Événements spécifiques selon l'onglet
+    switch (index) {
+      case 0:
+        AnalyticsService.logHomeVisit();
+        break;
+      case 1:
+        AnalyticsService.logPlaisirsVisit();
+        break;
+      case 2:
+        AnalyticsService.logEntreesVisit();
+        break;
+      case 3:
+        AnalyticsService.logSortiesVisit();
+        break;
+      case 4:
+        AnalyticsService.logAnalyseVisit();
+        break;
+    }
   }
 
   void _showAccountDialog() {
@@ -176,6 +210,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           _userEmail = result.user?.email;
           _userName = result.user?.displayName;
         });
+        
+        // Tracker la conversion
+        await AnalyticsService.logConversion('user_signup');
         
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -270,7 +307,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
       ),
       floatingActionButton: (_selectedIndex == 2 || _selectedIndex == 3) ? FloatingActionButton.extended(
-        onPressed: () => _showQuickAddDialog(context),
+        onPressed: () {
+          // Tracker l'utilisation du FAB
+          final isEntree = _selectedIndex == 2;
+          AnalyticsService.logFeatureUsed(isEntree ? 'fab_add_income' : 'fab_add_expense');
+          _showQuickAddDialog(context);
+        },
         icon: const Icon(Icons.add),
         label: Text(_selectedIndex == 2 ? 'Entrée' : 'Sortie'),
         backgroundColor: Theme.of(context).colorScheme.primary,
@@ -332,6 +374,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               final montant = montantController.text.trim();
               
               if (desc.isNotEmpty && montant.isNotEmpty && double.tryParse(montant) != null) {
+                // Tracker l'utilisation de la fonctionnalité
+                AnalyticsService.logFeatureUsed('quick_add_transaction');
+                
                 _saveTransaction(desc, double.parse(montant), isEntree);
                 Navigator.pop(context);
                 

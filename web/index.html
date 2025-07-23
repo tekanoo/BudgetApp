@@ -83,6 +83,12 @@
   <script src="https://apis.google.com/js/platform.js" async defer></script>
 
   <script>
+    // Activer le mode debug pour Analytics
+    window.gtag = window.gtag || function(){(window.gtag.q = window.gtag.q || []).push(arguments);};
+    window.gtag('config', 'GA_MEASUREMENT_ID', {
+      debug_mode: true
+    });
+    
     window.addEventListener('load', function(ev) {
       // Download main.dart.js
       _flutter.loader.loadEntrypoint({
