@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 import 'main_menu_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -29,22 +29,30 @@ class HomeScreen extends StatelessWidget {
           TextButton(
             onPressed: () async {
               Navigator.of(ctx).pop();
-              final success = await _signInWithGoogle();
+              
+              // Utiliser le nouveau service d'authentification
+              final result = await AuthService.signInWithGoogle();
+              
               if (!context.mounted) return;
               
-              if (success) {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setBool('isConnected', true);
-                if (context.mounted) {
-                  _goToMainMenu(context);
-                }
+              if (result != null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Bienvenue ${result.user?.displayName ?? result.user?.email} !'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+                _goToMainMenu(context);
               } else {
-                if (context.mounted) {
-                  _showError(context);
-                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('La connexion a échoué'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
               }
             },
-            child: const Text('Se connecter'),
+            child: const Text('Se connecter avec Google'),
           ),
           TextButton(
             onPressed: () async {
@@ -61,22 +69,6 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-
-  Future<bool> _signInWithGoogle() async {
-    try {
-      final GoogleSignInAccount? account = await GoogleSignIn().signIn();
-      return account != null;
-    } catch (e) {
-      return false;
-    }
-  }
-
-  void _showError(BuildContext context) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("La connexion a échoué.")),
     );
   }
 

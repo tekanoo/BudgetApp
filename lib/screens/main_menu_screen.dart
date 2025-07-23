@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_sign_in/google_sign_in.dart';
+import '../services/auth_service.dart';
+import '../services/storage_service.dart';
 import 'home_tab.dart';
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
@@ -19,6 +20,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final PageController _pageController = PageController();
   bool _isConnected = false;
   String? _userEmail;
+  String? _userName;
 
   final List<Widget> _tabs = const [
     HomeTab(),
@@ -66,11 +68,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     final prefs = await SharedPreferences.getInstance();
     final isConnected = prefs.getBool('isConnected') ?? false;
     final userEmail = prefs.getString('userEmail');
+    final userName = prefs.getString('userName');
+    
+    // Vérifier aussi Firebase Auth
+    final currentUser = AuthService.currentUser;
     
     if (mounted) {
       setState(() {
-        _isConnected = isConnected;
-        _userEmail = userEmail;
+        _isConnected = isConnected || currentUser != null;
+        _userEmail = userEmail ?? currentUser?.email;
+        _userName = userName ?? currentUser?.displayName;
       });
     }
   }
@@ -114,14 +121,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           children: [
             if (_isConnected && _userEmail != null) ...[
               Text('Email: $_userEmail'),
+              if (_userName != null) Text('Nom: $_userName'),
               const SizedBox(height: 8),
               const Text(
-                'Vos données sont synchronisées de manière sécurisée.',
+                'Vos données sont synchronisées avec Firebase.',
                 style: TextStyle(color: Colors.green),
               ),
             ] else ...[
               const Text(
-                'Connectez-vous pour synchroniser vos données de manière sécurisée.',
+                'Connectez-vous pour synchroniser vos données avec Firebase.',
               ),
             ],
           ],
@@ -161,25 +169,20 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   Future<void> _signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? account = await GoogleSignIn().signIn();
-      if (account != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isConnected', true);
-        await prefs.setString('userEmail', account.email);
+      final result = await AuthService.signInWithGoogle();
+      if (result != null && mounted) {
+        setState(() {
+          _isConnected = true;
+          _userEmail = result.user?.email;
+          _userName = result.user?.displayName;
+        });
         
-        if (mounted) {
-          setState(() {
-            _isConnected = true;
-            _userEmail = account.email;
-          });
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Connexion réussie !'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Bienvenue ${_userName ?? _userEmail} !'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -195,15 +198,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   Future<void> _signOut() async {
     try {
-      await GoogleSignIn().signOut();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isConnected', false);
-      await prefs.remove('userEmail');
-      
+      await AuthService.signOut();
       if (mounted) {
         setState(() {
           _isConnected = false;
           _userEmail = null;
+          _userName = null;
         });
         
         ScaffoldMessenger.of(context).showSnackBar(
@@ -353,13 +353,45 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Future<void> _saveTransaction(String description, double montant, bool isEntree) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = isEntree ? 'entrees' : 'sorties';
-    final existing = prefs.getStringList(key) ?? [];
-    
-    final transaction = {'description': description, 'montant': montant.toString()};
-    existing.add(transaction.toString());
-    
-    await prefs.setStringList(key, existing);
+    try {
+      await StorageService.addTransaction(
+        description: description,
+        montant: montant,
+        categorie: isEntree ? 'Revenu' : 'Dépense',
+        isRevenu: isEntree,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${isEntree ? 'Entrée' : 'Sortie'} sauvegardée !'),
+            backgroundColor: Colors.green,
+            action: SnackBarAction(
+              label: 'Voir',
+              textColor: Colors.white,
+              onPressed: () {
+                setState(() {
+                  _selectedIndex = isEntree ? 2 : 3;
+                });
+                _pageController.animateToPage(
+                  isEntree ? 2 : 3,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 }
