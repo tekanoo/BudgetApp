@@ -10,7 +10,11 @@ class FirebaseService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
+  
+  // GoogleSignIn initialisé directement
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    clientId: kIsWeb ? '570468917791-5op36av9boj6q6qcb3nmlf5a3bk0k7ub.apps.googleusercontent.com' : null,
+  );
 
   // Stream pour écouter les changements d'authentification
   Stream<User?> get authStateChanges => _auth.authStateChanges();
@@ -32,11 +36,16 @@ class FirebaseService {
 
       // Déclencher le flow d'authentification
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      
       if (googleUser == null) {
         if (kDebugMode) {
-          print('❌ Connexion Google annulée');
+          print('❌ Connexion Google annulée par l\'utilisateur');
         }
         return null;
+      }
+
+      if (kDebugMode) {
+        print('✅ Utilisateur Google sélectionné: ${googleUser.email}');
       }
 
       // Obtenir les détails d'authentification
@@ -48,17 +57,24 @@ class FirebaseService {
         idToken: googleAuth.idToken,
       );
 
+      if (kDebugMode) {
+        print('🔑 Credentials créés, connexion à Firebase...');
+      }
+
       // Se connecter à Firebase
       final UserCredential userCredential = await _auth.signInWithCredential(credential);
       
       if (kDebugMode) {
-        print('✅ Connexion réussie: ${userCredential.user?.displayName}');
+        print('✅ Connexion Firebase réussie: ${userCredential.user?.displayName}');
       }
 
       // Créer/mettre à jour le profil utilisateur
-      await _createUserProfile(userCredential.user!);
+      if (userCredential.user != null) {
+        await _createUserProfile(userCredential.user!);
+      }
       
       return userCredential;
+      
     } catch (e) {
       if (kDebugMode) {
         print('❌ Erreur connexion Google: $e');
@@ -70,8 +86,10 @@ class FirebaseService {
   // Déconnexion
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
-      await _auth.signOut();
+      await Future.wait([
+        _googleSignIn.signOut(),
+        _auth.signOut(),
+      ]);
       if (kDebugMode) {
         print('✅ Déconnexion réussie');
       }
@@ -92,9 +110,9 @@ class FirebaseService {
       if (!docSnapshot.exists) {
         await userDoc.set({
           'uid': user.uid,
-          'email': user.email,
-          'displayName': user.displayName,
-          'photoURL': user.photoURL,
+          'email': user.email ?? '',
+          'displayName': user.displayName ?? '',
+          'photoURL': user.photoURL ?? '',
           'createdAt': FieldValue.serverTimestamp(),
           'lastLoginAt': FieldValue.serverTimestamp(),
         });
@@ -106,11 +124,15 @@ class FirebaseService {
         await userDoc.update({
           'lastLoginAt': FieldValue.serverTimestamp(),
         });
+        if (kDebugMode) {
+          print('✅ Profil utilisateur mis à jour');
+        }
       }
     } catch (e) {
       if (kDebugMode) {
         print('❌ Erreur création profil: $e');
       }
+      // Ne pas faire échouer la connexion pour une erreur de profil
     }
   }
 

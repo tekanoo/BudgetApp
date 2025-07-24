@@ -70,11 +70,12 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyDo6YI-dW7tp4PfoBFNwXDuMy1zya1aLJ0',
-    appId: '1:570468917791:ios:REMPLACER_PAR_IOS_APP_ID',
+    appId: '1:570468917791:web:dc27ad5b146b4629e96b2a',
     messagingSenderId: '570468917791',
     projectId: 'budget-app-pro',
+    authDomain: 'budget-app-pro.firebaseapp.com',
     storageBucket: 'budget-app-pro.firebasestorage.app',
-    iosBundleId: 'com.example.budgetApp',
+    measurementId: 'G-BF88P0J6TJ',
   );
 
   static const FirebaseOptions windows = FirebaseOptions(
@@ -84,5 +85,6 @@ class DefaultFirebaseOptions {
     projectId: 'budget-app-pro',
     authDomain: 'budget-app-pro.firebaseapp.com',
     storageBucket: 'budget-app-pro.firebasestorage.app',
+    measurementId: 'G-BF88P0J6TJ',
   );
 }
