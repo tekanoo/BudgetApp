@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/budget_data_service.dart';
 
 class PlaisirsTab extends StatefulWidget {
   const PlaisirsTab({super.key});
@@ -9,7 +9,8 @@ class PlaisirsTab extends StatefulWidget {
 }
 
 class _PlaisirsTabState extends State<PlaisirsTab> {
-  List<Map<String, String>> plaisirs = [];
+  final BudgetDataService _dataService = BudgetDataService();
+  List<Map<String, dynamic>> plaisirs = [];
   bool isLoading = true;
   String _sortBy = 'date'; // 'date', 'amount', 'tag'
   bool _ascending = false;
@@ -21,30 +22,30 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   }
 
   Future<void> _loadPlaisirs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('plaisirs') ?? [];
-    final parsed = list.map((s) => _parseStringToMap(s)).toList();
-    
     setState(() {
-      plaisirs = parsed;
-      isLoading = false;
+      isLoading = true;
     });
-    _sortPlaisirs();
-  }
 
-  Map<String, String> _parseStringToMap(String s) {
-    final clean = s.replaceAll(RegExp(r'[{}]'), '');
-    final parts = clean.split(',');
-    final map = <String, String>{};
-    for (var part in parts) {
-      final kv = part.split(':');
-      if (kv.length >= 2) {
-        final key = kv[0].trim();
-        final value = kv.sublist(1).join(':').trim();
-        map[key] = value;
+    try {
+      final data = await _dataService.getPlaisirs();
+      setState(() {
+        plaisirs = data;
+        isLoading = false;
+      });
+      _sortPlaisirs();
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de chargement: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
-    return map;
   }
 
   void _sortPlaisirs() {
@@ -58,12 +59,14 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             comparison = dateA.compareTo(dateB);
             break;
           case 'amount':
-            final amountA = double.tryParse(a['amount'] ?? '0') ?? 0;
-            final amountB = double.tryParse(b['amount'] ?? '0') ?? 0;
+            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
+            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
             comparison = amountA.compareTo(amountB);
             break;
           case 'tag':
-            comparison = (a['tag'] ?? '').compareTo(b['tag'] ?? '');
+            final tagA = a['tag'] as String? ?? '';
+            final tagB = b['tag'] as String? ?? '';
+            comparison = tagA.compareTo(tagB);
             break;
         }
         return _ascending ? comparison : -comparison;
@@ -74,7 +77,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   double get totalPlaisirs {
     double total = 0;
     for (var plaisir in plaisirs) {
-      total += double.tryParse(plaisir['amount'] ?? '0') ?? 0;
+      total += (plaisir['amount'] as num?)?.toDouble() ?? 0;
     }
     return total;
   }
@@ -82,8 +85,8 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   Map<String, double> get totalsByTag {
     final Map<String, double> totals = {};
     for (var plaisir in plaisirs) {
-      final tag = plaisir['tag'] ?? 'Sans catégorie';
-      final amount = double.tryParse(plaisir['amount'] ?? '0') ?? 0;
+      final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
+      final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0;
       totals[tag] = (totals[tag] ?? 0) + amount;
     }
     return totals;
@@ -91,8 +94,12 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
   Future<void> _editPlaisir(int index) async {
     final plaisir = plaisirs[index];
-    final amountController = TextEditingController(text: plaisir['amount']);
-    final tagController = TextEditingController(text: plaisir['tag']);
+    final amountController = TextEditingController(
+      text: (plaisir['amount'] as num?)?.toString() ?? ''
+    );
+    final tagController = TextEditingController(
+      text: plaisir['tag'] as String? ?? ''
+    );
     DateTime? selectedDate = DateTime.tryParse(plaisir['date'] ?? '');
 
     final result = await showDialog<Map<String, dynamic>>(
@@ -173,14 +180,14 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             ),
             FilledButton(
               onPressed: () {
-                final amount = amountController.text.trim();
+                final amount = double.tryParse(amountController.text.trim());
                 final tag = tagController.text.trim();
                 
-                if (amount.isNotEmpty && double.tryParse(amount) != null && selectedDate != null) {
+                if (amount != null && amount > 0 && selectedDate != null) {
                   Navigator.pop(context, {
                     'amount': amount,
                     'tag': tag.isEmpty ? 'Sans catégorie' : tag,
-                    'date': selectedDate!.toIso8601String(),
+                    'date': selectedDate,
                   });
                 }
               },
@@ -197,29 +204,32 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   }
 
   Future<void> _updatePlaisir(int index, Map<String, dynamic> newData) async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('plaisirs') ?? [];
-    
-    // Créer la nouvelle transaction
-    final updatedTransaction = {
-      'amount': newData['amount'],
-      'tag': newData['tag'],
-      'date': newData['date'],
-      'timestamp': plaisirs[index]['timestamp'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-    };
-    
-    list[index] = updatedTransaction.toString();
-    await prefs.setStringList('plaisirs', list);
-    
-    _loadPlaisirs();
-    
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Dépense modifiée avec succès'),
-        backgroundColor: Colors.blue,
-      ),
-    );
+    try {
+      await _dataService.updatePlaisir(
+        index: index,
+        amount: newData['amount'],
+        tag: newData['tag'],
+        date: newData['date'],
+      );
+      
+      await _loadPlaisirs(); // Recharger les données
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Dépense modifiée avec succès'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la modification: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _deletePlaisir(int index) async {
@@ -233,28 +243,36 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Annuler'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Supprimer'),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      final prefs = await SharedPreferences.getInstance();
-      final list = prefs.getStringList('plaisirs') ?? [];
-      list.removeAt(index);
-      await prefs.setStringList('plaisirs', list);
-      _loadPlaisirs();
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Dépense supprimée'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      try {
+        await _dataService.deletePlaisir(index);
+        await _loadPlaisirs(); // Recharger les données
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Dépense supprimée'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la suppression: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -262,216 +280,228 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Chargement des dépenses...'),
+            ],
+          ),
+        ),
       );
     }
 
     return Scaffold(
-      body: plaisirs.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      body: RefreshIndicator(
+        onRefresh: _loadPlaisirs,
+        child: plaisirs.isEmpty
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey),
+                    SizedBox(height: 20),
+                    Text(
+                      'Aucune dépense plaisir',
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Ajoutez votre première dépense dans l\'onglet Dashboard',
+                      style: TextStyle(color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              )
+            : Column(
                 children: [
-                  Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey),
-                  SizedBox(height: 20),
-                  Text(
-                    'Aucune dépense plaisir',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  // Résumé en haut
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.purple.shade400, Colors.pink.shade400],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.purple.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.celebration,
+                              color: Colors.white,
+                              size: 40,
+                            ),
+                            const Spacer(),
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.sort, color: Colors.white),
+                              onSelected: (value) {
+                                if (value == _sortBy) {
+                                  setState(() {
+                                    _ascending = !_ascending;
+                                  });
+                                } else {
+                                  setState(() {
+                                    _sortBy = value;
+                                    _ascending = false;
+                                  });
+                                }
+                                _sortPlaisirs();
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'date',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par date'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'amount',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par montant'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'tag',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'tag' ? Icons.check : Icons.tag),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par catégorie'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Total Plaisirs',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          '${totalPlaisirs.toStringAsFixed(2)} €',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${plaisirs.length} dépense${plaisirs.length > 1 ? 's' : ''}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  SizedBox(height: 10),
-                  Text(
-                    'Ajoutez votre première dépense dans l\'onglet Home',
-                    style: TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center,
+
+                  // Liste des dépenses
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: plaisirs.length,
+                      itemBuilder: (context, index) {
+                        final plaisir = plaisirs[index];
+                        final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0;
+                        final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
+                        final dateStr = plaisir['date'] as String? ?? '';
+                        final date = DateTime.tryParse(dateStr);
+                        
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.purple.shade100,
+                              child: Text(
+                                tag.isNotEmpty ? tag[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  color: Colors.purple.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              '${amount.toStringAsFixed(2)} €',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  tag,
+                                  style: TextStyle(
+                                    color: Colors.purple.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                if (date != null)
+                                  Text(
+                                    '${date.day}/${date.month}/${date.year}',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () => _editPlaisir(index),
+                                  tooltip: 'Modifier',
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _deletePlaisir(index),
+                                  tooltip: 'Supprimer',
+                                ),
+                              ],
+                            ),
+                            onTap: () => _editPlaisir(index),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
-            )
-          : Column(
-              children: [
-                // Résumé en haut
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.purple.shade400, Colors.pink.shade400],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purple.withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.celebration,
-                            color: Colors.white,
-                            size: 40,
-                          ),
-                          const Spacer(),
-                          PopupMenuButton<String>(
-                            icon: const Icon(Icons.sort, color: Colors.white),
-                            onSelected: (value) {
-                              if (value == _sortBy) {
-                                setState(() {
-                                  _ascending = !_ascending;
-                                });
-                              } else {
-                                setState(() {
-                                  _sortBy = value;
-                                  _ascending = false;
-                                });
-                              }
-                              _sortPlaisirs();
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'date',
-                                child: Row(
-                                  children: [
-                                    Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
-                                    const SizedBox(width: 8),
-                                    const Text('Trier par date'),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'amount',
-                                child: Row(
-                                  children: [
-                                    Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
-                                    const SizedBox(width: 8),
-                                    const Text('Trier par montant'),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'tag',
-                                child: Row(
-                                  children: [
-                                    Icon(_sortBy == 'tag' ? Icons.check : Icons.tag),
-                                    const SizedBox(width: 8),
-                                    const Text('Trier par catégorie'),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Total Plaisirs',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        '${totalPlaisirs.toStringAsFixed(2)} €',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '${plaisirs.length} dépense${plaisirs.length > 1 ? 's' : ''}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Liste des dépenses
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: plaisirs.length,
-                    itemBuilder: (context, index) {
-                      final plaisir = plaisirs[index];
-                      final amount = double.tryParse(plaisir['amount'] ?? '0') ?? 0;
-                      final tag = plaisir['tag'] ?? 'Sans catégorie';
-                      final dateStr = plaisir['date'] ?? '';
-                      final date = DateTime.tryParse(dateStr);
-                      
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.purple.shade100,
-                            child: Text(
-                              tag.isNotEmpty ? tag[0].toUpperCase() : '?',
-                              style: TextStyle(
-                                color: Colors.purple.shade700,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          title: Text(
-                            '${amount.toStringAsFixed(2)} €',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                tag,
-                                style: TextStyle(
-                                  color: Colors.purple.shade600,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              if (date != null)
-                                Text(
-                                  '${date.day}/${date.month}/${date.year}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () => _editPlaisir(index),
-                                tooltip: 'Modifier',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _deletePlaisir(index),
-                                tooltip: 'Supprimer',
-                              ),
-                            ],
-                          ),
-                          onTap: () => _editPlaisir(index),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+      ),
     );
   }
 }

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../services/storage_service.dart';
+import '../services/budget_data_service.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -10,7 +9,7 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  final StorageService _storage = StorageService();
+  final BudgetDataService _dataService = BudgetDataService();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _tagController = TextEditingController();
   DateTime? _selectedDate;
@@ -22,7 +21,6 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
-    // Pré-remplir avec la date du jour
     _selectedDate = DateTime.now();
     _loadAvailableTags();
     _tagController.addListener(_onTagTextChanged);
@@ -37,12 +35,22 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadAvailableTags() async {
-    final prefs = await SharedPreferences.getInstance();
-    final tags = prefs.getStringList('available_tags') ?? [];
-    setState(() {
-      _availableTags = tags;
-      _filteredTags = tags;
-    });
+    try {
+      final tags = await _dataService.getTags();
+      setState(() {
+        _availableTags = tags;
+        _filteredTags = tags;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur chargement tags: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   void _onTagTextChanged() {
@@ -85,34 +93,25 @@ class _HomeTabState extends State<HomeTab> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      
-      // Créer la transaction
-      final transaction = {
-        'amount': amount.toString(),
-        'tag': _tagController.text.trim().isEmpty ? 'Sans catégorie' : _tagController.text.trim(),
-        'date': _selectedDate!.toIso8601String(),
-        'timestamp': DateTime.now().millisecondsSinceEpoch.toString(),
-      };
+      final tag = _tagController.text.trim().isEmpty 
+          ? 'Sans catégorie' 
+          : _tagController.text.trim();
 
-      // Sauvegarder la transaction dans "plaisirs"
-      final plaisirs = prefs.getStringList('plaisirs') ?? [];
-      plaisirs.add(transaction.toString());
-      await prefs.setStringList('plaisirs', plaisirs);
+      await _dataService.addPlaisir(
+        amount: amount,
+        tag: tag,
+        date: _selectedDate,
+      );
 
-      // Sauvegarder le tag s'il est nouveau
-      final tagText = _tagController.text.trim();
-      if (tagText.isNotEmpty && !_availableTags.contains(tagText)) {
-        _availableTags.add(tagText);
-        await prefs.setStringList('available_tags', _availableTags);
-      }
-
-      // Réinitialiser le formulaire mais garder la date du jour
+      // Réinitialiser le formulaire
       _amountController.clear();
       _tagController.clear();
       setState(() {
-        _selectedDate = DateTime.now(); // Remettre la date du jour
+        _selectedDate = DateTime.now();
       });
+
+      // Recharger les tags disponibles
+      await _loadAvailableTags();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -154,10 +153,21 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _loadBalance() async {
-    final balance = await _storage.getBankBalance();
-    setState(() {
-      _currentBalance = balance;
-    });
+    try {
+      final balance = await _dataService.getBankBalance();
+      setState(() {
+        _currentBalance = balance;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur chargement solde: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _updateBalance() async {
@@ -171,10 +181,11 @@ class _HomeTabState extends State<HomeTab> {
         title: const Text('Mettre à jour le solde'),
         content: TextField(
           controller: controller,
-          keyboardType: TextInputType.number,
+          keyboardType: const TextInputType.numberWithOptions(decimal: true),
           decoration: const InputDecoration(
             labelText: 'Nouveau solde',
             prefixText: '€ ',
+            border: OutlineInputBorder(),
           ),
         ),
         actions: [
@@ -182,14 +193,34 @@ class _HomeTabState extends State<HomeTab> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Annuler'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () async {
               final newBalance = double.tryParse(controller.text) ?? _currentBalance;
-              await _storage.saveBankBalance(newBalance);
-              setState(() {
-                _currentBalance = newBalance;
-              });
-              if (context.mounted) Navigator.pop(context);
+              try {
+                await _dataService.setBankBalance(newBalance);
+                setState(() {
+                  _currentBalance = newBalance;
+                });
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Solde mis à jour avec succès'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             child: const Text('Enregistrer'),
           ),
@@ -201,31 +232,72 @@ class _HomeTabState extends State<HomeTab> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            const Text('Nouvelle dépense'),
-            // Add bank balance button
-            TextButton.icon(
-              onPressed: _updateBalance,
-              icon: const Icon(Icons.account_balance_wallet, color: Colors.white),
-              label: Text(
-                '${_currentBalance.toStringAsFixed(2)} €',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // En-tête avec solde bancaire
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade400, Colors.blue.shade600],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.account_balance_wallet,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        onPressed: _updateBalance,
+                        icon: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                        tooltip: 'Modifier le solde',
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Solde du compte',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    '${_currentBalance.toStringAsFixed(2)} €',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Icône et titre
             Icon(
               Icons.shopping_bag_outlined,
@@ -298,7 +370,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: 20),
 
-            // Sélecteur de date avec date pré-remplie
+            // Sélecteur de date
             InkWell(
               onTap: _pickDate,
               child: Container(
@@ -330,21 +402,53 @@ class _HomeTabState extends State<HomeTab> {
 
             // Bouton de validation
             SizedBox(
-              height: 50,
-              child: ElevatedButton.icon(
+              height: 56,
+              child: FilledButton.icon(
                 onPressed: _isLoading ? null : _saveTransaction,
                 icon: _isLoading
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
                       )
                     : const Icon(Icons.add),
-                label: Text(_isLoading ? 'Sauvegarde...' : 'Ajouter la dépense'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  foregroundColor: Colors.white,
+                label: Text(
+                  _isLoading ? 'Sauvegarde...' : 'Ajouter la dépense',
+                  style: const TextStyle(fontSize: 16),
                 ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Informations
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.cloud_sync,
+                    color: Colors.blue.shade600,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Vos données sont automatiquement synchronisées dans le cloud',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 10),
