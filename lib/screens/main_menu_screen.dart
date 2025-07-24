@@ -6,6 +6,7 @@ import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
 import 'sorties_tab.dart';
 import 'analyse_tab.dart';
+import 'settings_tab.dart'; // Importez l'onglet des paramètres
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -19,12 +20,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final PageController _pageController = PageController();
   final StorageService _storage = StorageService();
 
+  // Modifiez la liste des onglets
   final List<Widget> _tabs = const [
     HomeTab(),
     PlaisirsTab(),
     EntreesTab(),
     SortiesTab(),
     AnalyseTab(),
+    SettingsTab(), // Ajoutez l'onglet des paramètres
   ];
 
   final List<NavigationDestination> _destinations = const [
@@ -52,6 +55,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       icon: Icon(Icons.analytics_outlined),
       selectedIcon: Icon(Icons.analytics),
       label: 'Analyse',
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.settings_outlined),
+      selectedIcon: Icon(Icons.settings),
+      label: 'Paramètres',
     ),
   ];
 
@@ -96,7 +104,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          ['Dashboard', 'Mes Plaisirs', 'Revenus', 'Charges', 'Analyse'][_selectedIndex],
+          ['Dashboard', 'Mes Plaisirs', 'Revenus', 'Charges', 'Analyse', 'Paramètres'][_selectedIndex],
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,

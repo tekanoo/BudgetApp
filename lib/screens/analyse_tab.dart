@@ -355,10 +355,12 @@ class _AnalyseTabState extends State<AnalyseTab> {
   List<PieChartSectionData> _buildPieChartSections({bool enlarged = false}) {
     final double total = totalEntrees + totalSorties;
     return [
-      PieChartSectionData(
+      if (totalEntrees > 0) PieChartSectionData(
         color: Colors.green,
-        value: totalEntrees.toDouble(),
-        title: enlarged ? 'Entrées\n${totalEntrees.toStringAsFixed(2)} €\n${total > 0 ? ((totalEntrees / total) * 100).toStringAsFixed(1) : '0'}%' : 'Entrées\n${total > 0 ? ((totalEntrees / total) * 100).toStringAsFixed(1) : '0'}%',
+        value: totalEntrees,
+        title: enlarged 
+          ? 'Entrées\n${totalEntrees.toStringAsFixed(2)} €\n${((totalEntrees / total) * 100).toStringAsFixed(1)}%' 
+          : '${((totalEntrees / total) * 100).toStringAsFixed(1)}%',
         radius: enlarged ? 120.0 : 80.0,
         titleStyle: TextStyle(
           fontSize: enlarged ? 14 : 12,
@@ -366,10 +368,12 @@ class _AnalyseTabState extends State<AnalyseTab> {
           color: Colors.white,
         ),
       ),
-      PieChartSectionData(
+      if (totalSorties > 0) PieChartSectionData(
         color: Colors.red,
-        value: totalSorties.toDouble(),
-        title: enlarged ? 'Sorties\n${totalSorties.toStringAsFixed(2)} €\n${total > 0 ? ((totalSorties / total) * 100).toStringAsFixed(1) : '0'}%' : 'Sorties\n${total > 0 ? ((totalSorties / total) * 100).toStringAsFixed(1) : '0'}%',
+        value: totalSorties,
+        title: enlarged 
+          ? 'Sorties\n${totalSorties.toStringAsFixed(2)} €\n${((totalSorties / total) * 100).toStringAsFixed(1)}%' 
+          : '${((totalSorties / total) * 100).toStringAsFixed(1)}%',
         radius: enlarged ? 120.0 : 80.0,
         titleStyle: TextStyle(
           fontSize: enlarged ? 14 : 12,
