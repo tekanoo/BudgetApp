@@ -1,8 +1,16 @@
 import 'package:flutter/material.dart';
-import 'screens/main_menu_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_service.dart';
+import 'screens/auth_wrapper.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialiser Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
   runApp(const BudgetApp());
 }
 
@@ -28,7 +36,7 @@ class BudgetApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const MainMenuScreen(),
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
     );
   }
