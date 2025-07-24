@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_service.dart';
+import 'firebase_options.dart';
 import 'screens/auth_wrapper.dart';
 
 void main() async {
