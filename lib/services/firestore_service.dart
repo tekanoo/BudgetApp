@@ -2,10 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-
+/// Service handling all Firestore operations
 class FirestoreService {
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   static final FirebaseAuth _auth = FirebaseAuth.instance;
+
+  // Cache duration
+  static const cacheDuration = Duration(minutes: 5);
+  static Map<String, dynamic>? _cachedData;
+  static DateTime? _lastFetchTime;
 
   // Obtenir l'ID utilisateur actuel
   static String? get _userId => _auth.currentUser?.uid;
@@ -18,6 +23,16 @@ class FirestoreService {
   static DocumentReference? get _userDoc => 
       _userId != null ? _userCollection.doc(_userId) : null;
 
+  /// Check network connectivity
+  static Future<bool> _checkConnectivity() async {
+    try {
+      await _firestore.runTransaction((transaction) async {});
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
   /// Sauvegarder les données de transactions dans Firestore
   static Future<void> saveUserData({
     required List<Map<String, dynamic>> transactions,
@@ -26,10 +41,17 @@ class FirestoreService {
     required List<Map<String, dynamic>> sorties,
   }) async {
     if (_userDoc == null) {
-      throw Exception('Utilisateur non connecté');
+      throw FirestoreException('Utilisateur non connecté');
+    }
+
+    final isOnline = await _checkConnectivity();
+    if (!isOnline) {
+      throw FirestoreException('Pas de connexion Internet');
     }
 
     try {
+      final batch = _firestore.batch();
+      
       final userData = {
         'transactions': transactions,
         'plaisirs': plaisirs,
@@ -39,31 +61,65 @@ class FirestoreService {
         'deviceInfo': {
           'platform': kIsWeb ? 'web' : 'mobile',
           'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'version': '1.0.0', // Add app version
         }
       };
 
-      await _userDoc!.set(userData, SetOptions(merge: true));
+      // Validate data before saving
+      _validateUserData(userData);
+
+      batch.set(_userDoc!, userData, SetOptions(merge: true));
+      await batch.commit();
       
+      // Update cache
+      _cachedData = userData;
+      _lastFetchTime = DateTime.now();
+
       if (kDebugMode) {
         debugPrint('✅ Données sauvegardées dans Firestore pour: ${_auth.currentUser?.email}');
       }
+    } on FirebaseException catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Erreur Firebase: ${e.message}');
+      }
+      throw FirestoreException('Erreur Firebase: ${e.message}');
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Erreur sauvegarde Firestore: $e');
       }
-      rethrow;
+      throw FirestoreException('Erreur sauvegarde: $e');
     }
+  }
+
+  /// Validate user data before saving
+  static void _validateUserData(Map<String, dynamic> userData) {
+    if (userData['transactions'] == null) throw FirestoreException('Transactions manquantes');
+    if (userData['plaisirs'] == null) throw FirestoreException('Plaisirs manquants');
+    if (userData['entrees'] == null) throw FirestoreException('Entrées manquantes');
+    if (userData['sorties'] == null) throw FirestoreException('Sorties manquantes');
+  }
+
+  /// Check if cache is valid
+  static bool _isCacheValid() {
+    if (_lastFetchTime == null || _cachedData == null) return false;
+    final difference = DateTime.now().difference(_lastFetchTime!);
+    return difference < cacheDuration;
   }
 
   /// Charger les données depuis Firestore
   static Future<Map<String, List<Map<String, dynamic>>>> loadUserData() async {
-    if (_userDoc == null) {
+    // Check cache first
+    if (_isCacheValid()) {
       return {
-        'transactions': [],
-        'plaisirs': [],
-        'entrees': [],
-        'sorties': [],
+        'transactions': List<Map<String, dynamic>>.from(_cachedData!['transactions'] ?? []),
+        'plaisirs': List<Map<String, dynamic>>.from(_cachedData!['plaisirs'] ?? []),
+        'entrees': List<Map<String, dynamic>>.from(_cachedData!['entrees'] ?? []),
+        'sorties': List<Map<String, dynamic>>.from(_cachedData!['sorties'] ?? []),
       };
+    }
+
+    if (_userDoc == null) {
+      return _getEmptyData();
     }
 
     try {
@@ -73,15 +129,14 @@ class FirestoreService {
         if (kDebugMode) {
           debugPrint('📄 Aucunes données Firestore trouvées pour: ${_auth.currentUser?.email}');
         }
-        return {
-          'transactions': [],
-          'plaisirs': [],
-          'entrees': [],
-          'sorties': [],
-        };
+        return _getEmptyData();
       }
 
       final data = docSnapshot.data() as Map<String, dynamic>;
+      
+      // Update cache
+      _cachedData = data;
+      _lastFetchTime = DateTime.now();
       
       return {
         'transactions': List<Map<String, dynamic>>.from(data['transactions'] ?? []),
@@ -93,13 +148,18 @@ class FirestoreService {
       if (kDebugMode) {
         debugPrint('❌ Erreur chargement Firestore: $e');
       }
-      return {
-        'transactions': [],
-        'plaisirs': [],
-        'entrees': [],
-        'sorties': [],
-      };
+      return _getEmptyData();
     }
+  }
+
+  /// Helper method to return empty data structure
+  static Map<String, List<Map<String, dynamic>>> _getEmptyData() {
+    return {
+      'transactions': [],
+      'plaisirs': [],
+      'entrees': [],
+      'sorties': [],
+    };
   }
 
   /// Ajouter une transaction (synchronisation automatique)
@@ -284,4 +344,22 @@ class FirestoreService {
       };
     }
   }
+
+  /// Clear cache manually if needed
+  static void clearCache() {
+    _cachedData = null;
+    _lastFetchTime = null;
+    if (kDebugMode) {
+      debugPrint('🧹 Cache cleared');
+    }
+  }
+}
+
+/// Custom exception for Firestore operations
+class FirestoreException implements Exception {
+  final String message;
+  FirestoreException(this.message);
+  
+  @override
+  String toString() => 'FirestoreException: $message';
 }

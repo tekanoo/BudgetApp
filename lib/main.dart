@@ -6,6 +6,7 @@ import 'services/auth_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/main_menu_screen.dart';
 import 'services/migration_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -14,17 +15,21 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     
-    // Initialiser Analytics
     await AnalyticsService.initialize();
     
-    // Migration automatique après connexion
     final user = AuthService.currentUser;
     if (user != null) {
       await MigrationService.checkAndMigrate();
     }
     
-  } catch (e) {
-    debugPrint('❌ Erreur initialisation: $e');
+  } on FirebaseException catch (e) {
+    debugPrint('❌ Firebase Error: ${e.message}');
+    debugPrint('Error code: ${e.code}');
+  } on StateError catch (e) {
+    debugPrint('❌ State Error: $e');
+  } catch (e, stackTrace) {
+    debugPrint('❌ General Error: $e');
+    debugPrint('Stack trace: $stackTrace');
   }
   
   runApp(const BudgetApp());
