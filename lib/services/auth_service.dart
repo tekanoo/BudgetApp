@@ -13,10 +13,14 @@ class AuthService {
       // Pour le web, le clientId est lu depuis la meta tag dans index.html
       _googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
+        // Forcer la sélection du compte à chaque connexion
+        forceCodeForRefreshToken: true,
       );
     } else {
       _googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
+        // Forcer la sélection du compte à chaque connexion
+        forceCodeForRefreshToken: true,
       );
     }
   }
@@ -27,7 +31,7 @@ class AuthService {
   // Stream pour écouter les changements d'état d'authentification
   static Stream<User?> get authStateChanges => _auth.authStateChanges();
 
-  // Connexion avec Google
+  // Connexion avec Google - Toujours demander le choix du compte
   static Future<UserCredential?> signInWithGoogle() async {
     try {
       if (kDebugMode) {
@@ -35,9 +39,13 @@ class AuthService {
       }
       _initGoogleSignIn();
       
+      // IMPORTANT: Se déconnecter d'abord pour forcer la sélection du compte
+      await _googleSignIn.signOut();
+      
       if (kDebugMode) {
-        debugPrint('🔄 Tentative de connexion Google...');
+        debugPrint('🔄 Tentative de connexion Google (sélection forcée)...');
       }
+      
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
@@ -48,7 +56,7 @@ class AuthService {
       }
 
       if (kDebugMode) {
-        debugPrint('✅ Compte Google récupéré: ${googleUser.email}');
+        debugPrint('✅ Compte Google sélectionné: ${googleUser.email}');
       }
 
       // Obtenir les détails d'authentification
@@ -87,39 +95,97 @@ class AuthService {
     }
   }
 
-  // Déconnexion
+  // Déconnexion complète
   static Future<void> signOut() async {
     try {
-      await Future.wait([
-        _auth.signOut(),
-        _googleSignIn.signOut(),
-      ]);
-      
-      // Supprimer l'état de connexion
-      await _saveAuthState(false, null);
       if (kDebugMode) {
-        debugPrint('✅ Déconnexion réussie');
+        debugPrint('🔄 Début de la déconnexion...');
+      }
+      
+      // Déconnexion Firebase
+      await _auth.signOut();
+      if (kDebugMode) {
+        debugPrint('✅ Déconnexion Firebase terminée');
+      }
+      
+      // Déconnexion Google (importante pour permettre la sélection du compte)
+      await _googleSignIn.signOut();
+      if (kDebugMode) {
+        debugPrint('✅ Déconnexion Google terminée');
+      }
+      
+      // Supprimer l'état de connexion local
+      await _saveAuthState(false, null);
+      
+      if (kDebugMode) {
+        debugPrint('✅ Déconnexion complète réussie');
       }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Erreur lors de la déconnexion: $e');
+      }
+      // Même en cas d'erreur, nettoyer l'état local
+      await _saveAuthState(false, null);
+    }
+  }
+
+  // Déconnexion et suppression de la session (pour changer de compte)
+  static Future<void> signOutAndClearSession() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('🔄 Déconnexion et nettoyage de session...');
+      }
+      
+      // Déconnexion complète
+      await signOut();
+      
+      // Nettoyage des données locales si nécessaire
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('userEmail');
+      await prefs.remove('userName');
+      await prefs.remove('userPhoto');
+      await prefs.remove('isConnected');
+      
+      if (kDebugMode) {
+        debugPrint('✅ Session nettoyée complètement');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lors du nettoyage de session: $e');
       }
     }
   }
 
   // Sauvegarder l'état d'authentification
   static Future<void> _saveAuthState(bool isConnected, User? user) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('isConnected', isConnected);
-    
-    if (user != null) {
-      await prefs.setString('userEmail', user.email ?? '');
-      await prefs.setString('userName', user.displayName ?? '');
-      await prefs.setString('userPhoto', user.photoURL ?? '');
-    } else {
-      await prefs.remove('userEmail');
-      await prefs.remove('userName');
-      await prefs.remove('userPhoto');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isConnected', isConnected);
+      
+      if (user != null && isConnected) {
+        await prefs.setString('userEmail', user.email ?? '');
+        await prefs.setString('userName', user.displayName ?? '');
+        await prefs.setString('userPhoto', user.photoURL ?? '');
+        await prefs.setString('userId', user.uid);
+        
+        if (kDebugMode) {
+          debugPrint('💾 État utilisateur sauvegardé: ${user.email}');
+        }
+      } else {
+        // Nettoyer les données utilisateur
+        await prefs.remove('userEmail');
+        await prefs.remove('userName');
+        await prefs.remove('userPhoto');
+        await prefs.remove('userId');
+        
+        if (kDebugMode) {
+          debugPrint('🧹 Données utilisateur nettoyées');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Erreur sauvegarde état auth: $e');
+      }
     }
   }
 
@@ -131,7 +197,71 @@ class AuthService {
       return true;
     }
     
+    // Vérifier SharedPreferences comme fallback
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('isConnected') ?? false;
+    final isConnected = prefs.getBool('isConnected') ?? false;
+    
+    if (isConnected && user == null) {
+      // État incohérent, nettoyer
+      await _saveAuthState(false, null);
+      return false;
+    }
+    
+    return isConnected;
+  }
+
+  // Obtenir les informations utilisateur stockées localement
+  static Future<Map<String, String?>> getCachedUserInfo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return {
+        'email': prefs.getString('userEmail'),
+        'name': prefs.getString('userName'),
+        'photo': prefs.getString('userPhoto'),
+        'id': prefs.getString('userId'),
+      };
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Erreur lecture cache utilisateur: $e');
+      }
+      return {};
+    }
+  }
+
+  // Forcer la reconnexion (utile en cas de problème de session)
+  static Future<UserCredential?> forceReconnect() async {
+    try {
+      if (kDebugMode) {
+        debugPrint('🔄 Reconnexion forcée...');
+      }
+      
+      // Déconnexion complète
+      await signOutAndClearSession();
+      
+      // Attendre un peu pour s'assurer que la déconnexion est effective
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // Nouvelle connexion
+      return await signInWithGoogle();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Erreur reconnexion forcée: $e');
+      }
+      return null;
+    }
+  }
+
+  // Vérifier l'état de la connexion réseau (pour diagnostic)
+  static Future<bool> checkConnectivity() async {
+    try {
+      // Tenter une requête Firebase simple
+      await _auth.fetchSignInMethodsForEmail('test@example.com');
+      return true;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('⚠️ Problème de connectivité détecté: $e');
+      }
+      return false;
+    }
   }
 }

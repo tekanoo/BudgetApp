@@ -3,7 +3,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'firebase_options.dart';
 import 'services/analytics_service.dart';
+import 'services/auth_service.dart';
 import 'screens/home_screen.dart';
+import 'screens/main_menu_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,16 +15,14 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     
-    // Utiliser debugPrint au lieu de print pour les logs de développement
     if (kDebugMode) {
-      debugPrint('🔥 Firebase initialisé avec succès pour le Web');
+      debugPrint('🔥 Firebase initialisé avec succès');
     }
     
     // Initialiser Analytics
     await AnalyticsService.initialize();
     
   } catch (e) {
-    // Utiliser debugPrint au lieu de print pour les erreurs
     if (kDebugMode) {
       debugPrint('❌ Erreur initialisation Firebase: $e');
     }
@@ -53,8 +53,37 @@ class BudgetApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      home: const HomeScreen(),
+      home: const AuthWrapper(),
       debugShowCheckedModeBanner: false,
+    );
+  }
+}
+
+// Nouveau widget pour gérer l'état d'authentification
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder(
+      stream: AuthService.authStateChanges,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(
+              child: CircularProgressIndicator(),
+            ),
+          );
+        }
+        
+        // Si l'utilisateur est connecté, aller au menu principal
+        if (snapshot.hasData && snapshot.data != null) {
+          return const MainMenuScreen();
+        }
+        
+        // Sinon, afficher l'écran d'accueil/connexion
+        return const HomeScreen();
+      },
     );
   }
 }
