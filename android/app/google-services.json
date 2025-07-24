@@ -1,41 +1,33 @@
 {
   "project_info": {
-    "project_number": "320883807207",
-    "project_id": "budget-app-26741",
-    "storage_bucket": "budget-app-26741.firebasestorage.app"
+    "project_number": "570468917791",
+    "project_id": "budget-app-pro",
+    "storage_bucket": "budget-app-pro.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:320883807207:android:d90aa3515557e7b9d9e342",
+        "mobilesdk_app_id": "1:570468917791:android:c624c82628b7348ce96b2a",
         "android_client_info": {
           "package_name": "com.example.budget_app"
         }
       },
       "oauth_client": [
         {
-          "client_id": "320883807207-j8njfjigf07gl3e54b807hc0k8079pkn.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.example.budget_app",
-            "certificate_hash": "5dd1da68ac3288d233c080e7c3059a3ea242750c"
-          }
-        },
-        {
-          "client_id": "320883807207-lciefpmpnte8u0o1cvqtd8i5p6fl4v44.apps.googleusercontent.com",
+          "client_id": "570468917791-5op36av9boj6q6qcb3nmlf5a3bk0k7ub.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyBIU3gJwizb5mc3ida_nmVLk2_-VhJ17kc"
+          "current_key": "AIzaSyDqW-ffCerW0F35NXfEVrlpdoEgD-UbHJ8"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "320883807207-lciefpmpnte8u0o1cvqtd8i5p6fl4v44.apps.googleusercontent.com",
+              "client_id": "570468917791-5op36av9boj6q6qcb3nmlf5a3bk0k7ub.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

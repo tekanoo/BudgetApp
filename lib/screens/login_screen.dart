@@ -153,25 +153,19 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                       icon: _isLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 3,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
-                              ),
-                            )
-                          : Image.asset(
-                              'assets/google_logo.png',
-                              width: 24,
-                              height: 24,
-                              errorBuilder: (context, error, stackTrace) {
-                                return const Icon(
-                                  Icons.login,
-                                  size: 24,
-                                );
-                              },
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 3,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.grey),
                             ),
+                          )
+                        : const Icon(
+                            Icons.account_circle,
+                            size: 24,
+                            color: Colors.grey,
+                          ),
                       label: Text(
                         _isLoading 
                           ? 'Connexion en cours...' 
