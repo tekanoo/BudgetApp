@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class StorageService {
   static const String _storageKey = 'budget_data';
   static const String _lastUpdateKey = 'last_update';
+  static const String _balanceKey = 'bank_balance';
+  static const String _checkedTransactionsKey = 'checked_transactions';
   static final StorageService _instance = StorageService._internal();
   
   factory StorageService() {
@@ -98,5 +100,28 @@ class StorageService {
         print('❌ Erreur suppression: $e');
       }
     }
+  }
+
+  Future<void> saveBankBalance(double balance) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_balanceKey, balance);
+  }
+
+  Future<double> getBankBalance() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getDouble(_balanceKey) ?? 0.0;
+  }
+
+  Future<void> updateTransactionStatus(String transactionId, bool isChecked) async {
+    final prefs = await SharedPreferences.getInstance();
+    final checkedTransactions = prefs.getStringList(_checkedTransactionsKey) ?? [];
+    
+    if (isChecked && !checkedTransactions.contains(transactionId)) {
+      checkedTransactions.add(transactionId);
+    } else if (!isChecked) {
+      checkedTransactions.remove(transactionId);
+    }
+    
+    await prefs.setStringList(_checkedTransactionsKey, checkedTransactions);
   }
 }

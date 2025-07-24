@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/storage_service.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -9,12 +10,14 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
+  final StorageService _storage = StorageService();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _tagController = TextEditingController();
   DateTime? _selectedDate;
   List<String> _availableTags = [];
   List<String> _filteredTags = [];
   bool _isLoading = false;
+  double _currentBalance = 0.0;
 
   @override
   void initState() {
@@ -23,6 +26,7 @@ class _HomeTabState extends State<HomeTab> {
     _selectedDate = DateTime.now();
     _loadAvailableTags();
     _tagController.addListener(_onTagTextChanged);
+    _loadBalance();
   }
 
   @override
@@ -149,12 +153,73 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
+  Future<void> _loadBalance() async {
+    final balance = await _storage.getBankBalance();
+    setState(() {
+      _currentBalance = balance;
+    });
+  }
+
+  Future<void> _updateBalance() async {
+    final TextEditingController controller = TextEditingController(
+      text: _currentBalance.toString(),
+    );
+
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Mettre à jour le solde'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Nouveau solde',
+            prefixText: '€ ',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newBalance = double.tryParse(controller.text) ?? _currentBalance;
+              await _storage.saveBankBalance(newBalance);
+              setState(() {
+                _currentBalance = newBalance;
+              });
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Nouvelle dépense'),
-        centerTitle: true,
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text('Nouvelle dépense'),
+            // Add bank balance button
+            TextButton.icon(
+              onPressed: _updateBalance,
+              icon: const Icon(Icons.account_balance_wallet, color: Colors.white),
+              label: Text(
+                '${_currentBalance.toStringAsFixed(2)} €',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
