@@ -19,6 +19,8 @@ class _HomeTabState extends State<HomeTab> {
   @override
   void initState() {
     super.initState();
+    // Pré-remplir avec la date du jour
+    _selectedDate = DateTime.now();
     _loadAvailableTags();
     _tagController.addListener(_onTagTextChanged);
   }
@@ -101,11 +103,11 @@ class _HomeTabState extends State<HomeTab> {
         await prefs.setStringList('available_tags', _availableTags);
       }
 
-      // Réinitialiser le formulaire
+      // Réinitialiser le formulaire mais garder la date du jour
       _amountController.clear();
       _tagController.clear();
       setState(() {
-        _selectedDate = null;
+        _selectedDate = DateTime.now(); // Remettre la date du jour
       });
 
       if (!mounted) return;
@@ -231,7 +233,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: 20),
 
-            // Sélecteur de date
+            // Sélecteur de date avec date pré-remplie
             InkWell(
               onTap: _pickDate,
               child: Container(

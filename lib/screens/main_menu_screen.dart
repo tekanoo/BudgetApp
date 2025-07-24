@@ -20,7 +20,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
   String? _userEmail;
-  // Supprimé _userName car non utilisé
 
   final List<Widget> _tabs = const [
     HomeTab(),
@@ -44,7 +43,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     NavigationDestination(
       icon: Icon(Icons.attach_money_outlined),
       selectedIcon: Icon(Icons.attach_money),
-      label: 'Salaires',
+      label: 'Revenus',
     ),
     NavigationDestination(
       icon: Icon(Icons.receipt_long_outlined),
@@ -80,7 +79,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     // Charger les informations utilisateur
     setState(() {
       _userEmail = currentUser.email;
-      // Supprimé _userName = currentUser.displayName;
     });
     
     // Charger les données utilisateur
@@ -104,7 +102,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _trackScreenVisit(int index) {
-    final screenNames = ['Dashboard', 'Plaisirs', 'Salaires', 'Charges', 'Analyse'];
+    final screenNames = ['Dashboard', 'Plaisirs', 'Revenus', 'Charges', 'Analyse'];
     
     AnalyticsService.logScreenView(screenNames[index]);
     
@@ -116,7 +114,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         AnalyticsService.logPlaisirsVisit();
         break;
       case 2:
-        AnalyticsService.logEvent(name: 'budget_salaires_visited', parameters: {'section': 'salaires'});
+        AnalyticsService.logEvent(name: 'budget_revenus_visited', parameters: {'section': 'revenus'});
         break;
       case 3:
         AnalyticsService.logEvent(name: 'budget_charges_visited', parameters: {'section': 'charges'});
@@ -165,16 +163,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 style: TextStyle(color: Colors.green),
               ),
             ],
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _showSavedData,
-              icon: const Icon(Icons.storage),
-              label: const Text('Voir données sauvegardées'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-            ),
           ],
         ),
         actions: [
@@ -301,64 +289,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
   }
 
-  Future<void> _showSavedData() async {
-    try {
-      final transactions = await StorageService.getTransactions();
-      final plaisirs = await StorageService.getPlaisirGoals();
-      final stats = await StorageService.getStatistics();
-      
-      if (!mounted) return;
-      
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('📊 Données sauvegardées'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('💰 Transactions: ${transactions.length}'),
-                Text('🎯 Objectifs: ${plaisirs.length}'),
-                Text('💵 Total revenus: €${stats['totalRevenus']?.toStringAsFixed(2)}'),
-                Text('💸 Total dépenses: €${stats['totalDepenses']?.toStringAsFixed(2)}'),
-                Text('📈 Solde: €${stats['solde']?.toStringAsFixed(2)}'),
-                const SizedBox(height: 16),
-                if (transactions.isNotEmpty) ...[
-                  const Text('📝 Dernières transactions:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  ...transactions.take(3).map((t) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Text(
-                      '• ${t['description']}: €${t['montant']} (${t['isRevenu'] ? 'Revenu' : 'Dépense'})',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  )),
-                ],
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Fermer'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors du chargement des données: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   @override
   void dispose() {
     _pageController.dispose();
@@ -390,7 +320,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           tooltip: 'Compte connecté',
         ),
         title: Text(
-          ['Dashboard', 'Mes Plaisirs', 'Salaires', 'Charges', 'Analyse'][_selectedIndex],
+          ['Dashboard', 'Mes Plaisirs', 'Revenus', 'Charges', 'Analyse'][_selectedIndex],
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
@@ -411,35 +341,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         destinations: _destinations,
         elevation: 8,
         backgroundColor: Theme.of(context).colorScheme.surface,
-      ),
-      floatingActionButton: (_selectedIndex == 2 || _selectedIndex == 3) ? FloatingActionButton.extended(
-        onPressed: () {
-          final isSalaire = _selectedIndex == 2;
-          AnalyticsService.logFeatureUsed(isSalaire ? 'fab_add_salaire' : 'fab_add_charge');
-          _showTransactionDialog(context, isSalaire);
-        },
-        icon: const Icon(Icons.add),
-        label: Text(_selectedIndex == 2 ? 'Salaire' : 'Charge'),
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Theme.of(context).colorScheme.onPrimary,
-      ) : null,
-    );
-  }
-
-  void _showTransactionDialog(BuildContext context, bool isSalaire) {
-    // Implémentation de la méthode pour afficher le dialogue de transaction
-    // Cette méthode était référencée mais non implémentée dans le code original
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(isSalaire ? 'Ajouter un salaire' : 'Ajouter une charge'),
-        content: const Text('Fonctionnalité à implémenter'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
       ),
     );
   }

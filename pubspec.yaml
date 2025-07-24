@@ -23,6 +23,7 @@ dependencies:
   # UI & Charts
   fl_chart: ^0.68.0
   cupertino_icons: ^1.0.8
+  cloud_firestore: ^4.15.6
 
 dev_dependencies:
   flutter_test:
