@@ -1,5 +1,5 @@
 name: budget_app
-description: "Une application de gestion de budget complète"
+description: A professional budget management app
 version: 1.0.0+1
 
 environment:
@@ -8,27 +8,14 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
-  # Firebase
-  firebase_core: ^2.32.0
-  firebase_auth: ^4.20.0
-  firebase_analytics: ^10.10.7
-  
-  # Authentication
-  google_sign_in: ^6.3.0
-  
-  # Storage
-  shared_preferences: ^2.5.3
-  
-  # UI & Charts
-  fl_chart: ^0.68.0
-  cupertino_icons: ^1.0.8
-  cloud_firestore: ^4.15.6
+  shared_preferences: ^2.2.0
+  fl_chart: ^0.63.0
+  intl: ^0.18.1
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^5.0.0
+  flutter_lints: ^2.0.2
 
 flutter:
   uses-material-design: true
