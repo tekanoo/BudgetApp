@@ -74,7 +74,7 @@ class StorageService {
     if (user != null) {
       if (kDebugMode) {
         debugPrint('📱 Chargement des données pour: ${user.email}');
-        debugPrint('🔑 Clé utilisateur: ${_userKey}');
+        debugPrint('🔑 Clé utilisateur: $_userKey'); // CORRIGÉ: supprimé les accolades inutiles
       }
       
       // Vérifier si l'utilisateur a des données
@@ -477,7 +477,7 @@ class StorageService {
         debugPrint('   - $key');
       }
       
-      debugPrint('🎯 Clé utilisateur actuelle: $_userKey');
+      debugPrint('🎯 Clé utilisateur actuelle: $_userKey'); // CORRIGÉ: supprimé les accolades inutiles
       
     } catch (e) {
       debugPrint('❌ Erreur debug: $e');

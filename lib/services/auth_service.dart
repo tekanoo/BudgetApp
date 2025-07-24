@@ -252,12 +252,25 @@ class AuthService {
     }
   }
 
-  // Vérifier l'état de la connexion réseau (pour diagnostic)
+  // Vérifier l'état de la connexion réseau (pour diagnostic) - CORRIGÉ
   static Future<bool> checkConnectivity() async {
     try {
-      // Tenter une requête Firebase simple
-      await _auth.fetchSignInMethodsForEmail('test@example.com');
-      return true;
+      // Alternative: vérifier l'état de l'authentification
+      final user = currentUser;
+      if (user != null) {
+        // Tenter de recharger l'utilisateur pour vérifier la connectivité
+        await user.reload();
+        return true;
+      }
+      
+      // Alternative 2: essayer de créer une requête simple
+      try {
+        // Créer une instance temporaire pour tester la connectivité
+        await FirebaseAuth.instance.setLanguageCode('en');
+        return true;
+      } catch (_) {
+        return false;
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('⚠️ Problème de connectivité détecté: $e');

@@ -26,12 +26,13 @@ class HomeScreen extends StatelessWidget {
       // Tenter la connexion Google
       final result = await AuthService.signInWithGoogle();
       
-      // Fermer le dialogue de chargement
-      if (context.mounted) {
-        Navigator.of(context).pop();
-      }
+      // Vérifier si le widget est toujours monté avant d'utiliser context
+      if (!context.mounted) return;
       
-      if (result != null && context.mounted) {
+      // Fermer le dialogue de chargement
+      Navigator.of(context).pop();
+      
+      if (result != null) {
         // Migrer les données locales vers le compte Firebase
         await StorageService.migrateLocalDataToUser();
         await StorageService.loadUserData();
@@ -39,6 +40,9 @@ class HomeScreen extends StatelessWidget {
         // Tracker la conversion
         await AnalyticsService.logConversion('user_signup');
         await AnalyticsService.logLogin();
+        
+        // Vérifier à nouveau si le widget est monté avant d'utiliser context
+        if (!context.mounted) return;
         
         // Afficher un message de succès
         ScaffoldMessenger.of(context).showSnackBar(
@@ -52,7 +56,8 @@ class HomeScreen extends StatelessWidget {
         // Le StreamBuilder dans AuthWrapper va automatiquement rediriger
         // vers MainMenuScreen car AuthService.authStateChanges va émettre l'utilisateur
         
-      } else if (context.mounted) {
+      } else {
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('❌ Connexion échouée ou annulée'),
@@ -61,17 +66,18 @@ class HomeScreen extends StatelessWidget {
         );
       }
     } catch (e) {
+      // Vérifier si le widget est monté avant d'utiliser context
+      if (!context.mounted) return;
+      
       // Fermer le dialogue de chargement s'il est encore ouvert
-      if (context.mounted) {
-        Navigator.of(context).pop();
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Erreur de connexion: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Erreur de connexion: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 

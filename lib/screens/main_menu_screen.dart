@@ -20,7 +20,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
   String? _userEmail;
-  String? _userName;
+  // Supprimé _userName car non utilisé
 
   final List<Widget> _tabs = const [
     HomeTab(),
@@ -80,7 +80,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     // Charger les informations utilisateur
     setState(() {
       _userEmail = currentUser.email;
-      _userName = currentUser.displayName;
+      // Supprimé _userName = currentUser.displayName;
     });
     
     // Charger les données utilisateur
@@ -426,8 +426,21 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  // [Garder toutes les autres méthodes existantes comme _showTransactionDialog, _saveDetailedTransaction, etc.]
   void _showTransactionDialog(BuildContext context, bool isSalaire) {
-    // ... (garder le code existant)
+    // Implémentation de la méthode pour afficher le dialogue de transaction
+    // Cette méthode était référencée mais non implémentée dans le code original
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isSalaire ? 'Ajouter un salaire' : 'Ajouter une charge'),
+        content: const Text('Fonctionnalité à implémenter'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
   }
 }
