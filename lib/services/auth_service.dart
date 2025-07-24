@@ -10,16 +10,13 @@ class AuthService {
   // Initialiser Google Sign-In selon la plateforme
   static void _initGoogleSignIn() {
     if (kIsWeb) {
-      // Pour le web, le clientId est lu depuis la meta tag dans index.html
       _googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
-        // Forcer la sélection du compte à chaque connexion
         forceCodeForRefreshToken: true,
       );
     } else {
       _googleSignIn = GoogleSignIn(
         scopes: ['email', 'profile'],
-        // Forcer la sélection du compte à chaque connexion
         forceCodeForRefreshToken: true,
       );
     }
@@ -80,6 +77,7 @@ class AuthService {
       
       if (kDebugMode) {
         debugPrint('✅ Connexion Firebase réussie: ${userCredential.user?.email}');
+        debugPrint('🆔 UID utilisateur: ${userCredential.user?.uid}');
       }
       
       // Sauvegarder l'état de connexion
@@ -95,11 +93,12 @@ class AuthService {
     }
   }
 
-  // Déconnexion complète
+  // Déconnexion complète avec nettoyage des données
   static Future<void> signOut() async {
     try {
       if (kDebugMode) {
-        debugPrint('🔄 Début de la déconnexion...');
+        final user = currentUser;
+        debugPrint('🔄 Début de la déconnexion pour: ${user?.email}');
       }
       
       // Déconnexion Firebase
@@ -139,12 +138,13 @@ class AuthService {
       // Déconnexion complète
       await signOut();
       
-      // Nettoyage des données locales si nécessaire
+      // Nettoyage des données locales
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('userEmail');
       await prefs.remove('userName');
       await prefs.remove('userPhoto');
       await prefs.remove('isConnected');
+      await prefs.remove('userId');
       
       if (kDebugMode) {
         debugPrint('✅ Session nettoyée complètement');
@@ -170,6 +170,7 @@ class AuthService {
         
         if (kDebugMode) {
           debugPrint('💾 État utilisateur sauvegardé: ${user.email}');
+          debugPrint('🆔 UID sauvegardé: ${user.uid}');
         }
       } else {
         // Nettoyer les données utilisateur
@@ -262,6 +263,22 @@ class AuthService {
         debugPrint('⚠️ Problème de connectivité détecté: $e');
       }
       return false;
+    }
+  }
+
+  // Debug: Afficher les informations de l'utilisateur connecté
+  static void debugUserInfo() {
+    if (!kDebugMode) return;
+    
+    final user = currentUser;
+    if (user != null) {
+      debugPrint('👤 Utilisateur connecté:');
+      debugPrint('   Email: ${user.email}');
+      debugPrint('   Nom: ${user.displayName}');
+      debugPrint('   UID: ${user.uid}');
+      debugPrint('   Photo: ${user.photoURL}');
+    } else {
+      debugPrint('❌ Aucun utilisateur connecté');
     }
   }
 }
