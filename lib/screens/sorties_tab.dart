@@ -546,7 +546,25 @@ class _SortiesTabState extends State<SortiesTab> {
                                       ? Colors.red 
                                       : Colors.grey.shade400,
                                 ),
-                                onPressed: () => _togglePointing(index),
+                                // Utiliser l'ID unique de la sortie au lieu de l'index
+                                onPressed: () async {
+                                  try {
+                                    // Trouver l'index réel basé sur l'ID
+                                    final id = sortie['id'];
+                                    final realIndex = sorties.indexWhere((s) => s['id'] == id);
+                                    if (realIndex != -1) {
+                                      await _togglePointing(realIndex);
+                                    }
+                                  } catch (e) {
+                                    if (!mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Erreur lors du pointage: $e'),
+                                        backgroundColor: Colors.red,
+                                      ),
+                                    );
+                                  }
+                                },
                               ),
                             ),
                             title: Text(
@@ -567,7 +585,7 @@ class _SortiesTabState extends State<SortiesTab> {
                                         : Colors.grey,
                                   ),
                                 ),
-                                if (sortie['isPointed'] == true) ...[
+                                if (sortie['isPointed'] == true && sortie['pointedAt'] != null) ...[
                                   const Text(' • '),
                                   Text(
                                     'Pointée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['pointedAt']))}',
@@ -610,13 +628,18 @@ class _SortiesTabState extends State<SortiesTab> {
                                     ),
                                   ],
                                   onSelected: (value) {
-                                    switch (value) {
-                                      case 'edit':
-                                        _editSortie(index);
-                                        break;
-                                      case 'delete':
-                                        _deleteSortie(index);
-                                        break;
+                                    // Utiliser également l'ID pour l'édition et la suppression
+                                    final id = sortie['id'];
+                                    final realIndex = sorties.indexWhere((s) => s['id'] == id);
+                                    if (realIndex != -1) {
+                                      switch (value) {
+                                        case 'edit':
+                                          _editSortie(realIndex);
+                                          break;
+                                        case 'delete':
+                                          _deleteSortie(realIndex);
+                                          break;
+                                      }
                                     }
                                   },
                                 ),
