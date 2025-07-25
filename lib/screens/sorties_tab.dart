@@ -294,15 +294,18 @@ class _SortiesTabState extends State<SortiesTab> {
   }
 
   Future<void> _togglePointing(int index) async {
-    final context = this.context;
+    if (!mounted) return;
+    
     try {
       await _dataService.toggleSortiePointing(index);
       if (!mounted) return;
       await _loadSorties();
       
-      final sortie = sorties[index];
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      final sortie = sorties[index];
+      final scaffoldMessenger = ScaffoldMessenger.of(context);
+      
+      scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
             sortie['isPointed'] == true 
@@ -323,14 +326,6 @@ class _SortiesTabState extends State<SortiesTab> {
         ),
       );
     }
-  }
-
-  String _buildSubtitleText(Map<String, dynamic> sortie) {
-    final dateStr = 'Ajoutée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['date']))}';
-    if (sortie['isPointed'] == true && sortie['pointedAt'] != null) {
-      return '$dateStr • Pointée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['pointedAt']))}';
-    }
-    return dateStr;
   }
 
   @override
@@ -540,7 +535,6 @@ class _SortiesTabState extends State<SortiesTab> {
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           child: ListTile(
-                            onTap: () => _editSortie(index),
                             leading: CircleAvatar(
                               backgroundColor: sortie['isPointed'] == true 
                                   ? Colors.red.shade100 
@@ -556,15 +550,31 @@ class _SortiesTabState extends State<SortiesTab> {
                               ),
                             ),
                             title: Text(
-                              sortie['description'],
+                              sortie['description'] ?? '',
                               style: TextStyle(
                                 decoration: sortie['isPointed'] == true 
                                     ? TextDecoration.lineThrough 
                                     : null,
                               ),
                             ),
-                            subtitle: Text(
-                              _buildSubtitleText(sortie),
+                            subtitle: Row(
+                              children: [
+                                Text(
+                                  DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['date'])),
+                                  style: TextStyle(
+                                    color: sortie['isPointed'] == true 
+                                        ? Colors.red.shade300 
+                                        : Colors.grey,
+                                  ),
+                                ),
+                                if (sortie['isPointed'] == true) ...[
+                                  const Text(' • '),
+                                  Text(
+                                    'Pointée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['pointedAt']))}',
+                                    style: TextStyle(color: Colors.red.shade300),
+                                  ),
+                                ],
+                              ],
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,

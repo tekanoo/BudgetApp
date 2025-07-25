@@ -767,10 +767,8 @@ Future<void> togglePlaisirPointing(int index) async {
           decryptedSortie.remove('pointedAt');
         }
         
-        // Rechiffrer la sortie modifiée
+        // Rechiffrer et sauvegarder
         sorties[index] = _encryption.encryptTransaction(decryptedSortie);
-        
-        // Sauvegarder
         await _firebaseService.saveSorties(sorties);
         
         if (kDebugMode) {
