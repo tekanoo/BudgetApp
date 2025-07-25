@@ -1,0 +1,593 @@
+import 'package:flutter/foundation.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'firebase_service.dart';
+import 'encryption_service.dart'; // Import du service de chiffrement
+
+class EncryptedBudgetDataService {
+  static final EncryptedBudgetDataService _instance = EncryptedBudgetDataService._internal();
+  factory EncryptedBudgetDataService() => _instance;
+  EncryptedBudgetDataService._internal();
+
+  final FirebaseService _firebaseService = FirebaseService();
+  final FinancialDataEncryption _encryption = FinancialDataEncryption();
+  
+  bool _isInitialized = false;
+
+  /// Initialise le service avec l'utilisateur connecté
+  Future<void> initialize() async {
+    if (_firebaseService.currentUser == null) {
+      throw Exception('Aucun utilisateur connecté');
+    }
+    
+    // Initialise le chiffrement pour cet utilisateur
+    _encryption.initializeForUser(_firebaseService.currentUser!.uid);
+    _isInitialized = true;
+    
+    if (kDebugMode) {
+      print('🔐 Service de budget chiffré initialisé');
+    }
+  }
+
+  void _ensureInitialized() {
+    if (!_isInitialized) {
+      throw Exception('Service non initialisé. Appelez initialize() d\'abord.');
+    }
+  }
+
+  /// Collection de référence pour l'utilisateur actuel
+  CollectionReference? get _userBudgetCollection {
+    if (!_firebaseService.isSignedIn) return null;
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(_firebaseService.currentUser!.uid)
+        .collection('budget');
+  }
+
+  /// GESTION DES ENTRÉES (REVENUS) CHIFFRÉES
+
+  Future<List<Map<String, dynamic>>> getEntrees() async {
+    _ensureInitialized();
+    try {
+      final encryptedData = await _firebaseService.loadEntrees();
+      
+      // Déchiffre chaque entrée
+      final List<Map<String, dynamic>> decryptedEntrees = [];
+      for (var entry in encryptedData) {
+        decryptedEntrees.add(_encryption.decryptTransaction(entry));
+      }
+      
+      return decryptedEntrees;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur chargement entrées chiffrées: $e');
+      }
+      return [];
+    }
+  }
+
+  Future<void> addEntree({
+    required double amount,
+    required String description,
+  }) async {
+    _ensureInitialized();
+    try {
+      final entrees = await _firebaseService.loadEntrees();
+      
+      // Crée la nouvelle entrée
+      final newEntree = {
+        'amount': amount,
+        'description': description,
+        'date': DateTime.now().toIso8601String(),
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      };
+      
+      // Chiffre avant d'ajouter
+      final encryptedEntree = _encryption.encryptTransaction(newEntree);
+      entrees.add(encryptedEntree);
+      
+      await _firebaseService.saveEntrees(entrees);
+      
+      if (kDebugMode) {
+        print('✅ Entrée chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur ajout entrée chiffrée: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateEntree({
+    required int index,
+    required double amount,
+    required String description,
+  }) async {
+    _ensureInitialized();
+    try {
+      final entrees = await _firebaseService.loadEntrees();
+      if (index >= 0 && index < entrees.length) {
+        final updatedEntree = {
+          'amount': amount,
+          'description': description,
+          'date': DateTime.now().toIso8601String(),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'id': entrees[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        };
+        
+        // Chiffre avant de remplacer
+        entrees[index] = _encryption.encryptTransaction(updatedEntree);
+        await _firebaseService.saveEntrees(entrees);
+        
+        if (kDebugMode) {
+          print('✅ Entrée chiffrée modifiée: [MONTANT_CHIFFRÉ] - $description');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur modification entrée chiffrée: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deleteEntree(int index) async {
+    _ensureInitialized();
+    try {
+      final entrees = await _firebaseService.loadEntrees();
+      if (index >= 0 && index < entrees.length) {
+        entrees.removeAt(index);
+        await _firebaseService.saveEntrees(entrees);
+        
+        if (kDebugMode) {
+          print('✅ Entrée chiffrée supprimée');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur suppression entrée chiffrée: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// GESTION DES SORTIES (CHARGES) CHIFFRÉES
+
+  Future<List<Map<String, dynamic>>> getSorties() async {
+    _ensureInitialized();
+    try {
+      final encryptedData = await _firebaseService.loadSorties();
+      
+      // Déchiffre chaque sortie
+      final List<Map<String, dynamic>> decryptedSorties = [];
+      for (var entry in encryptedData) {
+        decryptedSorties.add(_encryption.decryptTransaction(entry));
+      }
+      
+      return decryptedSorties;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur chargement sorties chiffrées: $e');
+      }
+      return [];
+    }
+  }
+
+  Future<void> addSortie({
+    required double amount,
+    required String description,
+  }) async {
+    _ensureInitialized();
+    try {
+      final sorties = await _firebaseService.loadSorties();
+      
+      final newSortie = {
+        'amount': amount,
+        'description': description,
+        'date': DateTime.now().toIso8601String(),
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      };
+      
+      // Chiffre avant d'ajouter
+      final encryptedSortie = _encryption.encryptTransaction(newSortie);
+      sorties.add(encryptedSortie);
+      
+      await _firebaseService.saveSorties(sorties);
+      
+      if (kDebugMode) {
+        print('✅ Sortie chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur ajout sortie chiffrée: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updateSortie({
+    required int index,
+    required double amount,
+    required String description,
+  }) async {
+    _ensureInitialized();
+    try {
+      final sorties = await _firebaseService.loadSorties();
+      if (index >= 0 && index < sorties.length) {
+        final updatedSortie = {
+          'amount': amount,
+          'description': description,
+          'date': DateTime.now().toIso8601String(),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'id': sorties[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        };
+        
+        // Chiffre avant de remplacer
+        sorties[index] = _encryption.encryptTransaction(updatedSortie);
+        await _firebaseService.saveSorties(sorties);
+        
+        if (kDebugMode) {
+          print('✅ Sortie chiffrée modifiée: [MONTANT_CHIFFRÉ] - $description');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur modification sortie chiffrée: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deleteSortie(int index) async {
+    _ensureInitialized();
+    try {
+      final sorties = await _firebaseService.loadSorties();
+      if (index >= 0 && index < sorties.length) {
+        sorties.removeAt(index);
+        await _firebaseService.saveSorties(sorties);
+        
+        if (kDebugMode) {
+          print('✅ Sortie chiffrée supprimée');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur suppression sortie chiffrée: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// GESTION DES PLAISIRS (DÉPENSES) CHIFFRÉES
+
+  Future<List<Map<String, dynamic>>> getPlaisirs() async {
+    _ensureInitialized();
+    try {
+      final encryptedData = await _firebaseService.loadPlaisirs();
+      
+      // Déchiffre chaque plaisir
+      final List<Map<String, dynamic>> decryptedPlaisirs = [];
+      for (var entry in encryptedData) {
+        decryptedPlaisirs.add(_encryption.decryptTransaction(entry));
+      }
+      
+      return decryptedPlaisirs;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur chargement plaisirs chiffrés: $e');
+      }
+      return [];
+    }
+  }
+
+  Future<void> addPlaisir({
+    required double amount,
+    String? tag,
+    DateTime? date,
+  }) async {
+    _ensureInitialized();
+    try {
+      final plaisirs = await _firebaseService.loadPlaisirs();
+      
+      final newPlaisir = {
+        'amount': amount,
+        'tag': tag ?? 'Sans catégorie',
+        'date': (date ?? DateTime.now()).toIso8601String(),
+        'timestamp': DateTime.now().millisecondsSinceEpoch,
+        'id': DateTime.now().millisecondsSinceEpoch.toString(),
+      };
+      
+      // Chiffre avant d'ajouter
+      final encryptedPlaisir = _encryption.encryptTransaction(newPlaisir);
+      plaisirs.add(encryptedPlaisir);
+      
+      await _firebaseService.savePlaisirs(plaisirs);
+      
+      // Sauvegarder le tag s'il est nouveau (en clair pour l'autocomplétion)
+      if (tag != null && tag.isNotEmpty) {
+        await _addTagIfNew(tag);
+      }
+      
+      if (kDebugMode) {
+        print('✅ Plaisir chiffré ajouté: [MONTANT_CHIFFRÉ] - ${tag ?? "Sans catégorie"}');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur ajout plaisir chiffré: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> updatePlaisir({
+    required int index,
+    required double amount,
+    String? tag,
+    DateTime? date,
+  }) async {
+    _ensureInitialized();
+    try {
+      final plaisirs = await _firebaseService.loadPlaisirs();
+      if (index >= 0 && index < plaisirs.length) {
+        final updatedPlaisir = {
+          'amount': amount,
+          'tag': tag ?? 'Sans catégorie',
+          'date': (date ?? DateTime.now()).toIso8601String(),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'id': plaisirs[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        };
+        
+        // Chiffre avant de remplacer
+        plaisirs[index] = _encryption.encryptTransaction(updatedPlaisir);
+        await _firebaseService.savePlaisirs(plaisirs);
+        
+        // Sauvegarder le tag s'il est nouveau
+        if (tag != null && tag.isNotEmpty) {
+          await _addTagIfNew(tag);
+        }
+        
+        if (kDebugMode) {
+          print('✅ Plaisir chiffré modifié: [MONTANT_CHIFFRÉ] - ${tag ?? "Sans catégorie"}');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur modification plaisir chiffré: $e');
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> deletePlaisir(int index) async {
+    _ensureInitialized();
+    try {
+      final plaisirs = await _firebaseService.loadPlaisirs();
+      if (index >= 0 && index < plaisirs.length) {
+        plaisirs.removeAt(index);
+        await _firebaseService.savePlaisirs(plaisirs);
+        
+        if (kDebugMode) {
+          print('✅ Plaisir chiffré supprimé');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur suppression plaisir chiffré: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// GESTION DU SOLDE BANCAIRE CHIFFRÉ
+
+  Future<double> getBankBalance() async {
+    _ensureInitialized();
+    try {
+      // Charge les données chiffrées
+      final data = await _userBudgetCollection!.doc('settings').get();
+      if (data.exists && data.data() != null) {
+        final settings = data.data() as Map<String, dynamic>;
+        
+        // Vérifie si le solde est chiffré
+        if (settings.containsKey('encryptedBankBalance')) {
+          return _encryption.decryptAmount(settings['encryptedBankBalance']);
+        }
+        
+        // Fallback vers l'ancien format non chiffré
+        return (settings['bankBalance'] ?? 0.0).toDouble();
+      }
+      return 0.0;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur chargement solde chiffré: $e');
+      }
+      return 0.0;
+    }
+  }
+
+  Future<void> setBankBalance(double balance) async {
+    _ensureInitialized();
+    try {
+      await _userBudgetCollection!.doc('settings').set({
+        'encryptedBankBalance': _encryption.encryptAmount(balance),
+        'updatedAt': FieldValue.serverTimestamp(),
+        // Supprime l'ancien champ non chiffré
+        'bankBalance': FieldValue.delete(),
+      }, SetOptions(merge: true));
+      
+      if (kDebugMode) {
+        print('✅ Solde bancaire chiffré sauvegardé: [MONTANT_CHIFFRÉ]');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur sauvegarde solde chiffré: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// UTILITAIRES
+
+  Future<void> _addTagIfNew(String tag) async {
+    try {
+      final tags = await _firebaseService.loadTags();
+      if (!tags.contains(tag)) {
+        tags.add(tag);
+        await _firebaseService.saveTags(tags);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur ajout tag: $e');
+      }
+    }
+  }
+
+  Future<List<String>> getTags() async {
+    try {
+      return await _firebaseService.loadTags();
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur chargement tags: $e');
+      }
+      return [];
+    }
+  }
+
+  /// CALCULS ET STATISTIQUES (sur données déchiffrées côté client)
+
+  Future<Map<String, double>> getTotals() async {
+    _ensureInitialized();
+    try {
+      final entrees = await getEntrees();
+      final sorties = await getSorties();
+      final plaisirs = await getPlaisirs();
+
+      double totalEntrees = 0;
+      for (var entree in entrees) {
+        totalEntrees += (entree['amount'] as num).toDouble();
+      }
+
+      double totalSorties = 0;
+      for (var sortie in sorties) {
+        totalSorties += (sortie['amount'] as num).toDouble();
+      }
+
+      double totalPlaisirs = 0;
+      for (var plaisir in plaisirs) {
+        totalPlaisirs += (plaisir['amount'] as num).toDouble();
+      }
+
+      return {
+        'entrees': totalEntrees,
+        'sorties': totalSorties,
+        'plaisirs': totalPlaisirs,
+        'solde': totalEntrees - totalSorties - totalPlaisirs,
+      };
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul totaux chiffrés: $e');
+      }
+      return {
+        'entrees': 0.0,
+        'sorties': 0.0,
+        'plaisirs': 0.0,
+        'solde': 0.0,
+      };
+    }
+  }
+
+  Future<Map<String, double>> getPlaisirsByTag() async {
+    try {
+      final plaisirs = await getPlaisirs();
+      final Map<String, double> totals = {};
+
+      for (var plaisir in plaisirs) {
+        final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
+        final amount = (plaisir['amount'] as num).toDouble();
+        totals[tag] = (totals[tag] ?? 0) + amount;
+      }
+
+      return totals;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul plaisirs par tag: $e');
+      }
+      return {};
+    }
+  }
+
+  /// Migration des données existantes vers le format chiffré
+  Future<void> migrateToEncrypted() async {
+    _ensureInitialized();
+    try {
+      if (kDebugMode) {
+        print('🔄 Migration vers données chiffrées...');
+      }
+
+      // Migrer les entrées
+      final entrees = await _firebaseService.loadEntrees();
+      bool needsMigration = false;
+      
+      for (int i = 0; i < entrees.length; i++) {
+        if (entrees[i]['_encrypted'] != true) {
+          entrees[i] = _encryption.encryptTransaction(entrees[i]);
+          needsMigration = true;
+        }
+      }
+      
+      if (needsMigration) {
+        await _firebaseService.saveEntrees(entrees);
+        if (kDebugMode) {
+          print('✅ Entrées migrées vers format chiffré');
+        }
+      }
+
+      // Migrer les sorties
+      final sorties = await _firebaseService.loadSorties();
+      needsMigration = false;
+      
+      for (int i = 0; i < sorties.length; i++) {
+        if (sorties[i]['_encrypted'] != true) {
+          sorties[i] = _encryption.encryptTransaction(sorties[i]);
+          needsMigration = true;
+        }
+      }
+      
+      if (needsMigration) {
+        await _firebaseService.saveSorties(sorties);
+        if (kDebugMode) {
+          print('✅ Sorties migrées vers format chiffré');
+        }
+      }
+
+      // Migrer les plaisirs
+      final plaisirs = await _firebaseService.loadPlaisirs();
+      needsMigration = false;
+      
+      for (int i = 0; i < plaisirs.length; i++) {
+        if (plaisirs[i]['_encrypted'] != true) {
+          plaisirs[i] = _encryption.encryptTransaction(plaisirs[i]);
+          needsMigration = true;
+        }
+      }
+      
+      if (needsMigration) {
+        await _firebaseService.savePlaisirs(plaisirs);
+        if (kDebugMode) {
+          print('✅ Plaisirs migrés vers format chiffré');
+        }
+      }
+
+      if (kDebugMode) {
+        print('✅ Migration terminée');
+      }
+      
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur migration: $e');
+      }
+    }
+  }
+}

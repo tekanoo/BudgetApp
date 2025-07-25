@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/budget_data_service.dart';
+import '../services/encrypted_budget_service.dart'; // CHANGÉ: import du service chiffré
 
 class PlaisirsTab extends StatefulWidget {
   const PlaisirsTab({super.key});
@@ -9,7 +9,7 @@ class PlaisirsTab extends StatefulWidget {
 }
 
 class _PlaisirsTabState extends State<PlaisirsTab> {
-  final BudgetDataService _dataService = BudgetDataService();
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ: service chiffré
   List<Map<String, dynamic>> plaisirs = [];
   bool isLoading = true;
   String _sortBy = 'date'; // 'date', 'amount', 'tag'
@@ -27,7 +27,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     });
 
     try {
-      final data = await _dataService.getPlaisirs();
+      final data = await _dataService.getPlaisirs(); // Les données sont automatiquement déchiffrées
       setState(() {
         plaisirs = data;
         isLoading = false;
@@ -205,6 +205,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
   Future<void> _updatePlaisir(int index, Map<String, dynamic> newData) async {
     try {
+      // Les données sont automatiquement chiffrées par le service
       await _dataService.updatePlaisir(
         index: index,
         amount: newData['amount'],

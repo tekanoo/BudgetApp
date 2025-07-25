@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/budget_data_service.dart';
+import '../services/encrypted_budget_service.dart'; // CHANGÉ: service chiffré
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -9,7 +9,7 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  final BudgetDataService _dataService = BudgetDataService();
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _tagController = TextEditingController();
   DateTime? _selectedDate;
@@ -97,6 +97,7 @@ class _HomeTabState extends State<HomeTab> {
           ? 'Sans catégorie' 
           : _tagController.text.trim();
 
+      // Les données sont automatiquement chiffrées !
       await _dataService.addPlaisir(
         amount: amount,
         tag: tag,
@@ -116,7 +117,7 @@ class _HomeTabState extends State<HomeTab> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Dépense ajoutée avec succès !'),
+          content: Text('💰 Dépense ajoutée avec succès ! (Données chiffrées)'),
           backgroundColor: Colors.green,
         ),
       );
@@ -154,6 +155,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _loadBalance() async {
     try {
+      // Les données sont automatiquement déchiffrées !
       final balance = await _dataService.getBankBalance();
       setState(() {
         _currentBalance = balance;
@@ -178,15 +180,50 @@ class _HomeTabState extends State<HomeTab> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Mettre à jour le solde'),
-        content: TextField(
-          controller: controller,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          decoration: const InputDecoration(
-            labelText: 'Nouveau solde',
-            prefixText: '€ ',
-            border: OutlineInputBorder(),
-          ),
+        title: const Row(
+          children: [
+            Icon(Icons.account_balance_wallet),
+            SizedBox(width: 8),
+            Text('Mettre à jour le solde'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'Nouveau solde',
+                prefixText: '€ ',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.security, color: Colors.green.shade700, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ce montant sera automatiquement chiffré',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -197,6 +234,7 @@ class _HomeTabState extends State<HomeTab> {
             onPressed: () async {
               final newBalance = double.tryParse(controller.text) ?? _currentBalance;
               try {
+                // Les données sont automatiquement chiffrées !
                 await _dataService.setBankBalance(newBalance);
                 setState(() {
                   _currentBalance = newBalance;
@@ -205,7 +243,7 @@ class _HomeTabState extends State<HomeTab> {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Solde mis à jour avec succès'),
+                      content: Text('🔐 Solde mis à jour et chiffré avec succès'),
                       backgroundColor: Colors.green,
                     ),
                   );
@@ -267,6 +305,30 @@ class _HomeTabState extends State<HomeTab> {
                         size: 32,
                       ),
                       const Spacer(),
+                      // NOUVEAU: Indicateur de chiffrement
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock, color: Colors.white, size: 14),
+                            SizedBox(width: 4),
+                            Text(
+                              'Chiffré',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       IconButton(
                         onPressed: _updateBalance,
                         icon: const Icon(
@@ -321,7 +383,7 @@ class _HomeTabState extends State<HomeTab> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
-                helperText: 'Montant de la dépense',
+                helperText: 'Montant de la dépense (sera chiffré)',
               ),
             ),
             const SizedBox(height: 20),
@@ -416,35 +478,35 @@ class _HomeTabState extends State<HomeTab> {
                       )
                     : const Icon(Icons.add),
                 label: Text(
-                  _isLoading ? 'Sauvegarde...' : 'Ajouter la dépense',
+                  _isLoading ? 'Chiffrement et sauvegarde...' : 'Ajouter la dépense',
                   style: const TextStyle(fontSize: 16),
                 ),
               ),
             ),
             const SizedBox(height: 16),
             
-            // Informations
+            // Informations sur la sécurité
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: Colors.green.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: Colors.green.shade200),
               ),
               child: Row(
                 children: [
                   Icon(
-                    Icons.cloud_sync,
-                    color: Colors.blue.shade600,
+                    Icons.security,
+                    color: Colors.green.shade600,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Vos données sont automatiquement synchronisées dans le cloud',
+                      '🔐 Vos données financières sont automatiquement chiffrées avant d\'être envoyées dans le cloud. Même le développeur ne peut pas voir vos montants !',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.blue.shade700,
+                        color: Colors.green.shade700,
                       ),
                     ),
                   ),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/budget_data_service.dart';
+import '../services/encrypted_budget_service.dart'; // CHANGÉ: service chiffré
 
 class EntreesTab extends StatefulWidget {
   const EntreesTab({super.key});
@@ -9,7 +9,7 @@ class EntreesTab extends StatefulWidget {
 }
 
 class _EntreesTabState extends State<EntreesTab> {
-  final BudgetDataService _dataService = BudgetDataService();
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ
   List<Map<String, dynamic>> entrees = [];
   bool isLoading = true;
   String _sortBy = 'date'; // 'date', 'amount', 'description'
@@ -27,7 +27,7 @@ class _EntreesTabState extends State<EntreesTab> {
     });
 
     try {
-      final data = await _dataService.getEntrees();
+      final data = await _dataService.getEntrees(); // Données automatiquement déchiffrées
       setState(() {
         entrees = data;
         isLoading = false;
@@ -86,6 +86,7 @@ class _EntreesTabState extends State<EntreesTab> {
     final result = await _showEntreeDialog();
     if (result != null) {
       try {
+        // Données automatiquement chiffrées avant sauvegarde
         await _dataService.addEntree(
           amount: result['amount'],
           description: result['description'],
@@ -95,7 +96,7 @@ class _EntreesTabState extends State<EntreesTab> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Revenu ajouté avec succès'),
+            content: Text('💰 Revenu ajouté et chiffré avec succès'),
             backgroundColor: Colors.green,
           ),
         );
@@ -121,6 +122,7 @@ class _EntreesTabState extends State<EntreesTab> {
     
     if (result != null) {
       try {
+        // Données automatiquement chiffrées avant mise à jour
         await _dataService.updateEntree(
           index: index,
           amount: result['amount'],
@@ -131,7 +133,7 @@ class _EntreesTabState extends State<EntreesTab> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Revenu modifié avec succès'),
+            content: Text('🔐 Revenu modifié et rechiffré avec succès'),
             backgroundColor: Colors.blue,
           ),
         );
@@ -189,6 +191,32 @@ class _EntreesTabState extends State<EntreesTab> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
+                helperText: 'Sera automatiquement chiffré',
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Indicateur de sécurité
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.security, color: Colors.green.shade700, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ce montant sera automatiquement chiffré',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -345,6 +373,30 @@ class _EntreesTabState extends State<EntreesTab> {
                               color: Colors.white,
                               size: 40,
                             ),
+                            const SizedBox(width: 12),
+                            // Indicateur de chiffrement
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.lock, color: Colors.white, size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Chiffré',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             const Spacer(),
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.sort, color: Colors.white),
@@ -468,13 +520,23 @@ class _EntreesTabState extends State<EntreesTab> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '${amount.toStringAsFixed(2)} €',
-                                  style: TextStyle(
-                                    color: Colors.green.shade600,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '${amount.toStringAsFixed(2)} €',
+                                      style: TextStyle(
+                                        color: Colors.green.shade600,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.lock,
+                                      size: 12,
+                                      color: Colors.green.shade600,
+                                    ),
+                                  ],
                                 ),
                                 if (date != null)
                                   Text(
@@ -512,4 +574,4 @@ class _EntreesTabState extends State<EntreesTab> {
       ),
     );
   }
-  }
+}

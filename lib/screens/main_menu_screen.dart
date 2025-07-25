@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../services/firebase_service.dart';
+import '../services/encrypted_budget_service.dart'; // AJOUTÉ: import du service chiffré
 import 'home_tab.dart';
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
@@ -67,6 +68,19 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         print('📱 Application initialisée avec Firebase');
         print('👤 Utilisateur: ${_firebaseService.currentUser?.displayName}');
       }
+      
+      // NOUVEAU : Initialiser le service de chiffrement
+      final encryptedService = EncryptedBudgetDataService();
+      await encryptedService.initialize();
+      
+      // Migration optionnelle des données existantes (décommentez pour migrer une seule fois)
+      // await encryptedService.migrateToEncrypted();
+      
+      if (kDebugMode) {
+        print('🔐 Chiffrement des données financières activé');
+        print('🛡️ Vos données sont maintenant protégées');
+      }
+      
     } catch (e) {
       if (kDebugMode) {
         print('❌ Erreur initialisation: $e');
@@ -142,6 +156,31 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                         style: TextStyle(
                           color: Colors.grey[600],
                           fontSize: 14,
+                        ),
+                      ),
+                      // NOUVEAU: Indicateur de sécurité
+                      Container(
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.shade300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.security, size: 12, color: Colors.green.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Données chiffrées',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -251,15 +290,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 8),
-            Text('Version 2.0.0 - Firebase Edition'),
+            Text('Version 2.1.0 - Edition Sécurisée'),
             SizedBox(height: 16),
             Text('Fonctionnalités :'),
             Text('• Synchronisation cloud avec Google'),
             Text('• Suivi des revenus, charges et dépenses'),
             Text('• Analyses détaillées avec graphiques'),
             Text('• Accès multi-appareils'),
+            Text('• 🔐 Chiffrement des données financières'),
             SizedBox(height: 16),
-            Text('Vos données sont automatiquement sauvegardées et synchronisées sur tous vos appareils connectés avec le même compte Google.'),
+            Text('🛡️ Sécurité : Vos montants sont chiffrés et même le développeur ne peut pas les voir dans la base de données.'),
           ],
         ),
         actions: [
@@ -293,8 +333,37 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: Text(tabTitles[_selectedIndex]),
-        centerTitle: true,
+        title: Row(
+          children: [
+            Text(tabTitles[_selectedIndex]),
+            const SizedBox(width: 8),
+            // NOUVEAU: Indicateur de sécurité dans l'AppBar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade300, width: 0.5),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.lock, size: 12, color: Colors.green.shade700),
+                  const SizedBox(width: 2),
+                  Text(
+                    'Sécurisé',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.green.shade700,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        centerTitle: false,
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
