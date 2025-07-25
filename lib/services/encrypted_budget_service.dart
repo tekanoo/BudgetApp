@@ -106,12 +106,34 @@ Future<void> togglePlaisirPointing(int index) async {
     }
   }
 
+  /// Calcule le total des sorties pointées
+  Future<double> getTotalSortiesTotaux() async {
+    try {
+      final sorties = await getSorties();
+      double total = 0.0;
+      
+      for (var sortie in sorties) {
+        if (sortie['isPointed'] == true) {
+          total += (sortie['amount'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+      
+      return total;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul total sorties pointées: $e');
+      }
+      return 0.0;
+    }
+  }
+
   /// Calcule le solde disponible (solde compte - dépenses pointées)
   Future<double> getSoldeDisponible() async {
     try {
       final soldeCompte = await getBankBalance();
-      final totalPointe = await getTotalPlaisirsTotaux();
-      return soldeCompte - totalPointe;
+      final totalPlaisirs = await getTotalPlaisirsTotaux();
+      final totalSorties = await getTotalSortiesTotaux();
+      return soldeCompte - totalPlaisirs - totalSorties;
     } catch (e) {
       if (kDebugMode) {
         print('❌ Erreur calcul solde disponible: $e');
@@ -271,6 +293,7 @@ Future<void> togglePlaisirPointing(int index) async {
         'date': DateTime.now().toIso8601String(),
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'isPointed': false, // Ajout du statut de pointage
       };
       
       // Chiffre avant d'ajouter
@@ -719,6 +742,46 @@ Future<void> togglePlaisirPointing(int index) async {
       if (kDebugMode) {
         print('❌ Erreur migration: $e');
       }
+    }
+  }
+
+  // Ajouter cette méthode après les autres méthodes de gestion des sorties
+  Future<void> toggleSortiePointing(int index) async {
+    _ensureInitialized();
+    try {
+      final sorties = await _firebaseService.loadSorties();
+      if (index >= 0 && index < sorties.length) {
+        // Déchiffrer la sortie
+        final decryptedSortie = _encryption.decryptTransaction(sorties[index]);
+        
+        final bool currentlyPointed = decryptedSortie['isPointed'] == true;
+        
+        // Bascule le statut
+        decryptedSortie['isPointed'] = !currentlyPointed;
+        
+        if (!currentlyPointed) {
+          // Si on pointe, on ajoute la date
+          decryptedSortie['pointedAt'] = DateTime.now().toIso8601String();
+        } else {
+          // Si on dépointe, on supprime la date
+          decryptedSortie.remove('pointedAt');
+        }
+        
+        // Rechiffrer la sortie modifiée
+        sorties[index] = _encryption.encryptTransaction(decryptedSortie);
+        
+        // Sauvegarder
+        await _firebaseService.saveSorties(sorties);
+        
+        if (kDebugMode) {
+          print('✅ Charge ${currentlyPointed ? 'dépointée' : 'pointée'}');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur basculement pointage sortie: $e');
+      }
+      rethrow;
     }
   }
 }

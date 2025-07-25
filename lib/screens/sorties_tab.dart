@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../services/encryption_service.dart';
 
@@ -292,6 +293,46 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
+  Future<void> _togglePointing(int index) async {
+    final context = this.context;
+    try {
+      await _dataService.toggleSortiePointing(index);
+      if (!mounted) return;
+      await _loadSorties();
+      
+      final sortie = sorties[index];
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            sortie['isPointed'] == true 
+                ? '✅ Charge pointée' 
+                : '↩️ Charge dépointée'
+          ),
+          backgroundColor: sortie['isPointed'] == true 
+              ? Colors.green 
+              : Colors.orange,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du pointage: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  String _buildSubtitleText(Map<String, dynamic> sortie) {
+    final dateStr = 'Ajoutée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['date']))}';
+    if (sortie['isPointed'] == true && sortie['pointedAt'] != null) {
+      return '$dateStr • Pointée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['pointedAt']))}';
+    }
+    return dateStr;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -480,7 +521,7 @@ class _SortiesTabState extends State<SortiesTab> {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          '${sorties.length} charge${sorties.length > 1 ? 's' : ''}',
+                          '${sorties.length} charge${sorties.length > 1 ? 's' : ''} • ${sorties.where((s) => s['isPointed'] == true).length} pointée${sorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}',
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 14,
@@ -496,78 +537,81 @@ class _SortiesTabState extends State<SortiesTab> {
                       itemCount: sorties.length,
                       itemBuilder: (context, index) {
                         final sortie = sorties[index];
-                        final amount = (sortie['amount'] as num?)?.toDouble() ?? 0;
-                        final description = sortie['description'] as String? ?? '';
-                        final dateStr = sortie['date'] as String? ?? '';
-                        final date = DateTime.tryParse(dateStr);
-                        
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           child: ListTile(
+                            onTap: () => _editSortie(index),
                             leading: CircleAvatar(
-                              backgroundColor: Colors.red.shade100,
-                              child: Text(
-                                description.isNotEmpty ? description[0].toUpperCase() : '?',
-                                style: TextStyle(
-                                  color: Colors.red.shade700,
-                                  fontWeight: FontWeight.bold,
+                              backgroundColor: sortie['isPointed'] == true 
+                                  ? Colors.red.shade100 
+                                  : Colors.grey.shade200,
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.check,
+                                  color: sortie['isPointed'] == true 
+                                      ? Colors.red 
+                                      : Colors.grey.shade400,
                                 ),
+                                onPressed: () => _togglePointing(index),
                               ),
                             ),
                             title: Text(
-                              description,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w500,
-                                fontSize: 16,
+                              sortie['description'],
+                              style: TextStyle(
+                                decoration: sortie['isPointed'] == true 
+                                    ? TextDecoration.lineThrough 
+                                    : null,
                               ),
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      '${AmountParser.formatAmount(amount)} €',
-                                      style: TextStyle(
-                                        color: Colors.red.shade600,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    Icon(
-                                      Icons.lock,
-                                      size: 12,
-                                      color: Colors.red.shade600,
-                                    ),
-                                  ],
-                                ),
-                                if (date != null)
-                                  Text(
-                                    '${date.day}/${date.month}/${date.year}',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade600,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                              ],
+                            subtitle: Text(
+                              _buildSubtitleText(sortie),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _editSortie(index),
-                                  tooltip: 'Modifier',
+                                Text(
+                                  '${AmountParser.formatAmount((sortie['amount'] as num).toDouble())} €',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: sortie['isPointed'] == true ? Colors.red : null,
+                                  ),
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _deleteSortie(index),
-                                  tooltip: 'Supprimer',
+                                PopupMenuButton<String>(
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.edit, color: Colors.blue),
+                                          SizedBox(width: 8),
+                                          Text('Modifier'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.delete, color: Colors.red),
+                                          SizedBox(width: 8),
+                                          Text('Supprimer'),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case 'edit':
+                                        _editSortie(index);
+                                        break;
+                                      case 'delete':
+                                        _deleteSortie(index);
+                                        break;
+                                    }
+                                  },
                                 ),
                               ],
                             ),
-                            onTap: () => _editSortie(index),
                           ),
                         );
                       },
