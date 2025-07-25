@@ -317,32 +317,31 @@ Future<void> togglePlaisirPointing(int index) async {
     required int index,
     required String amountStr,
     required String description,
+    String? type,
   }) async {
     _ensureInitialized();
     try {
       final sorties = await _firebaseService.loadSorties();
       if (index >= 0 && index < sorties.length) {
-        final double amount = AmountParser.parseAmount(amountStr);
+        final decryptedSortie = _encryption.decryptTransaction(sorties[index]);
         
-        final updatedSortie = {
-          'amount': amount,
-          'description': description,
-          'date': DateTime.now().toIso8601String(),
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'id': sorties[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-        };
+        final amount = AmountParser.parseAmount(amountStr);
+        decryptedSortie['amount'] = amount;
+        decryptedSortie['description'] = description;
+        if (type != null) {
+          decryptedSortie['type'] = type;
+        }
         
-        // Chiffre avant de remplacer
-        sorties[index] = _encryption.encryptTransaction(updatedSortie);
+        sorties[index] = _encryption.encryptTransaction(decryptedSortie);
         await _firebaseService.saveSorties(sorties);
         
         if (kDebugMode) {
-          print('✅ Sortie chiffrée modifiée: [MONTANT_CHIFFRÉ] - $description');
+          print('✅ Charge mise à jour');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur modification sortie chiffrée: $e');
+        print('❌ Erreur mise à jour sortie: $e');
       }
       rethrow;
     }

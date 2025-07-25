@@ -293,35 +293,33 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
-  Future<void> _togglePointing(int index) async {
-    if (!mounted) return;
-    
+  Future<void> _toggleSortieType(int index) async {
     try {
-      await _dataService.toggleSortiePointing(index);
-      if (!mounted) return;
+      final sortie = sorties[index];
+      final currentType = sortie['type'] as String? ?? 'variable';
+      final newType = currentType == 'fixe' ? 'variable' : 'fixe';
+      
+      await _dataService.updateSortie(
+        index: index,
+        amountStr: sortie['amount'].toString(),
+        description: sortie['description'],
+        type: newType,
+      );
+      
       await _loadSorties();
       
       if (!mounted) return;
-      final sortie = sorties[index];
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      
-      scaffoldMessenger.showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            sortie['isPointed'] == true 
-                ? '✅ Charge pointée' 
-                : '↩️ Charge dépointée'
-          ),
-          backgroundColor: sortie['isPointed'] == true 
-              ? Colors.green 
-              : Colors.orange,
+          content: Text('Charge passée en ${newType == 'fixe' ? 'fixe' : 'variable'}'),
+          backgroundColor: newType == 'fixe' ? Colors.red : Colors.orange,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Erreur lors du pointage: $e'),
+          content: Text('Erreur lors du changement de type: $e'),
           backgroundColor: Colors.red,
         ),
       );
@@ -535,57 +533,47 @@ class _SortiesTabState extends State<SortiesTab> {
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           child: ListTile(
-                            leading: GestureDetector(
-                              onTap: () async {
-                                // Utiliser l'id unique de la charge pour le pointage
-                                final id = sortie['id'];
-                                final currentIndex = sorties.indexWhere((s) => s['id'] == id);
-                                if (currentIndex != -1) {
-                                  await _togglePointing(currentIndex);
-                                }
-                              },
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: sortie['isPointed'] == true 
-                                      ? Colors.red.shade100 
-                                      : Colors.grey.shade200,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Icon(
-                                  Icons.check,
-                                  color: sortie['isPointed'] == true 
-                                      ? Colors.red 
-                                      : Colors.grey.shade400,
-                                ),
+                            leading: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: sortie['type'] == 'fixe' 
+                                    ? Colors.red.shade100 
+                                    : Colors.orange.shade100,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Icon(
+                                sortie['type'] == 'fixe' ? Icons.calendar_month : Icons.calendar_today,
+                                color: sortie['type'] == 'fixe' ? Colors.red : Colors.orange,
                               ),
                             ),
                             title: Text(
                               sortie['description'] ?? '',
                               style: TextStyle(
-                                decoration: sortie['isPointed'] == true 
-                                    ? TextDecoration.lineThrough 
-                                    : null,
+                                fontWeight: sortie['type'] == 'fixe' ? FontWeight.bold : FontWeight.normal,
                               ),
                             ),
                             subtitle: Row(
                               children: [
+                                Icon(
+                                  sortie['type'] == 'fixe' 
+                                      ? Icons.repeat 
+                                      : Icons.show_chart,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  sortie['type'] == 'fixe' 
+                                      ? 'Charge fixe mensuelle'
+                                      : 'Charge variable',
+                                  style: const TextStyle(color: Colors.grey),
+                                ),
+                                const Text(' • '),
                                 Text(
                                   DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['date'])),
-                                  style: TextStyle(
-                                    color: sortie['isPointed'] == true 
-                                        ? Colors.red.shade300 
-                                        : Colors.grey,
-                                  ),
+                                  style: const TextStyle(color: Colors.grey),
                                 ),
-                                if (sortie['isPointed'] == true) ...[
-                                  const Text(' • '),
-                                  Text(
-                                    'Pointée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['pointedAt']))}',
-                                    style: TextStyle(color: Colors.red.shade300),
-                                  ),
-                                ],
                               ],
                             ),
                             trailing: Row(
@@ -595,11 +583,21 @@ class _SortiesTabState extends State<SortiesTab> {
                                   '${AmountParser.formatAmount((sortie['amount'] as num).toDouble())} €',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    color: sortie['isPointed'] == true ? Colors.red : null,
+                                    color: sortie['type'] == 'fixe' ? Colors.red : Colors.orange,
                                   ),
                                 ),
                                 PopupMenuButton<String>(
                                   itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'type',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.swap_horiz, color: Colors.blue),
+                                          SizedBox(width: 8),
+                                          Text('Changer type'),
+                                        ],
+                                      ),
+                                    ),
                                     const PopupMenuItem(
                                       value: 'edit',
                                       child: Row(
@@ -621,18 +619,17 @@ class _SortiesTabState extends State<SortiesTab> {
                                       ),
                                     ),
                                   ],
-                                  onSelected: (value) {
-                                    final id = sortie['id'];
-                                    final currentIndex = sorties.indexWhere((s) => s['id'] == id);
-                                    if (currentIndex != -1) {
-                                      switch (value) {
-                                        case 'edit':
-                                          _editSortie(currentIndex);
-                                          break;
-                                        case 'delete':
-                                          _deleteSortie(currentIndex);
-                                          break;
-                                      }
+                                  onSelected: (value) async {
+                                    switch (value) {
+                                      case 'type':
+                                        await _toggleSortieType(index);
+                                        break;
+                                      case 'edit':
+                                        await _editSortie(index);
+                                        break;
+                                      case 'delete':
+                                        await _deleteSortie(index);
+                                        break;
                                     }
                                   },
                                 ),
