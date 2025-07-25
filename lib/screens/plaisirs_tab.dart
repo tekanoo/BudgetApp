@@ -743,20 +743,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 ],
               ),
       ),
-      floatingActionButton: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        child: FloatingActionButton.extended(
-          onPressed: () {
-            // Naviguer vers l'onglet Dashboard pour ajouter une dépense
-            DefaultTabController.of(context).animateTo(0);
-          },
-          backgroundColor: Colors.purple.shade400,
-          foregroundColor: Colors.white,
-          icon: const Icon(Icons.add),
-          label: const Text('Ajouter'),
-          tooltip: 'Ajouter une dépense',
-        ),
-      ),
+      // Le floatingActionButton a été supprimé d'ici
     );
   }
 }
