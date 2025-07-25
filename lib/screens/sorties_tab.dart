@@ -535,36 +535,30 @@ class _SortiesTabState extends State<SortiesTab> {
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: sortie['isPointed'] == true 
-                                  ? Colors.red.shade100 
-                                  : Colors.grey.shade200,
-                              child: IconButton(
-                                icon: Icon(
+                            leading: GestureDetector(
+                              onTap: () async {
+                                // Utiliser l'id unique de la charge pour le pointage
+                                final id = sortie['id'];
+                                final currentIndex = sorties.indexWhere((s) => s['id'] == id);
+                                if (currentIndex != -1) {
+                                  await _togglePointing(currentIndex);
+                                }
+                              },
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: sortie['isPointed'] == true 
+                                      ? Colors.red.shade100 
+                                      : Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Icon(
                                   Icons.check,
                                   color: sortie['isPointed'] == true 
                                       ? Colors.red 
                                       : Colors.grey.shade400,
                                 ),
-                                // Utiliser l'ID unique de la sortie au lieu de l'index
-                                onPressed: () async {
-                                  try {
-                                    // Trouver l'index réel basé sur l'ID
-                                    final id = sortie['id'];
-                                    final realIndex = sorties.indexWhere((s) => s['id'] == id);
-                                    if (realIndex != -1) {
-                                      await _togglePointing(realIndex);
-                                    }
-                                  } catch (e) {
-                                    if (!mounted) return;
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Erreur lors du pointage: $e'),
-                                        backgroundColor: Colors.red,
-                                      ),
-                                    );
-                                  }
-                                },
                               ),
                             ),
                             title: Text(
@@ -585,7 +579,7 @@ class _SortiesTabState extends State<SortiesTab> {
                                         : Colors.grey,
                                   ),
                                 ),
-                                if (sortie['isPointed'] == true && sortie['pointedAt'] != null) ...[
+                                if (sortie['isPointed'] == true) ...[
                                   const Text(' • '),
                                   Text(
                                     'Pointée le ${DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['pointedAt']))}',
@@ -628,16 +622,15 @@ class _SortiesTabState extends State<SortiesTab> {
                                     ),
                                   ],
                                   onSelected: (value) {
-                                    // Utiliser également l'ID pour l'édition et la suppression
                                     final id = sortie['id'];
-                                    final realIndex = sorties.indexWhere((s) => s['id'] == id);
-                                    if (realIndex != -1) {
+                                    final currentIndex = sorties.indexWhere((s) => s['id'] == id);
+                                    if (currentIndex != -1) {
                                       switch (value) {
                                         case 'edit':
-                                          _editSortie(realIndex);
+                                          _editSortie(currentIndex);
                                           break;
                                         case 'delete':
-                                          _deleteSortie(realIndex);
+                                          _deleteSortie(currentIndex);
                                           break;
                                       }
                                     }
