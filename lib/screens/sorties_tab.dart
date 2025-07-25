@@ -14,8 +14,11 @@ class _SortiesTabState extends State<SortiesTab> {
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> sorties = [];
   bool isLoading = true;
-  String _sortBy = 'date'; // 'date', 'amount', 'description'
+  String _sortBy = 'date'; // 'date', 'amount', 'description', 'pointed'
   bool _ascending = false;
+  double totalSorties = 0.0;
+  double totalPointe = 0.0;
+  double soldeDisponible = 0.0;
 
   @override
   void initState() {
@@ -30,8 +33,15 @@ class _SortiesTabState extends State<SortiesTab> {
 
     try {
       final data = await _dataService.getSorties();
+      final totals = await _dataService.getTotals();
+      final solde = await _dataService.getSoldeDisponible();
+      final totalSortiesPointe = await _dataService.getTotalSortiesTotaux();
+      
       setState(() {
         sorties = data;
+        totalSorties = totals['sorties'] ?? 0.0;
+        totalPointe = totalSortiesPointe;
+        soldeDisponible = solde;
         isLoading = false;
       });
       _sortSorties();
@@ -70,18 +80,44 @@ class _SortiesTabState extends State<SortiesTab> {
             final descB = b['description'] as String? ?? '';
             comparison = descA.compareTo(descB);
             break;
+          case 'pointed':
+            final pointedA = a['isPointed'] == true ? 1 : 0;
+            final pointedB = b['isPointed'] == true ? 1 : 0;
+            comparison = pointedA.compareTo(pointedB);
+            break;
         }
         return _ascending ? comparison : -comparison;
       });
     });
   }
 
-  double get totalSorties {
-    double total = 0;
-    for (var sortie in sorties) {
-      total += (sortie['amount'] as num?)?.toDouble() ?? 0;
+  Future<void> _togglePointing(int index) async {
+    try {
+      await _dataService.toggleSortiePointing(index);
+      await _loadSorties(); // Recharger pour mettre à jour les totaux
+      
+      if (!mounted) return;
+      final isPointed = sorties[index]['isPointed'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPointed 
+              ? '✅ Charge pointée - Solde mis à jour'
+              : '↩️ Charge dépointée - Solde mis à jour'
+          ),
+          backgroundColor: isPointed ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du pointage: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-    return total;
   }
 
   Future<void> _addSortie() async {
@@ -223,6 +259,36 @@ class _SortiesTabState extends State<SortiesTab> {
                 ],
               ),
             ),
+            if (isEdit) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  border: Border.fromBorderSide(BorderSide(color: Color(0xFFBBDEFB))),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.info,
+                      color: Color(0xFF1976D2),
+                      size: 16
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Le statut de pointage sera préservé lors de la modification',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF1976D2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
@@ -382,7 +448,7 @@ class _SortiesTabState extends State<SortiesTab> {
               )
             : Column(
                 children: [
-                  // En-tête avec total
+                  // En-tête avec totaux et solde
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.all(16),
@@ -482,6 +548,16 @@ class _SortiesTabState extends State<SortiesTab> {
                                     ],
                                   ),
                                 ),
+                                PopupMenuItem(
+                                  value: 'pointed',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'pointed' ? Icons.check : Icons.check_circle),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par pointage'),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                             IconButton(
@@ -495,24 +571,99 @@ class _SortiesTabState extends State<SortiesTab> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 15),
+                        
+                        // Ligne des totaux
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Total Charges',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${AmountParser.formatAmount(totalSorties)} €',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        'Pointées',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.white70,
+                                        size: 12,
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    '${AmountParser.formatAmount(totalPointe)} €',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Solde Disponible',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${AmountParser.formatAmount(soldeDisponible)} €',
+                                    style: TextStyle(
+                                      color: soldeDisponible >= 0 ? Colors.greenAccent : Colors.redAccent,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        
                         const SizedBox(height: 10),
-                        const Text(
-                          'Total Charges',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Text(
-                          '${AmountParser.formatAmount(totalSorties)} €',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
                         Text(
                           '${sorties.length} charge${sorties.length > 1 ? 's' : ''} • ${sorties.where((s) => s['isPointed'] == true).length} pointée${sorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}',
                           style: const TextStyle(
@@ -530,64 +681,178 @@ class _SortiesTabState extends State<SortiesTab> {
                       itemCount: sorties.length,
                       itemBuilder: (context, index) {
                         final sortie = sorties[index];
+                        final amount = (sortie['amount'] as num?)?.toDouble() ?? 0;
+                        final description = sortie['description'] as String? ?? '';
+                        final dateStr = sortie['date'] as String? ?? '';
+                        final date = DateTime.tryParse(dateStr);
+                        final isPointed = sortie['isPointed'] == true;
+                        final pointedAt = sortie['pointedAt'] != null 
+                            ? DateTime.tryParse(sortie['pointedAt']) 
+                            : null;
+                        
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          elevation: isPointed ? 3 : 1,
+                          color: isPointed ? Colors.green.shade50 : null,
                           child: ListTile(
-                            leading: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: sortie['type'] == 'fixe' 
-                                    ? Colors.red.shade100 
-                                    : Colors.orange.shade100,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Icon(
-                                sortie['type'] == 'fixe' ? Icons.calendar_month : Icons.calendar_today,
-                                color: sortie['type'] == 'fixe' ? Colors.red : Colors.orange,
+                            leading: GestureDetector(
+                              onTap: () => _togglePointing(index),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: isPointed ? Colors.green.shade100 : 
+                                         (sortie['type'] == 'fixe' ? Colors.red.shade100 : Colors.orange.shade100),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isPointed ? Colors.green.shade300 : 
+                                           (sortie['type'] == 'fixe' ? Colors.red.shade300 : Colors.orange.shade300),
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Icon(
+                                  isPointed ? Icons.check_circle : Icons.radio_button_unchecked,
+                                  color: isPointed ? Colors.green.shade700 : 
+                                         (sortie['type'] == 'fixe' ? Colors.red.shade700 : Colors.orange.shade700),
+                                  size: 24,
+                                ),
                               ),
                             ),
-                            title: Text(
-                              sortie['description'] ?? '',
-                              style: TextStyle(
-                                fontWeight: sortie['type'] == 'fixe' ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                            subtitle: Row(
+                            title: Row(
                               children: [
-                                Icon(
-                                  sortie['type'] == 'fixe' 
-                                      ? Icons.repeat 
-                                      : Icons.show_chart,
-                                  size: 16,
-                                  color: Colors.grey,
+                                Expanded(
+                                  child: Text(
+                                    description,
+                                    style: TextStyle(
+                                      fontWeight: sortie['type'] == 'fixe' ? FontWeight.bold : FontWeight.normal,
+                                      color: isPointed ? Colors.green.shade700 : null,
+                                    ),
+                                  ),
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  sortie['type'] == 'fixe' 
-                                      ? 'Charge fixe mensuelle'
-                                      : 'Charge variable',
-                                  style: const TextStyle(color: Colors.grey),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '${AmountParser.formatAmount(amount)} €',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: isPointed ? Colors.green.shade700 : 
+                                               (sortie['type'] == 'fixe' ? Colors.red : Colors.orange),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.lock_open,
+                                      size: 12,
+                                      color: isPointed ? Colors.green.shade400 : 
+                                             (sortie['type'] == 'fixe' ? Colors.red.shade400 : Colors.orange.shade400),
+                                    ),
+                                  ],
                                 ),
-                                const Text(' • '),
-                                Text(
-                                  DateFormat('dd/MM/yyyy').format(DateTime.parse(sortie['date'])),
-                                  style: const TextStyle(color: Colors.grey),
+                              ],
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      sortie['type'] == 'fixe' 
+                                          ? Icons.repeat 
+                                          : Icons.show_chart,
+                                      size: 16,
+                                      color: isPointed ? Colors.green.shade600 : Colors.grey,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      sortie['type'] == 'fixe' 
+                                          ? 'Charge fixe mensuelle'
+                                          : 'Charge variable',
+                                      style: TextStyle(
+                                        color: isPointed ? Colors.green.shade600 : Colors.grey,
+                                      ),
+                                    ),
+                                    if (date != null) ...[
+                                      const Text(' • '),
+                                      Text(
+                                        DateFormat('dd/MM/yyyy').format(date),
+                                        style: TextStyle(
+                                          color: isPointed ? Colors.green.shade600 : Colors.grey,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
+                                if (isPointed && pointedAt != null)
+                                  Text(
+                                    'Pointée le ${pointedAt.day}/${pointedAt.month} à ${pointedAt.hour}:${pointedAt.minute.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      color: Colors.green.shade600,
+                                      fontSize: 10,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
                               ],
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(
-                                  '${AmountParser.formatAmount((sortie['amount'] as num).toDouble())} €',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: sortie['type'] == 'fixe' ? Colors.red : Colors.orange,
+                                if (isPointed)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.green.shade300),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check, size: 12, color: Colors.green.shade700),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          'Pointé',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.green.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                ),
+                                const SizedBox(width: 8),
                                 PopupMenuButton<String>(
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case 'toggle':
+                                        _togglePointing(index);
+                                        break;
+                                      case 'type':
+                                        _toggleSortieType(index);
+                                        break;
+                                      case 'edit':
+                                        _editSortie(index);
+                                        break;
+                                      case 'delete':
+                                        _deleteSortie(index);
+                                        break;
+                                    }
+                                  },
                                   itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'toggle',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
+                                            color: isPointed ? Colors.orange : Colors.green,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(isPointed ? 'Dépointer' : 'Pointer'),
+                                        ],
+                                      ),
+                                    ),
                                     const PopupMenuItem(
                                       value: 'type',
                                       child: Row(
@@ -619,22 +884,10 @@ class _SortiesTabState extends State<SortiesTab> {
                                       ),
                                     ),
                                   ],
-                                  onSelected: (value) async {
-                                    switch (value) {
-                                      case 'type':
-                                        await _toggleSortieType(index);
-                                        break;
-                                      case 'edit':
-                                        await _editSortie(index);
-                                        break;
-                                      case 'delete':
-                                        await _deleteSortie(index);
-                                        break;
-                                    }
-                                  },
                                 ),
                               ],
                             ),
+                            onTap: () => _togglePointing(index),
                           ),
                         );
                       },
