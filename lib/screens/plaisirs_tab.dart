@@ -201,16 +201,16 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE3F2FD), // Using a fixed color instead of Colors.blue.shade50
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFBBDEFB)), // Instead of Colors.blue.shade200
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  border: Border.fromBorderSide(BorderSide(color: Color(0xFFBBDEFB))),
                 ),
                 child: const Row(
                   children: [
                     Icon(
                       Icons.info,
-                      color: Color(0xFF1976D2), // Instead of Colors.blue.shade700
+                      color: Color(0xFF1976D2),
                       size: 16
                     ),
                     SizedBox(width: 8),
@@ -219,7 +219,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                         'Le statut de pointage sera préservé lors de la modification',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF1976D2), // Instead of Colors.blue.shade700
+                          color: Color(0xFF1976D2),
                         ),
                       ),
                     ),
@@ -497,17 +497,17 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                             Expanded(
                               child: Column(
                                 children: [
-                                  Row(
+                                  const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'Pointées',
                                         style: TextStyle(
                                           color: Colors.white70,
                                           fontSize: 12,
                                         ),
                                       ),
-                                      const SizedBox(width: 4),
+                                      SizedBox(width: 4),
                                       Icon(
                                         Icons.check_circle,
                                         color: Colors.white70,

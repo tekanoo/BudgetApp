@@ -398,14 +398,15 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
         await Future.delayed(const Duration(milliseconds: 500));
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la mise à jour des transactions: $e'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
+      // Vérifier que le widget est toujours monté avant d'utiliser context
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la mise à jour des transactions: $e'),
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
@@ -510,8 +511,8 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
                         : null,
                     filled: true,
                     fillColor: Colors.white.withValues(alpha: 0.2),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    border: const OutlineInputBorder(
+                      borderRadius: BorderRadius.all(Radius.circular(12)),
                       borderSide: BorderSide.none,
                     ),
                   ),

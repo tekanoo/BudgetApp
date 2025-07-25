@@ -128,7 +128,7 @@ class _HomeTabState extends State<HomeTab> {
             label: 'Voir',
             onPressed: () {
               // Naviguer vers l'onglet des dépenses
-              DefaultTabController.of(context)?.animateTo(1);
+              DefaultTabController.of(context).animateTo(1);
             },
           ),
         ),
@@ -386,17 +386,17 @@ class _HomeTabState extends State<HomeTab> {
                       Expanded(
                         child: Column(
                           children: [
-                            Row(
+                            const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Text(
+                                Text(
                                   'Pointé',
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 12,
                                   ),
                                 ),
-                                const SizedBox(width: 4),
+                                SizedBox(width: 4),
                                 Icon(
                                   Icons.check_circle,
                                   color: Colors.white70,
