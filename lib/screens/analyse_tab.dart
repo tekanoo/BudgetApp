@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../services/encrypted_budget_service.dart'; // CHANGÉ: service chiffré
 
 class AnalyseTab extends StatefulWidget {
   const AnalyseTab({super.key});
@@ -10,8 +10,10 @@ class AnalyseTab extends StatefulWidget {
 }
 
 class _AnalyseTabState extends State<AnalyseTab> {
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ
   double totalEntrees = 0;
   double totalSorties = 0;
+  double totalPlaisirs = 0;
   bool isLoading = true;
 
   @override
@@ -21,42 +23,33 @@ class _AnalyseTabState extends State<AnalyseTab> {
   }
 
   Future<void> _loadData() async {
-    final prefs = await SharedPreferences.getInstance();
-
-    final entreesStr = prefs.getStringList('entrees') ?? [];
-    final sortiesStr = prefs.getStringList('sorties') ?? [];
-
-    double sumEntrees = 0;
-    for (var s in entreesStr) {
-      final montant = _extractMontant(s);
-      sumEntrees += montant;
-    }
-
-    double sumSorties = 0;
-    for (var s in sortiesStr) {
-      final montant = _extractMontant(s);
-      sumSorties += montant;
-    }
-
     setState(() {
-      totalEntrees = sumEntrees;
-      totalSorties = sumSorties;
-      isLoading = false;
+      isLoading = true;
     });
-  }
 
-  double _extractMontant(String s) {
-    final clean = s.replaceAll(RegExp(r'[{}]'), '');
-    final parts = clean.split(',');
-    for (var part in parts) {
-      final kv = part.split(':');
-      if (kv.length == 2) {
-        if (kv[0].trim() == 'montant') {
-          return double.tryParse(kv[1].trim()) ?? 0;
-        }
+    try {
+      // Charge toutes les données (automatiquement déchiffrées)
+      final totals = await _dataService.getTotals();
+      
+      setState(() {
+        totalEntrees = totals['entrees'] ?? 0.0;
+        totalSorties = totals['sorties'] ?? 0.0;
+        totalPlaisirs = totals['plaisirs'] ?? 0.0;
+        isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de chargement: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
-    return 0;
   }
 
   void _showEnlargedChart() {
@@ -72,19 +65,51 @@ class _AnalyseTabState extends State<AnalyseTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
+                  const Text(
                     'Répartition détaillée',
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(context),
+                  Row(
+                    children: [
+                      // Indicateur de sécurité
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.green.shade300),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.security, size: 12, color: Colors.green.shade700),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Données déchiffrées',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.green.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
                   ),
                 ],
               ),
               const SizedBox(height: 20),
               Expanded(
-                child: totalEntrees > 0 || totalSorties > 0
+                child: (totalEntrees > 0 || totalSorties > 0 || totalPlaisirs > 0)
                     ? PieChart(
                         PieChartData(
                           sections: _buildPieChartSections(enlarged: true),
@@ -104,8 +129,9 @@ class _AnalyseTabState extends State<AnalyseTab> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildLegendItem('Entrées', Colors.green, totalEntrees),
-                  _buildLegendItem('Sorties', Colors.red, totalSorties),
+                  _buildLegendItem('Revenus', Colors.green, totalEntrees),
+                  _buildLegendItem('Charges', Colors.red, totalSorties),
+                  _buildLegendItem('Dépenses', Colors.purple, totalPlaisirs),
                 ],
               ),
             ],
@@ -116,7 +142,7 @@ class _AnalyseTabState extends State<AnalyseTab> {
   }
 
   Widget _buildLegendItem(String label, Color color, double value) {
-    final total = totalEntrees + totalSorties;
+    final total = totalEntrees + totalSorties + totalPlaisirs;
     final percentage = total > 0 ? (value / total) * 100 : 0;
     
     return Column(
@@ -140,12 +166,23 @@ class _AnalyseTabState extends State<AnalyseTab> {
           ],
         ),
         const SizedBox(height: 4),
-        Text(
-          '${value.toStringAsFixed(2)} €',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${value.toStringAsFixed(2)} €',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.lock_open,
+              size: 12,
+              color: Colors.green.shade600,
+            ),
+          ],
         ),
         Text(
           '${percentage.toStringAsFixed(1)}%',
@@ -162,17 +199,103 @@ class _AnalyseTabState extends State<AnalyseTab> {
   Widget build(BuildContext context) {
     if (isLoading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('🔓 Déchiffrement des données en cours...'),
+            ],
+          ),
+        ),
       );
     }
 
-    final difference = totalEntrees - totalSorties;
+    final difference = totalEntrees - totalSorties - totalPlaisirs;
 
     return Scaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           children: [
+            // En-tête sécurisé
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.blue.shade400, Colors.purple.shade400],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.analytics,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Analyse Financière Sécurisée',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Données déchiffrées en temps réel',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.8),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.security, color: Colors.white, size: 16),
+                        SizedBox(width: 4),
+                        Text(
+                          'Sécurisé',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
             // Carte de résumé
             Card(
               elevation: 4,
@@ -189,16 +312,22 @@ class _AnalyseTabState extends State<AnalyseTab> {
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
                         _buildSummaryItem(
-                          'Entrées',
+                          'Revenus',
                           totalEntrees,
                           Colors.green,
                           Icons.trending_up,
                         ),
                         _buildSummaryItem(
-                          'Sorties',
+                          'Charges',
                           totalSorties,
                           Colors.red,
-                          Icons.trending_down,
+                          Icons.receipt_long,
+                        ),
+                        _buildSummaryItem(
+                          'Dépenses',
+                          totalPlaisirs,
+                          Colors.purple,
+                          Icons.shopping_cart,
                         ),
                       ],
                     ),
@@ -210,6 +339,31 @@ class _AnalyseTabState extends State<AnalyseTab> {
                       difference >= 0 ? Icons.trending_up : Icons.trending_down,
                       isLarge: true,
                     ),
+                    const SizedBox(height: 10),
+                    // Note de sécurité
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.green.shade700, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Ces montants sont stockés chiffrés dans la base de données',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -218,7 +372,7 @@ class _AnalyseTabState extends State<AnalyseTab> {
             const SizedBox(height: 20),
 
             // Graphique en secteurs
-            if (totalEntrees > 0 || totalSorties > 0) ...[
+            if (totalEntrees > 0 || totalSorties > 0 || totalPlaisirs > 0) ...[
               Card(
                 elevation: 4,
                 child: InkWell(
@@ -231,7 +385,7 @@ class _AnalyseTabState extends State<AnalyseTab> {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Répartition',
+                              'Répartition des finances',
                               style: Theme.of(context).textTheme.headlineSmall,
                             ),
                             const Icon(
@@ -283,9 +437,14 @@ class _AnalyseTabState extends State<AnalyseTab> {
                     ),
                     const SizedBox(height: 20),
                     _buildMetricRow(
-                      'Ratio charges/entrées',
+                      'Ratio charges/revenus',
                       '${(totalEntrees == 0 ? 0 : (totalSorties / totalEntrees) * 100).toStringAsFixed(1)}%',
-                      (totalEntrees == 0 ? 0 : (totalSorties / totalEntrees) * 100) > 80 ? Colors.red : (totalEntrees == 0 ? 0 : (totalSorties / totalEntrees) * 100) > 60 ? Colors.orange : Colors.green,
+                      _getRatioColor((totalEntrees == 0 ? 0 : (totalSorties / totalEntrees) * 100)),
+                    ),
+                    _buildMetricRow(
+                      'Ratio dépenses/revenus',
+                      '${(totalEntrees == 0 ? 0 : (totalPlaisirs / totalEntrees) * 100).toStringAsFixed(1)}%',
+                      _getRatioColor((totalEntrees == 0 ? 0 : (totalPlaisirs / totalEntrees) * 100)),
                     ),
                     _buildMetricRow(
                       'Économies potentielles',
@@ -294,8 +453,8 @@ class _AnalyseTabState extends State<AnalyseTab> {
                     ),
                     _buildMetricRow(
                       'Santé financière',
-                      _getHealthStatus(totalEntrees == 0 ? 0 : (totalSorties / totalEntrees) * 100, difference),
-                      _getHealthColor(totalEntrees == 0 ? 0 : (totalSorties / totalEntrees) * 100, difference),
+                      _getHealthStatus(totalEntrees == 0 ? 0 : ((totalSorties + totalPlaisirs) / totalEntrees) * 100, difference),
+                      _getHealthColor(totalEntrees == 0 ? 0 : ((totalSorties + totalPlaisirs) / totalEntrees) * 100, difference),
                     ),
                   ],
                 ),
@@ -320,13 +479,24 @@ class _AnalyseTabState extends State<AnalyseTab> {
           ),
         ),
         const SizedBox(height: 4),
-        Text(
-          '${value.toStringAsFixed(2)} €',
-          style: TextStyle(
-            fontSize: isLarge ? 24 : 18,
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${value.toStringAsFixed(2)} €',
+              style: TextStyle(
+                fontSize: isLarge ? 24 : 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.lock_open,
+              size: isLarge ? 16 : 12,
+              color: Colors.green.shade600,
+            ),
+          ],
         ),
       ],
     );
@@ -339,13 +509,24 @@ class _AnalyseTabState extends State<AnalyseTab> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label, style: const TextStyle(fontSize: 16)),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                Icons.calculate,
+                size: 14,
+                color: Colors.green.shade600,
+              ),
+            ],
           ),
         ],
       ),
@@ -353,13 +534,15 @@ class _AnalyseTabState extends State<AnalyseTab> {
   }
 
   List<PieChartSectionData> _buildPieChartSections({bool enlarged = false}) {
-    final double total = totalEntrees + totalSorties;
-    return [
-      if (totalEntrees > 0) PieChartSectionData(
+    final double total = totalEntrees + totalSorties + totalPlaisirs;
+    final List<PieChartSectionData> sections = [];
+
+    if (totalEntrees > 0) {
+      sections.add(PieChartSectionData(
         color: Colors.green,
         value: totalEntrees,
         title: enlarged 
-          ? 'Entrées\n${totalEntrees.toStringAsFixed(2)} €\n${((totalEntrees / total) * 100).toStringAsFixed(1)}%' 
+          ? 'Revenus\n${totalEntrees.toStringAsFixed(2)} €\n${((totalEntrees / total) * 100).toStringAsFixed(1)}%' 
           : '${((totalEntrees / total) * 100).toStringAsFixed(1)}%',
         radius: enlarged ? 120.0 : 80.0,
         titleStyle: TextStyle(
@@ -367,12 +550,15 @@ class _AnalyseTabState extends State<AnalyseTab> {
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
-      ),
-      if (totalSorties > 0) PieChartSectionData(
+      ));
+    }
+
+    if (totalSorties > 0) {
+      sections.add(PieChartSectionData(
         color: Colors.red,
         value: totalSorties,
         title: enlarged 
-          ? 'Sorties\n${totalSorties.toStringAsFixed(2)} €\n${((totalSorties / total) * 100).toStringAsFixed(1)}%' 
+          ? 'Charges\n${totalSorties.toStringAsFixed(2)} €\n${((totalSorties / total) * 100).toStringAsFixed(1)}%' 
           : '${((totalSorties / total) * 100).toStringAsFixed(1)}%',
         radius: enlarged ? 120.0 : 80.0,
         titleStyle: TextStyle(
@@ -380,21 +566,48 @@ class _AnalyseTabState extends State<AnalyseTab> {
           fontWeight: FontWeight.bold,
           color: Colors.white,
         ),
-      ),
-    ];
+      ));
+    }
+
+    if (totalPlaisirs > 0) {
+      sections.add(PieChartSectionData(
+        color: Colors.purple,
+        value: totalPlaisirs,
+        title: enlarged 
+          ? 'Dépenses\n${totalPlaisirs.toStringAsFixed(2)} €\n${((totalPlaisirs / total) * 100).toStringAsFixed(1)}%' 
+          : '${((totalPlaisirs / total) * 100).toStringAsFixed(1)}%',
+        radius: enlarged ? 120.0 : 80.0,
+        titleStyle: TextStyle(
+          fontSize: enlarged ? 14 : 12,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      ));
+    }
+
+    return sections;
+  }
+
+  Color _getRatioColor(double ratio) {
+    if (ratio > 80) return Colors.red;
+    if (ratio > 60) return Colors.orange;
+    if (ratio > 40) return Colors.yellow.shade700;
+    return Colors.green;
   }
 
   String _getHealthStatus(double ratio, double difference) {
     if (difference < 0) return 'Déficitaire';
-    if (ratio > 80) return 'À risque';
-    if (ratio > 60) return 'Acceptable';
+    if (ratio > 90) return 'À risque';
+    if (ratio > 70) return 'Acceptable';
+    if (ratio > 50) return 'Bonne';
     return 'Excellente';
   }
 
   Color _getHealthColor(double ratio, double difference) {
     if (difference < 0) return Colors.red;
-    if (ratio > 80) return Colors.red;
-    if (ratio > 60) return Colors.orange;
+    if (ratio > 90) return Colors.red;
+    if (ratio > 70) return Colors.orange;
+    if (ratio > 50) return Colors.yellow.shade700;
     return Colors.green;
   }
 }

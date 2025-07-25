@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/budget_data_service.dart';
+import '../services/encrypted_budget_service.dart'; // CHANGÉ: service chiffré
 
 class SortiesTab extends StatefulWidget {
   const SortiesTab({super.key});
@@ -9,7 +9,7 @@ class SortiesTab extends StatefulWidget {
 }
 
 class _SortiesTabState extends State<SortiesTab> {
-  final BudgetDataService _dataService = BudgetDataService();
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ
   List<Map<String, dynamic>> sorties = [];
   bool isLoading = true;
   String _sortBy = 'date'; // 'date', 'amount', 'description'
@@ -27,7 +27,7 @@ class _SortiesTabState extends State<SortiesTab> {
     });
 
     try {
-      final data = await _dataService.getSorties();
+      final data = await _dataService.getSorties(); // Données automatiquement déchiffrées
       setState(() {
         sorties = data;
         isLoading = false;
@@ -86,6 +86,7 @@ class _SortiesTabState extends State<SortiesTab> {
     final result = await _showSortieDialog();
     if (result != null) {
       try {
+        // Données automatiquement chiffrées avant sauvegarde
         await _dataService.addSortie(
           amount: result['amount'],
           description: result['description'],
@@ -95,7 +96,7 @@ class _SortiesTabState extends State<SortiesTab> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Charge ajoutée avec succès'),
+            content: Text('🔐 Charge ajoutée et chiffrée avec succès'),
             backgroundColor: Colors.green,
           ),
         );
@@ -121,6 +122,7 @@ class _SortiesTabState extends State<SortiesTab> {
     
     if (result != null) {
       try {
+        // Données automatiquement rechiffrées avant mise à jour
         await _dataService.updateSortie(
           index: index,
           amount: result['amount'],
@@ -131,7 +133,7 @@ class _SortiesTabState extends State<SortiesTab> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Charge modifiée avec succès'),
+            content: Text('🔐 Charge modifiée et rechiffrée avec succès'),
             backgroundColor: Colors.blue,
           ),
         );
@@ -189,6 +191,32 @@ class _SortiesTabState extends State<SortiesTab> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
+                helperText: 'Sera automatiquement chiffré',
+              ),
+            ),
+            const SizedBox(height: 16),
+            // Indicateur de sécurité
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.security, color: Colors.red.shade700, size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ce montant sera automatiquement chiffré',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -345,6 +373,30 @@ class _SortiesTabState extends State<SortiesTab> {
                               color: Colors.white,
                               size: 40,
                             ),
+                            const SizedBox(width: 12),
+                            // Indicateur de chiffrement
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.lock, color: Colors.white, size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Chiffré',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             const Spacer(),
                             PopupMenuButton<String>(
                               icon: const Icon(Icons.sort, color: Colors.white),
@@ -468,13 +520,23 @@ class _SortiesTabState extends State<SortiesTab> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  '${amount.toStringAsFixed(2)} €',
-                                  style: TextStyle(
-                                    color: Colors.red.shade600,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 14,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      '${amount.toStringAsFixed(2)} €',
+                                      style: TextStyle(
+                                        color: Colors.red.shade600,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Icon(
+                                      Icons.lock,
+                                      size: 12,
+                                      color: Colors.red.shade600,
+                                    ),
+                                  ],
                                 ),
                                 if (date != null)
                                   Text(
