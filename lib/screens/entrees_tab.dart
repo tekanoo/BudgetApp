@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/encrypted_budget_service.dart'; // CHANGÉ: service chiffré
+import '../services/encrypted_budget_service.dart';
+import '../services/encryption_service.dart';
 
 class EntreesTab extends StatefulWidget {
   const EntreesTab({super.key});
@@ -9,7 +10,7 @@ class EntreesTab extends StatefulWidget {
 }
 
 class _EntreesTabState extends State<EntreesTab> {
-  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> entrees = [];
   bool isLoading = true;
   String _sortBy = 'date'; // 'date', 'amount', 'description'
@@ -27,7 +28,7 @@ class _EntreesTabState extends State<EntreesTab> {
     });
 
     try {
-      final data = await _dataService.getEntrees(); // Données automatiquement déchiffrées
+      final data = await _dataService.getEntrees();
       setState(() {
         entrees = data;
         isLoading = false;
@@ -42,99 +43,6 @@ class _EntreesTabState extends State<EntreesTab> {
           SnackBar(
             content: Text('Erreur de chargement: $e'),
             backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _sortEntrees() {
-    setState(() {
-      entrees.sort((a, b) {
-        int comparison = 0;
-        switch (_sortBy) {
-          case 'date':
-            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
-            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
-            comparison = dateA.compareTo(dateB);
-            break;
-          case 'amount':
-            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
-            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
-            comparison = amountA.compareTo(amountB);
-            break;
-          case 'description':
-            final descA = a['description'] as String? ?? '';
-            final descB = b['description'] as String? ?? '';
-            comparison = descA.compareTo(descB);
-            break;
-        }
-        return _ascending ? comparison : -comparison;
-      });
-    });
-  }
-
-  double get totalEntrees {
-    double total = 0;
-    for (var entree in entrees) {
-      total += (entree['amount'] as num?)?.toDouble() ?? 0;
-    }
-    return total;
-  }
-
-  Future<void> _addEntree() async {
-    final result = await _showEntreeDialog();
-    if (result != null) {
-      try {
-        // Données automatiquement chiffrées avant sauvegarde
-        await _dataService.addEntree(
-          amount: result['amount'],
-          description: result['description'],
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('💰 Revenu ajouté et chiffré avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de l\'ajout: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _editEntree(int index) async {
-    final entree = entrees[index];
-    final result = await _showEntreeDialog(
-      description: entree['description'] as String? ?? '',
-      amount: (entree['amount'] as num?)?.toDouble() ?? 0,
-      isEdit: true,
-    );
-    
-    if (result != null) {
-      try {
-        // Données automatiquement chiffrées avant mise à jour
-        await _dataService.updateEntree(
-          index: index,
-          amount: result['amount'],
-          description: result['description'],
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔐 Revenu modifié et rechiffré avec succès'),
-            backgroundColor: Colors.blue,
           ),
         );
       } catch (e) {
@@ -155,7 +63,9 @@ class _EntreesTabState extends State<EntreesTab> {
     bool isEdit = false,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
-    final montantController = TextEditingController(text: amount?.toString() ?? '');
+    final montantController = TextEditingController(
+      text: amount != null ? AmountParser.formatAmount(amount) : ''
+    );
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -191,11 +101,10 @@ class _EntreesTabState extends State<EntreesTab> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
-                helperText: 'Sera automatiquement chiffré',
+                helperText: 'Utilisez , ou . pour les décimales (ex: 1500,50)',
               ),
             ),
             const SizedBox(height: 16),
-            // Indicateur de sécurité
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -229,11 +138,12 @@ class _EntreesTabState extends State<EntreesTab> {
           FilledButton(
             onPressed: () {
               final desc = descriptionController.text.trim();
-              final montant = double.tryParse(montantController.text.trim());
-              if (desc.isNotEmpty && montant != null && montant > 0) {
+              final amountStr = montantController.text.trim();
+              final montant = AmountParser.parseAmount(amountStr);
+              if (desc.isNotEmpty && montant > 0) {
                 Navigator.pop(context, {
                   'description': desc,
-                  'amount': montant,
+                  'amountStr': amountStr,
                 });
               }
             },
@@ -374,7 +284,6 @@ class _EntreesTabState extends State<EntreesTab> {
                               size: 40,
                             ),
                             const SizedBox(width: 12),
-                            // Indicateur de chiffrement
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
@@ -467,7 +376,7 @@ class _EntreesTabState extends State<EntreesTab> {
                           ),
                         ),
                         Text(
-                          '${totalEntrees.toStringAsFixed(2)} €',
+                          '${AmountParser.formatAmount(totalEntrees)} €',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 28,
@@ -523,7 +432,7 @@ class _EntreesTabState extends State<EntreesTab> {
                                 Row(
                                   children: [
                                     Text(
-                                      '${amount.toStringAsFixed(2)} €',
+                                      '${AmountParser.formatAmount(amount)} €',
                                       style: TextStyle(
                                         color: Colors.green.shade600,
                                         fontWeight: FontWeight.bold,
@@ -575,3 +484,93 @@ class _EntreesTabState extends State<EntreesTab> {
     );
   }
 }
+      }
+    }
+  }
+
+  void _sortEntrees() {
+    setState(() {
+      entrees.sort((a, b) {
+        int comparison = 0;
+        switch (_sortBy) {
+          case 'date':
+            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
+            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
+            comparison = dateA.compareTo(dateB);
+            break;
+          case 'amount':
+            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
+            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
+            comparison = amountA.compareTo(amountB);
+            break;
+          case 'description':
+            final descA = a['description'] as String? ?? '';
+            final descB = b['description'] as String? ?? '';
+            comparison = descA.compareTo(descB);
+            break;
+        }
+        return _ascending ? comparison : -comparison;
+      });
+    });
+  }
+
+  double get totalEntrees {
+    double total = 0;
+    for (var entree in entrees) {
+      total += (entree['amount'] as num?)?.toDouble() ?? 0;
+    }
+    return total;
+  }
+
+  Future<void> _addEntree() async {
+    final result = await _showEntreeDialog();
+    if (result != null) {
+      try {
+        await _dataService.addEntree(
+          amountStr: result['amountStr'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💰 Revenu de ${result['amountStr']} € ajouté et chiffré avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editEntree(int index) async {
+    final entree = entrees[index];
+    final result = await _showEntreeDialog(
+      description: entree['description'] as String? ?? '',
+      amount: (entree['amount'] as num?)?.toDouble() ?? 0,
+      isEdit: true,
+    );
+    
+    if (result != null) {
+      try {
+        await _dataService.updateEntree(
+          index: index,
+          amountStr: result['amountStr'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🔐 Revenu modifié et rechiffré avec succès'),
+            backgroundColor: Colors.blue,
+          ),

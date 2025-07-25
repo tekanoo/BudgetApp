@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/encrypted_budget_service.dart'; // CHANGÉ: service chiffré
+import '../services/encrypted_budget_service.dart';
+import '../services/encryption_service.dart';
 
 class HomeTab extends StatefulWidget {
   const HomeTab({super.key});
@@ -9,7 +10,7 @@ class HomeTab extends StatefulWidget {
 }
 
 class _HomeTabState extends State<HomeTab> {
-  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _tagController = TextEditingController();
   DateTime? _selectedDate;
@@ -17,6 +18,8 @@ class _HomeTabState extends State<HomeTab> {
   List<String> _filteredTags = [];
   bool _isLoading = false;
   double _currentBalance = 0.0;
+  double _soldeDisponible = 0.0;
+  double _totalPointe = 0.0;
 
   @override
   void initState() {
@@ -77,11 +80,12 @@ class _HomeTabState extends State<HomeTab> {
       return;
     }
 
-    final amount = double.tryParse(_amountController.text);
-    if (amount == null || amount <= 0) {
+    // Parse le montant avec support des virgules
+    final amount = AmountParser.parseAmount(_amountController.text);
+    if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Veuillez entrer un montant valide'),
+          content: Text('Veuillez entrer un montant valide (utilisez , ou . pour les décimales)'),
           backgroundColor: Colors.red,
         ),
       );
@@ -99,7 +103,7 @@ class _HomeTabState extends State<HomeTab> {
 
       // Les données sont automatiquement chiffrées !
       await _dataService.addPlaisir(
-        amount: amount,
+        amountStr: _amountController.text,
         tag: tag,
         date: _selectedDate,
       );
@@ -111,14 +115,22 @@ class _HomeTabState extends State<HomeTab> {
         _selectedDate = DateTime.now();
       });
 
-      // Recharger les tags disponibles
+      // Recharger les tags disponibles et les soldes
       await _loadAvailableTags();
+      await _loadBalance();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('💰 Dépense ajoutée avec succès ! (Données chiffrées)'),
+        SnackBar(
+          content: Text('💰 Dépense de ${AmountParser.formatAmount(amount)} € ajoutée avec succès !'),
           backgroundColor: Colors.green,
+          action: SnackBarAction(
+            label: 'Voir',
+            onPressed: () {
+              // Naviguer vers l'onglet des dépenses
+              DefaultTabController.of(context)?.animateTo(1);
+            },
+          ),
         ),
       );
     } catch (e) {
@@ -155,10 +167,14 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _loadBalance() async {
     try {
-      // Les données sont automatiquement déchiffrées !
       final balance = await _dataService.getBankBalance();
+      final solde = await _dataService.getSoldeDisponible();
+      final totals = await _dataService.getTotals();
+      
       setState(() {
         _currentBalance = balance;
+        _soldeDisponible = solde;
+        _totalPointe = totals['plaisirsTotaux'] ?? 0.0;
       });
     } catch (e) {
       if (mounted) {
@@ -174,7 +190,7 @@ class _HomeTabState extends State<HomeTab> {
 
   Future<void> _updateBalance() async {
     final TextEditingController controller = TextEditingController(
-      text: _currentBalance.toString(),
+      text: AmountParser.formatAmount(_currentBalance),
     );
 
     await showDialog(
@@ -197,6 +213,7 @@ class _HomeTabState extends State<HomeTab> {
                 labelText: 'Nouveau solde',
                 prefixText: '€ ',
                 border: OutlineInputBorder(),
+                helperText: 'Utilisez , ou . pour les décimales',
               ),
             ),
             const SizedBox(height: 16),
@@ -232,13 +249,9 @@ class _HomeTabState extends State<HomeTab> {
           ),
           FilledButton(
             onPressed: () async {
-              final newBalance = double.tryParse(controller.text) ?? _currentBalance;
               try {
-                // Les données sont automatiquement chiffrées !
-                await _dataService.setBankBalance(newBalance);
-                setState(() {
-                  _currentBalance = newBalance;
-                });
+                await _dataService.setBankBalance(controller.text);
+                await _loadBalance();
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -275,7 +288,7 @@ class _HomeTabState extends State<HomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // En-tête avec solde bancaire
+            // En-tête avec soldes
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -305,7 +318,6 @@ class _HomeTabState extends State<HomeTab> {
                         size: 32,
                       ),
                       const Spacer(),
-                      // NOUVEAU: Indicateur de chiffrement
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
@@ -340,21 +352,96 @@ class _HomeTabState extends State<HomeTab> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Solde du compte',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    '${_currentBalance.toStringAsFixed(2)} €',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const SizedBox(height: 15),
+                  
+                  // Ligne des soldes
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Solde du compte',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              '${AmountParser.formatAmount(_currentBalance)} €',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  'Pointé',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Icon(
+                                  Icons.check_circle,
+                                  color: Colors.white70,
+                                  size: 12,
+                                ),
+                              ],
+                            ),
+                            Text(
+                              '${AmountParser.formatAmount(_totalPointe)} €',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 40,
+                        color: Colors.white.withValues(alpha: 0.3),
+                      ),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            const Text(
+                              'Disponible',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                              ),
+                            ),
+                            Text(
+                              '${AmountParser.formatAmount(_soldeDisponible)} €',
+                              style: TextStyle(
+                                color: _soldeDisponible >= 0 ? Colors.greenAccent : Colors.redAccent,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -374,7 +461,7 @@ class _HomeTabState extends State<HomeTab> {
             ),
             const SizedBox(height: 30),
 
-            // Champ montant
+            // Champ montant avec support virgules
             TextField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
@@ -383,7 +470,7 @@ class _HomeTabState extends State<HomeTab> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
-                helperText: 'Montant de la dépense (sera chiffré)',
+                helperText: 'Utilisez , ou . pour les décimales (ex: 15,50 ou 15.50)',
               ),
             ),
             const SizedBox(height: 20),
@@ -484,6 +571,49 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
             const SizedBox(height: 16),
+            
+            // Informations sur le système de pointage
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info,
+                        color: Colors.blue.shade600,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Système de pointage des dépenses',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Après avoir ajouté une dépense, vous pouvez la "pointer" dans l\'onglet Dépenses en appuyant dessus. Les dépenses pointées sont déduites de votre solde disponible.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
             
             // Informations sur la sécurité
             Container(

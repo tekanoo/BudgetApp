@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/encrypted_budget_service.dart'; // CHANGÉ: import du service chiffré
+import '../services/encrypted_budget_service.dart';
+import '../services/encryption_service.dart';
 
 class PlaisirsTab extends StatefulWidget {
   const PlaisirsTab({super.key});
@@ -9,11 +10,14 @@ class PlaisirsTab extends StatefulWidget {
 }
 
 class _PlaisirsTabState extends State<PlaisirsTab> {
-  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ: service chiffré
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> plaisirs = [];
   bool isLoading = true;
-  String _sortBy = 'date'; // 'date', 'amount', 'tag'
+  String _sortBy = 'date'; // 'date', 'amount', 'tag', 'pointed'
   bool _ascending = false;
+  double totalPlaisirs = 0.0;
+  double totalPointe = 0.0;
+  double soldeDisponible = 0.0;
 
   @override
   void initState() {
@@ -27,9 +31,15 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     });
 
     try {
-      final data = await _dataService.getPlaisirs(); // Les données sont automatiquement déchiffrées
+      final data = await _dataService.getPlaisirs();
+      final totals = await _dataService.getTotals();
+      final solde = await _dataService.getSoldeDisponible();
+      
       setState(() {
         plaisirs = data;
+        totalPlaisirs = totals['plaisirs'] ?? 0.0;
+        totalPointe = totals['plaisirsTotaux'] ?? 0.0;
+        soldeDisponible = solde;
         isLoading = false;
       });
       _sortPlaisirs();
@@ -68,34 +78,50 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             final tagB = b['tag'] as String? ?? '';
             comparison = tagA.compareTo(tagB);
             break;
+          case 'pointed':
+            final pointedA = a['isPointed'] == true ? 1 : 0;
+            final pointedB = b['isPointed'] == true ? 1 : 0;
+            comparison = pointedA.compareTo(pointedB);
+            break;
         }
         return _ascending ? comparison : -comparison;
       });
     });
   }
 
-  double get totalPlaisirs {
-    double total = 0;
-    for (var plaisir in plaisirs) {
-      total += (plaisir['amount'] as num?)?.toDouble() ?? 0;
+  Future<void> _togglePointing(int index) async {
+    try {
+      await _dataService.togglePlaisirPointing(index);
+      await _loadPlaisirs(); // Recharger pour mettre à jour les totaux
+      
+      if (!mounted) return;
+      final isPointed = plaisirs[index]['isPointed'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPointed 
+              ? '✅ Dépense pointée - Solde mis à jour'
+              : '↩️ Dépense dépointée - Solde mis à jour'
+          ),
+          backgroundColor: isPointed ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du pointage: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-    return total;
-  }
-
-  Map<String, double> get totalsByTag {
-    final Map<String, double> totals = {};
-    for (var plaisir in plaisirs) {
-      final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
-      final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0;
-      totals[tag] = (totals[tag] ?? 0) + amount;
-    }
-    return totals;
   }
 
   Future<void> _editPlaisir(int index) async {
     final plaisir = plaisirs[index];
     final amountController = TextEditingController(
-      text: (plaisir['amount'] as num?)?.toString() ?? ''
+      text: AmountParser.formatAmount((plaisir['amount'] as num?)?.toDouble() ?? 0)
     );
     final tagController = TextEditingController(
       text: plaisir['tag'] as String? ?? ''
@@ -124,6 +150,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.euro),
                   suffixText: '€',
+                  helperText: 'Utilisez , ou . pour les décimales',
                 ),
               ),
               const SizedBox(height: 16),
@@ -171,6 +198,30 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                   ),
                 ),
               ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.blue.shade700, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Le statut de pointage sera préservé lors de la modification',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
           actions: [
@@ -180,12 +231,12 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             ),
             FilledButton(
               onPressed: () {
-                final amount = double.tryParse(amountController.text.trim());
+                final amountStr = amountController.text.trim();
                 final tag = tagController.text.trim();
                 
-                if (amount != null && amount > 0 && selectedDate != null) {
+                if (amountStr.isNotEmpty && selectedDate != null) {
                   Navigator.pop(context, {
-                    'amount': amount,
+                    'amountStr': amountStr,
                     'tag': tag.isEmpty ? 'Sans catégorie' : tag,
                     'date': selectedDate,
                   });
@@ -205,20 +256,19 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
   Future<void> _updatePlaisir(int index, Map<String, dynamic> newData) async {
     try {
-      // Les données sont automatiquement chiffrées par le service
       await _dataService.updatePlaisir(
         index: index,
-        amount: newData['amount'],
+        amountStr: newData['amountStr'],
         tag: newData['tag'],
         date: newData['date'],
       );
       
-      await _loadPlaisirs(); // Recharger les données
+      await _loadPlaisirs();
       
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Dépense modifiée avec succès'),
+          content: Text('✅ Dépense modifiée avec succès'),
           backgroundColor: Colors.green,
         ),
       );
@@ -256,12 +306,12 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     if (confirmed == true) {
       try {
         await _dataService.deletePlaisir(index);
-        await _loadPlaisirs(); // Recharger les données
+        await _loadPlaisirs();
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Dépense supprimée'),
+            content: Text('🗑️ Dépense supprimée'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -319,7 +369,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
               )
             : Column(
                 children: [
-                  // Résumé en haut
+                  // En-tête avec totaux et solde
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.all(16),
@@ -395,30 +445,115 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                     ],
                                   ),
                                 ),
+                                PopupMenuItem(
+                                  value: 'pointed',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'pointed' ? Icons.check : Icons.check_circle),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par pointage'),
+                                    ],
+                                  ),
+                                ),
                               ],
                             ),
                           ],
                         ),
+                        const SizedBox(height: 15),
+                        
+                        // Ligne des totaux
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Total Dépenses',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${AmountParser.formatAmount(totalPlaisirs)} €',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text(
+                                        'Pointées',
+                                        style: TextStyle(
+                                          color: Colors.white70,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.check_circle,
+                                        color: Colors.white70,
+                                        size: 12,
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    '${AmountParser.formatAmount(totalPointe)} €',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Solde Disponible',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  Text(
+                                    '${AmountParser.formatAmount(soldeDisponible)} €',
+                                    style: TextStyle(
+                                      color: soldeDisponible >= 0 ? Colors.greenAccent : Colors.redAccent,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        
                         const SizedBox(height: 10),
-                        const Text(
-                          'Total Dépenses',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
                         Text(
-                          '${totalPlaisirs.toStringAsFixed(2)} €',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(
-                          '${plaisirs.length} dépense${plaisirs.length > 1 ? 's' : ''}',
+                          '${plaisirs.length} dépense${plaisirs.length > 1 ? 's' : ''} • ${plaisirs.where((p) => p['isPointed'] == true).length} pointée${plaisirs.where((p) => p['isPointed'] == true).length > 1 ? 's' : ''}',
                           style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 14,
@@ -438,47 +573,63 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                         final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
                         final dateStr = plaisir['date'] as String? ?? '';
                         final date = DateTime.tryParse(dateStr);
+                        final isPointed = plaisir['isPointed'] == true;
+                        final pointedAt = plaisir['pointedAt'] != null 
+                            ? DateTime.tryParse(plaisir['pointedAt']) 
+                            : null;
                         
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          elevation: isPointed ? 3 : 1,
+                          color: isPointed ? Colors.green.shade50 : null,
                           child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.purple.shade100,
-                              child: Text(
-                                tag.isNotEmpty ? tag[0].toUpperCase() : '?',
-                                style: TextStyle(
-                                  color: Colors.purple.shade700,
-                                  fontWeight: FontWeight.bold,
+                            leading: GestureDetector(
+                              onTap: () => _togglePointing(index),
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: isPointed ? Colors.green.shade100 : Colors.purple.shade100,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isPointed ? Colors.green.shade300 : Colors.purple.shade300,
+                                    width: 2,
+                                  ),
+                                ),
+                                child: Icon(
+                                  isPointed ? Icons.check_circle : Icons.radio_button_unchecked,
+                                  color: isPointed ? Colors.green.shade700 : Colors.purple.shade700,
+                                  size: 24,
                                 ),
                               ),
                             ),
-                            title: Text(
-                              '${amount.toStringAsFixed(2)} €',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                            title: Row(
+                              children: [
+                                Text(
+                                  '${AmountParser.formatAmount(amount)} €',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: isPointed ? Colors.green.shade700 : null,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.lock_open,
+                                  size: 12,
+                                  color: isPointed ? Colors.green.shade400 : Colors.purple.shade400,
+                                ),
+                              ],
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      tag,
-                                      style: TextStyle(
-                                        color: Colors.purple.shade600,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    // Seuls les montants sont chiffrés, pas les tags
-                                    Icon(
-                                      Icons.lock_open,
-                                      size: 12,
-                                      color: Colors.purple.shade400,
-                                    ),
-                                  ],
+                                Text(
+                                  tag,
+                                  style: TextStyle(
+                                    color: isPointed ? Colors.green.shade600 : Colors.purple.shade600,
+                                    fontWeight: FontWeight.w500,
+                                  ),
                                 ),
                                 if (date != null)
                                   Text(
@@ -488,24 +639,98 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                       fontSize: 12,
                                     ),
                                   ),
+                                if (isPointed && pointedAt != null)
+                                  Text(
+                                    'Pointé le ${pointedAt!.day}/${pointedAt!.month} à ${pointedAt!.hour}:${pointedAt!.minute.toString().padLeft(2, '0')}',
+                                    style: TextStyle(
+                                      color: Colors.green.shade600,
+                                      fontSize: 10,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
                               ],
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _editPlaisir(index),
-                                  tooltip: 'Modifier',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _deletePlaisir(index),
-                                  tooltip: 'Supprimer',
+                                if (isPointed)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green.shade100,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.green.shade300),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check, size: 12, color: Colors.green.shade700),
+                                        const SizedBox(width: 2),
+                                        Text(
+                                          'Pointé',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.green.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                const SizedBox(width: 8),
+                                PopupMenuButton<String>(
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case 'toggle':
+                                        _togglePointing(index);
+                                        break;
+                                      case 'edit':
+                                        _editPlaisir(index);
+                                        break;
+                                      case 'delete':
+                                        _deletePlaisir(index);
+                                        break;
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'toggle',
+                                      child: Row(
+                                        children: [
+                                          Icon(
+                                            isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
+                                            color: isPointed ? Colors.orange : Colors.green,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(isPointed ? 'Dépointer' : 'Pointer'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.edit, color: Colors.blue),
+                                          SizedBox(width: 8),
+                                          Text('Modifier'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.delete, color: Colors.red),
+                                          SizedBox(width: 8),
+                                          Text('Supprimer'),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                            onTap: () => _editPlaisir(index),
+                            onTap: () => _togglePointing(index),
                           ),
                         );
                       },
@@ -514,6 +739,21 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 ],
               ),
       ),
+      floatingActionButton: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        child: FloatingActionButton.extended(
+          onPressed: () {
+            // Naviguer vers l'onglet Dashboard pour ajouter une dépense
+            DefaultTabController.of(context)?.animateTo(0);
+          },
+          backgroundColor: Colors.purple.shade400,
+          foregroundColor: Colors.white,
+          icon: const Icon(Icons.add),
+          label: const Text('Ajouter'),
+          tooltip: 'Ajouter une dépense',
+        ),
+      ),
     );
   }
 }
+                
