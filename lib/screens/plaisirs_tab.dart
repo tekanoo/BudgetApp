@@ -202,20 +202,24 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: const Color(0xFFE3F2FD), // Using a fixed color instead of Colors.blue.shade50
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: const Color(0xFFBBDEFB)), // Instead of Colors.blue.shade200
                 ),
-                child: Row(
+                child: const Row(
                   children: [
-                    Icon(Icons.info, color: Colors.blue.shade700, size: 16),
-                    const SizedBox(width: 8),
+                    Icon(
+                      Icons.info,
+                      color: Color(0xFF1976D2), // Instead of Colors.blue.shade700
+                      size: 16
+                    ),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Le statut de pointage sera préservé lors de la modification',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.blue.shade700,
+                          color: Color(0xFF1976D2), // Instead of Colors.blue.shade700
                         ),
                       ),
                     ),
@@ -641,7 +645,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                   ),
                                 if (isPointed && pointedAt != null)
                                   Text(
-                                    'Pointé le ${pointedAt!.day}/${pointedAt!.month} à ${pointedAt!.hour}:${pointedAt!.minute.toString().padLeft(2, '0')}',
+                                    'Pointé le ${pointedAt.day}/${pointedAt.month} à ${pointedAt.hour}:${pointedAt.minute.toString().padLeft(2, '0')}',
                                     style: TextStyle(
                                       color: Colors.green.shade600,
                                       fontSize: 10,
@@ -744,7 +748,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
         child: FloatingActionButton.extended(
           onPressed: () {
             // Naviguer vers l'onglet Dashboard pour ajouter une dépense
-            DefaultTabController.of(context)?.animateTo(0);
+            DefaultTabController.of(context).animateTo(0);
           },
           backgroundColor: Colors.purple.shade400,
           foregroundColor: Colors.white,
@@ -756,4 +760,3 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     );
   }
 }
-                

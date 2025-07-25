@@ -45,14 +45,6 @@ class _EntreesTabState extends State<EntreesTab> {
             backgroundColor: Colors.red,
           ),
         );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la modification: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     }
   }
@@ -191,6 +183,105 @@ class _EntreesTabState extends State<EntreesTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la suppression: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _sortEntrees() {
+    setState(() {
+      entrees.sort((a, b) {
+        int comparison = 0;
+        switch (_sortBy) {
+          case 'date':
+            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
+            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
+            comparison = dateA.compareTo(dateB);
+            break;
+          case 'amount':
+            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
+            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
+            comparison = amountA.compareTo(amountB);
+            break;
+          case 'description':
+            final descA = a['description'] as String? ?? '';
+            final descB = b['description'] as String? ?? '';
+            comparison = descA.compareTo(descB);
+            break;
+        }
+        return _ascending ? comparison : -comparison;
+      });
+    });
+  }
+
+  double get totalEntrees {
+    double total = 0;
+    for (var entree in entrees) {
+      total += (entree['amount'] as num?)?.toDouble() ?? 0;
+    }
+    return total;
+  }
+
+  Future<void> _addEntree() async {
+    final result = await _showEntreeDialog();
+    if (result != null) {
+      try {
+        await _dataService.addEntree(
+          amountStr: result['amountStr'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('💰 Revenu de ${result['amountStr']} € ajouté et chiffré avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _editEntree(int index) async {
+    final entree = entrees[index];
+    final result = await _showEntreeDialog(
+      description: entree['description'] as String? ?? '',
+      amount: (entree['amount'] as num?)?.toDouble() ?? 0,
+      isEdit: true,
+    );
+    
+    if (result != null) {
+      try {
+        await _dataService.updateEntree(
+          index: index,
+          amountStr: result['amountStr'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🔐 Revenu modifié et rechiffré avec succès'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la modification: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -484,93 +575,3 @@ class _EntreesTabState extends State<EntreesTab> {
     );
   }
 }
-      }
-    }
-  }
-
-  void _sortEntrees() {
-    setState(() {
-      entrees.sort((a, b) {
-        int comparison = 0;
-        switch (_sortBy) {
-          case 'date':
-            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
-            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
-            comparison = dateA.compareTo(dateB);
-            break;
-          case 'amount':
-            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
-            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
-            comparison = amountA.compareTo(amountB);
-            break;
-          case 'description':
-            final descA = a['description'] as String? ?? '';
-            final descB = b['description'] as String? ?? '';
-            comparison = descA.compareTo(descB);
-            break;
-        }
-        return _ascending ? comparison : -comparison;
-      });
-    });
-  }
-
-  double get totalEntrees {
-    double total = 0;
-    for (var entree in entrees) {
-      total += (entree['amount'] as num?)?.toDouble() ?? 0;
-    }
-    return total;
-  }
-
-  Future<void> _addEntree() async {
-    final result = await _showEntreeDialog();
-    if (result != null) {
-      try {
-        await _dataService.addEntree(
-          amountStr: result['amountStr'],
-          description: result['description'],
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('💰 Revenu de ${result['amountStr']} € ajouté et chiffré avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de l\'ajout: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _editEntree(int index) async {
-    final entree = entrees[index];
-    final result = await _showEntreeDialog(
-      description: entree['description'] as String? ?? '',
-      amount: (entree['amount'] as num?)?.toDouble() ?? 0,
-      isEdit: true,
-    );
-    
-    if (result != null) {
-      try {
-        await _dataService.updateEntree(
-          index: index,
-          amountStr: result['amountStr'],
-          description: result['description'],
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔐 Revenu modifié et rechiffré avec succès'),
-            backgroundColor: Colors.blue,
-          ),

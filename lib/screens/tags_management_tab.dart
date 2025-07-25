@@ -48,22 +48,22 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
 
     try {
       final loadedTags = await _dataService.getTags();
+      if (!mounted) return;  // Add this check
       setState(() {
         tags = loadedTags;
         isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;  // Add this check
       setState(() {
         isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur de chargement: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur de chargement: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -385,7 +385,7 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
         if (plaisirs[i]['tag'] == oldTag) {
           await _dataService.updatePlaisir(
             index: i,
-            amount: (plaisirs[i]['amount'] as num).toDouble(),
+            amountStr: plaisirs[i]['amount'].toString(), // Changed from amount to amountStr
             tag: newTag,
             date: DateTime.tryParse(plaisirs[i]['date'] ?? '') ?? DateTime.now(),
           );

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_service.dart';
-import 'encryption_service.dart'; // Import du service de chiffrement
+import 'encryption_service.dart';
 
 class EncryptedBudgetDataService {
   static final EncryptedBudgetDataService _instance = EncryptedBudgetDataService._internal();
@@ -43,6 +43,84 @@ class EncryptedBudgetDataService {
         .collection('budget');
   }
 
+  /// SYSTÈME DE POINTAGE DES DÉPENSES
+
+  /// Bascule le statut de pointage d'une dépense
+  Future<void> togglePlaisirPointing(int index) async {
+    _ensureInitialized();
+    try {
+      final plaisirs = await _firebaseService.loadPlaisirs();
+      if (index >= 0 && index < plaisirs.length) {
+        final plaisir = plaisirs[index];
+        final bool currentlyPointed = plaisir['isPointed'] == true;
+        
+        // Bascule le statut
+        plaisir['isPointed'] = !currentlyPointed;
+        
+        if (!currentlyPointed) {
+          // Si on pointe, on ajoute la date
+          plaisir['pointedAt'] = DateTime.now().toIso8601String();
+        } else {
+          // Si on dépointe, on supprime la date
+          plaisir.remove('pointedAt');
+        }
+        
+        // Sauvegarde avec chiffrement si nécessaire
+        if (plaisir['_encrypted'] == true) {
+          plaisirs[index] = _encryption.encryptTransaction(plaisir);
+        } else {
+          plaisirs[index] = plaisir;
+        }
+        
+        await _firebaseService.savePlaisirs(plaisirs);
+        
+        if (kDebugMode) {
+          print('✅ Dépense ${currentlyPointed ? 'dépointée' : 'pointée'}');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur basculement pointage: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Calcule le total des dépenses pointées
+  Future<double> getTotalPlaisirsTotaux() async {
+    try {
+      final plaisirs = await getPlaisirs();
+      double total = 0.0;
+      
+      for (var plaisir in plaisirs) {
+        if (plaisir['isPointed'] == true) {
+          total += (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+      
+      return total;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul total pointé: $e');
+      }
+      return 0.0;
+    }
+  }
+
+  /// Calcule le solde disponible (solde compte - dépenses pointées)
+  Future<double> getSoldeDisponible() async {
+    try {
+      final soldeCompte = await getBankBalance();
+      final totalPointe = await getTotalPlaisirsTotaux();
+      return soldeCompte - totalPointe;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul solde disponible: $e');
+      }
+      return 0.0;
+    }
+  }
+
   /// GESTION DES ENTRÉES (REVENUS) CHIFFRÉES
 
   Future<List<Map<String, dynamic>>> getEntrees() async {
@@ -66,12 +144,15 @@ class EncryptedBudgetDataService {
   }
 
   Future<void> addEntree({
-    required double amount,
+    required String amountStr,
     required String description,
   }) async {
     _ensureInitialized();
     try {
       final entrees = await _firebaseService.loadEntrees();
+      
+      // Parse le montant avec support des virgules
+      final double amount = AmountParser.parseAmount(amountStr);
       
       // Crée la nouvelle entrée
       final newEntree = {
@@ -101,13 +182,15 @@ class EncryptedBudgetDataService {
 
   Future<void> updateEntree({
     required int index,
-    required double amount,
+    required String amountStr,
     required String description,
   }) async {
     _ensureInitialized();
     try {
       final entrees = await _firebaseService.loadEntrees();
       if (index >= 0 && index < entrees.length) {
+        final double amount = AmountParser.parseAmount(amountStr);
+        
         final updatedEntree = {
           'amount': amount,
           'description': description,
@@ -175,12 +258,13 @@ class EncryptedBudgetDataService {
   }
 
   Future<void> addSortie({
-    required double amount,
+    required String amountStr,
     required String description,
   }) async {
     _ensureInitialized();
     try {
       final sorties = await _firebaseService.loadSorties();
+      final double amount = AmountParser.parseAmount(amountStr);
       
       final newSortie = {
         'amount': amount,
@@ -209,13 +293,15 @@ class EncryptedBudgetDataService {
 
   Future<void> updateSortie({
     required int index,
-    required double amount,
+    required String amountStr,
     required String description,
   }) async {
     _ensureInitialized();
     try {
       final sorties = await _firebaseService.loadSorties();
       if (index >= 0 && index < sorties.length) {
+        final double amount = AmountParser.parseAmount(amountStr);
+        
         final updatedSortie = {
           'amount': amount,
           'description': description,
@@ -260,7 +346,7 @@ class EncryptedBudgetDataService {
     }
   }
 
-  /// GESTION DES PLAISIRS (DÉPENSES) CHIFFRÉES
+  /// GESTION DES PLAISIRS (DÉPENSES) CHIFFRÉES AVEC POINTAGE
 
   Future<List<Map<String, dynamic>>> getPlaisirs() async {
     _ensureInitialized();
@@ -283,13 +369,14 @@ class EncryptedBudgetDataService {
   }
 
   Future<void> addPlaisir({
-    required double amount,
+    required String amountStr,
     String? tag,
     DateTime? date,
   }) async {
     _ensureInitialized();
     try {
       final plaisirs = await _firebaseService.loadPlaisirs();
+      final double amount = AmountParser.parseAmount(amountStr);
       
       final newPlaisir = {
         'amount': amount,
@@ -297,6 +384,7 @@ class EncryptedBudgetDataService {
         'date': (date ?? DateTime.now()).toIso8601String(),
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'isPointed': false, // Par défaut, non pointé
       };
       
       // Chiffre avant d'ajouter
@@ -323,7 +411,7 @@ class EncryptedBudgetDataService {
 
   Future<void> updatePlaisir({
     required int index,
-    required double amount,
+    required String amountStr,
     String? tag,
     DateTime? date,
   }) async {
@@ -331,13 +419,23 @@ class EncryptedBudgetDataService {
     try {
       final plaisirs = await _firebaseService.loadPlaisirs();
       if (index >= 0 && index < plaisirs.length) {
+        final double amount = AmountParser.parseAmount(amountStr);
+        final oldPlaisir = plaisirs[index];
+        
         final updatedPlaisir = {
           'amount': amount,
           'tag': tag ?? 'Sans catégorie',
           'date': (date ?? DateTime.now()).toIso8601String(),
           'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'id': plaisirs[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          'id': oldPlaisir['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          // Préserve le statut de pointage
+          'isPointed': oldPlaisir['isPointed'] ?? false,
         };
+        
+        // Préserve la date de pointage si elle existe
+        if (oldPlaisir['pointedAt'] != null) {
+          updatedPlaisir['pointedAt'] = oldPlaisir['pointedAt'];
+        }
         
         // Chiffre avant de remplacer
         plaisirs[index] = _encryption.encryptTransaction(updatedPlaisir);
@@ -407,9 +505,11 @@ class EncryptedBudgetDataService {
     }
   }
 
-  Future<void> setBankBalance(double balance) async {
+  Future<void> setBankBalance(String balanceStr) async {
     _ensureInitialized();
     try {
+      final double balance = AmountParser.parseAmount(balanceStr);
+      
       await _userBudgetCollection!.doc('settings').set({
         'encryptedBankBalance': _encryption.encryptAmount(balance),
         'updatedAt': FieldValue.serverTimestamp(),
@@ -489,14 +589,21 @@ class EncryptedBudgetDataService {
       }
 
       double totalPlaisirs = 0;
+      double totalPlaisirsTotaux = 0; // Total des dépenses pointées
       for (var plaisir in plaisirs) {
-        totalPlaisirs += (plaisir['amount'] as num).toDouble();
+        final amount = (plaisir['amount'] as num).toDouble();
+        totalPlaisirs += amount;
+        
+        if (plaisir['isPointed'] == true) {
+          totalPlaisirsTotaux += amount;
+        }
       }
 
       return {
         'entrees': totalEntrees,
         'sorties': totalSorties,
         'plaisirs': totalPlaisirs,
+        'plaisirsTotaux': totalPlaisirsTotaux, // Nouveau : total pointé
         'solde': totalEntrees - totalSorties - totalPlaisirs,
       };
     } catch (e) {
@@ -507,6 +614,7 @@ class EncryptedBudgetDataService {
         'entrees': 0.0,
         'sorties': 0.0,
         'plaisirs': 0.0,
+        'plaisirsTotaux': 0.0,
         'solde': 0.0,
       };
     }
@@ -576,13 +684,23 @@ class EncryptedBudgetDataService {
         }
       }
 
-      // Migrer les plaisirs
+      // Migrer les plaisirs avec ajout du système de pointage
       final plaisirs = await _firebaseService.loadPlaisirs();
       needsMigration = false;
       
       for (int i = 0; i < plaisirs.length; i++) {
         if (plaisirs[i]['_encrypted'] != true) {
+          // Ajoute le système de pointage si absent
+          if (!plaisirs[i].containsKey('isPointed')) {
+            plaisirs[i]['isPointed'] = false;
+          }
           plaisirs[i] = _encryption.encryptTransaction(plaisirs[i]);
+          needsMigration = true;
+        } else if (!plaisirs[i].containsKey('isPointed')) {
+          // Ajoute le pointage aux données déjà chiffrées
+          final decrypted = _encryption.decryptTransaction(plaisirs[i]);
+          decrypted['isPointed'] = false;
+          plaisirs[i] = _encryption.encryptTransaction(decrypted);
           needsMigration = true;
         }
       }
@@ -590,7 +708,7 @@ class EncryptedBudgetDataService {
       if (needsMigration) {
         await _firebaseService.savePlaisirs(plaisirs);
         if (kDebugMode) {
-          print('✅ Plaisirs migrés vers format chiffré');
+          print('✅ Plaisirs migrés vers format chiffré avec pointage');
         }
       }
 

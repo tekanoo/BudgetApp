@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../services/encrypted_budget_service.dart'; // CHANGÉ: service chiffré
+import '../services/encrypted_budget_service.dart';
+import '../services/encryption_service.dart';
 
 class SortiesTab extends StatefulWidget {
   const SortiesTab({super.key});
@@ -9,7 +10,7 @@ class SortiesTab extends StatefulWidget {
 }
 
 class _SortiesTabState extends State<SortiesTab> {
-  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService(); // CHANGÉ
+  final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> sorties = [];
   bool isLoading = true;
   String _sortBy = 'date'; // 'date', 'amount', 'description'
@@ -27,7 +28,7 @@ class _SortiesTabState extends State<SortiesTab> {
     });
 
     try {
-      final data = await _dataService.getSorties(); // Données automatiquement déchiffrées
+      final data = await _dataService.getSorties();
       setState(() {
         sorties = data;
         isLoading = false;
@@ -88,7 +89,7 @@ class _SortiesTabState extends State<SortiesTab> {
       try {
         // Données automatiquement chiffrées avant sauvegarde
         await _dataService.addSortie(
-          amount: result['amount'],
+          amountStr: result['amountStr'],
           description: result['description'],
         );
         await _loadSorties();
@@ -125,7 +126,7 @@ class _SortiesTabState extends State<SortiesTab> {
         // Données automatiquement rechiffrées avant mise à jour
         await _dataService.updateSortie(
           index: index,
-          amount: result['amount'],
+          amountStr: result['amountStr'],
           description: result['description'],
         );
         await _loadSorties();
@@ -155,7 +156,9 @@ class _SortiesTabState extends State<SortiesTab> {
     bool isEdit = false,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
-    final montantController = TextEditingController(text: amount?.toString() ?? '');
+    final montantController = TextEditingController(
+      text: amount != null ? AmountParser.formatAmount(amount) : ''
+    );
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -191,7 +194,7 @@ class _SortiesTabState extends State<SortiesTab> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
-                helperText: 'Sera automatiquement chiffré',
+                helperText: 'Utilisez , ou . pour les décimales',
               ),
             ),
             const SizedBox(height: 16),
@@ -229,11 +232,12 @@ class _SortiesTabState extends State<SortiesTab> {
           FilledButton(
             onPressed: () {
               final desc = descriptionController.text.trim();
-              final montant = double.tryParse(montantController.text.trim());
-              if (desc.isNotEmpty && montant != null && montant > 0) {
+              final amountStr = montantController.text.trim();
+              final montant = AmountParser.parseAmount(amountStr);
+              if (desc.isNotEmpty && montant > 0) {
                 Navigator.pop(context, {
                   'description': desc,
-                  'amount': montant,
+                  'amountStr': amountStr,
                 });
               }
             },
@@ -467,7 +471,7 @@ class _SortiesTabState extends State<SortiesTab> {
                           ),
                         ),
                         Text(
-                          '${totalSorties.toStringAsFixed(2)} €',
+                          '${AmountParser.formatAmount(totalSorties)} €',
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 28,
@@ -523,7 +527,7 @@ class _SortiesTabState extends State<SortiesTab> {
                                 Row(
                                   children: [
                                     Text(
-                                      '${amount.toStringAsFixed(2)} €',
+                                      '${AmountParser.formatAmount(amount)} €',
                                       style: TextStyle(
                                         color: Colors.red.shade600,
                                         fontWeight: FontWeight.bold,
