@@ -455,6 +455,20 @@ class EncryptedBudgetDataService {
     }
   }
 
+  Future<void> saveTags(List<String> tags) async {
+    try {
+      await _firebaseService.saveTags(tags);
+      if (kDebugMode) {
+        print('✅ Tags sauvegardés (${tags.length} tags)');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur sauvegarde tags: $e');
+      }
+      rethrow;
+    }
+  }
+
   /// CALCULS ET STATISTIQUES (sur données déchiffrées côté client)
 
   Future<Map<String, double>> getTotals() async {

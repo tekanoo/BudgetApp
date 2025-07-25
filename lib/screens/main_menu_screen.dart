@@ -7,6 +7,7 @@ import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
 import 'sorties_tab.dart';
 import 'analyse_tab.dart';
+import 'tags_management_tab.dart'; // NOUVEAU: import de l'onglet tags
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -26,6 +27,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     EntreesTab(),
     SortiesTab(),
     AnalyseTab(),
+    TagsManagementTab(), // NOUVEAU: onglet de gestion des tags
   ];
 
   final List<NavigationDestination> _destinations = const [
@@ -53,6 +55,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       icon: Icon(Icons.analytics_outlined),
       selectedIcon: Icon(Icons.analytics),
       label: 'Analyse',
+    ),
+    NavigationDestination( // NOUVEAU: destination pour les tags
+      icon: Icon(Icons.tag_outlined),
+      selectedIcon: Icon(Icons.tag),
+      label: 'Catégories',
     ),
   ];
 
@@ -328,7 +335,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       'Mes Dépenses', // Changé de "Mes Plaisirs" à "Mes Dépenses"
       'Revenus', 
       'Charges', 
-      'Analyse'
+      'Analyse',
+      'Catégories', // NOUVEAU: titre pour l'onglet tags
     ];
     
     return Scaffold(

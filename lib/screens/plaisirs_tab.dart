@@ -462,12 +462,23 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  tag,
-                                  style: TextStyle(
-                                    color: Colors.purple.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                Row(
+                                  children: [
+                                    Text(
+                                      tag,
+                                      style: TextStyle(
+                                        color: Colors.purple.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Seuls les montants sont chiffrés, pas les tags
+                                    Icon(
+                                      Icons.lock_open,
+                                      size: 12,
+                                      color: Colors.purple.shade400,
+                                    ),
+                                  ],
                                 ),
                                 if (date != null)
                                   Text(

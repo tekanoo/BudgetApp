@@ -93,24 +93,24 @@ class FinancialDataEncryption {
   Map<String, dynamic> encryptTransaction(Map<String, dynamic> transaction) {
     final Map<String, dynamic> encryptedTransaction = Map.from(transaction);
     
-    // Chiffre le montant
+    // Chiffre le montant (OBLIGATOIRE)
     if (transaction.containsKey('amount')) {
       final double amount = (transaction['amount'] as num?)?.toDouble() ?? 0.0;
       encryptedTransaction['amount'] = encryptAmount(amount);
       encryptedTransaction['_encrypted'] = true; // Marqueur de chiffrement
     }
     
-    // Chiffre la description si présente (optionnel)
+    // Chiffre la description si présente (OPTIONNEL)
     if (transaction.containsKey('description')) {
       final String description = transaction['description'] as String? ?? '';
       encryptedTransaction['description'] = encryptDescription(description);
     }
     
-    // Chiffre le tag si présent (optionnel)
-    if (transaction.containsKey('tag')) {
-      final String tag = transaction['tag'] as String? ?? '';
-      encryptedTransaction['tag'] = encryptDescription(tag);
-    }
+    // Les tags restent en CLAIR pour l'autocomplétion et la recherche
+    // Pas de chiffrement du tag car :
+    // 1. Nécessaire pour l'autocomplétion fluide
+    // 2. Pas d'information financière sensible
+    // 3. Améliore les performances
     
     return encryptedTransaction;
   }
@@ -136,11 +136,7 @@ class FinancialDataEncryption {
       transaction['description'] = decryptDescription(encryptedDesc);
     }
     
-    // Déchiffre le tag si présent
-    if (encryptedTransaction.containsKey('tag')) {
-      final String encryptedTag = encryptedTransaction['tag'] as String? ?? '';
-      transaction['tag'] = decryptDescription(encryptedTag);
-    }
+    // Les tags restent tels quels (pas de déchiffrement nécessaire)
     
     // Supprime le marqueur de chiffrement
     transaction.remove('_encrypted');
@@ -175,5 +171,10 @@ extension EncryptedBudgetData on Map<String, dynamic> {
       return FinancialDataEncryption().decryptDescription(this['description']);
     }
     return this['description'] as String? ?? '';
+  }
+  
+  /// Obtient le tag (reste en clair, pas de déchiffrement nécessaire)
+  String getTag() {
+    return this['tag'] as String? ?? 'Sans catégorie';
   }
 }
