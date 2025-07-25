@@ -46,45 +46,44 @@ class EncryptedBudgetDataService {
   /// SYSTÈME DE POINTAGE DES DÉPENSES
 
   /// Bascule le statut de pointage d'une dépense
-  Future<void> togglePlaisirPointing(int index) async {
-    _ensureInitialized();
-    try {
-      final plaisirs = await _firebaseService.loadPlaisirs();
-      if (index >= 0 && index < plaisirs.length) {
-        final plaisir = plaisirs[index];
-        final bool currentlyPointed = plaisir['isPointed'] == true;
-        
-        // Bascule le statut
-        plaisir['isPointed'] = !currentlyPointed;
-        
-        if (!currentlyPointed) {
-          // Si on pointe, on ajoute la date
-          plaisir['pointedAt'] = DateTime.now().toIso8601String();
-        } else {
-          // Si on dépointe, on supprime la date
-          plaisir.remove('pointedAt');
-        }
-        
-        // Sauvegarde avec chiffrement si nécessaire
-        if (plaisir['_encrypted'] == true) {
-          plaisirs[index] = _encryption.encryptTransaction(plaisir);
-        } else {
-          plaisirs[index] = plaisir;
-        }
-        
-        await _firebaseService.savePlaisirs(plaisirs);
-        
-        if (kDebugMode) {
-          print('✅ Dépense ${currentlyPointed ? 'dépointée' : 'pointée'}');
-        }
+Future<void> togglePlaisirPointing(int index) async {
+  _ensureInitialized();
+  try {
+    final plaisirs = await _firebaseService.loadPlaisirs();
+    if (index >= 0 && index < plaisirs.length) {
+      // Déchiffrer d'abord la transaction pour la modifier
+      final decryptedPlaisir = _encryption.decryptTransaction(plaisirs[index]);
+      
+      final bool currentlyPointed = decryptedPlaisir['isPointed'] == true;
+      
+      // Bascule le statut
+      decryptedPlaisir['isPointed'] = !currentlyPointed;
+      
+      if (!currentlyPointed) {
+        // Si on pointe, on ajoute la date
+        decryptedPlaisir['pointedAt'] = DateTime.now().toIso8601String();
+      } else {
+        // Si on dépointe, on supprime la date
+        decryptedPlaisir.remove('pointedAt');
       }
-    } catch (e) {
+      
+      // Rechiffrer la transaction modifiée
+      plaisirs[index] = _encryption.encryptTransaction(decryptedPlaisir);
+      
+      // Sauvegarder
+      await _firebaseService.savePlaisirs(plaisirs);
+      
       if (kDebugMode) {
-        print('❌ Erreur basculement pointage: $e');
+        print('✅ Dépense ${currentlyPointed ? 'dépointée' : 'pointée'}');
       }
-      rethrow;
     }
+  } catch (e) {
+    if (kDebugMode) {
+      print('❌ Erreur basculement pointage: $e');
+    }
+    rethrow;
   }
+}
 
   /// Calcule le total des dépenses pointées
   Future<double> getTotalPlaisirsTotaux() async {
