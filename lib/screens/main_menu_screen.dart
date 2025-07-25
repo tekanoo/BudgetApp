@@ -21,7 +21,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   final List<Widget> _tabs = const [
     HomeTab(),
-    PlaisirsTab(),
+    PlaisirsTab(), // Renommé en "Dépenses" dans l'interface
     EntreesTab(),
     SortiesTab(),
     AnalyseTab(),
@@ -34,13 +34,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       label: 'Dashboard',
     ),
     NavigationDestination(
-      icon: Icon(Icons.celebration_outlined),
-      selectedIcon: Icon(Icons.celebration),
-      label: 'Plaisirs',
+      icon: Icon(Icons.shopping_cart_outlined),
+      selectedIcon: Icon(Icons.shopping_cart),
+      label: 'Dépenses', // Changé de "Plaisirs" à "Dépenses"
     ),
     NavigationDestination(
-      icon: Icon(Icons.attach_money_outlined),
-      selectedIcon: Icon(Icons.attach_money),
+      icon: Icon(Icons.trending_up_outlined),
+      selectedIcon: Icon(Icons.trending_up),
       label: 'Revenus',
     ),
     NavigationDestination(
@@ -255,7 +255,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             SizedBox(height: 16),
             Text('Fonctionnalités :'),
             Text('• Synchronisation cloud avec Google'),
-            Text('• Suivi des revenus et dépenses'),
+            Text('• Suivi des revenus, charges et dépenses'),
             Text('• Analyses détaillées avec graphiques'),
             Text('• Accès multi-appareils'),
             SizedBox(height: 16),
@@ -282,11 +282,18 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Widget build(BuildContext context) {
     final user = _firebaseService.currentUser;
     
+    // Titres des onglets mis à jour
+    final List<String> tabTitles = [
+      'Dashboard', 
+      'Mes Dépenses', // Changé de "Mes Plaisirs" à "Mes Dépenses"
+      'Revenus', 
+      'Charges', 
+      'Analyse'
+    ];
+    
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          ['Dashboard', 'Mes Plaisirs', 'Revenus', 'Charges', 'Analyse'][_selectedIndex],
-        ),
+        title: Text(tabTitles[_selectedIndex]),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,

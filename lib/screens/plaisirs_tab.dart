@@ -301,10 +301,10 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.shopping_bag_outlined, size: 80, color: Colors.grey),
+                    Icon(Icons.shopping_cart_outlined, size: 80, color: Colors.grey),
                     SizedBox(height: 20),
                     Text(
-                      'Aucune dépense plaisir',
+                      'Aucune dépense enregistrée',
                       style: TextStyle(fontSize: 18, color: Colors.grey),
                     ),
                     SizedBox(height: 10),
@@ -343,7 +343,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                         Row(
                           children: [
                             const Icon(
-                              Icons.celebration,
+                              Icons.shopping_cart,
                               color: Colors.white,
                               size: 40,
                             ),
@@ -400,7 +400,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                         ),
                         const SizedBox(height: 10),
                         const Text(
-                          'Total Plaisirs',
+                          'Total Dépenses',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 16,

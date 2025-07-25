@@ -300,13 +300,13 @@ class _HomeTabState extends State<HomeTab> {
 
             // Icône et titre
             Icon(
-              Icons.shopping_bag_outlined,
+              Icons.shopping_cart_outlined,
               size: 80,
               color: Theme.of(context).primaryColor,
             ),
             const SizedBox(height: 20),
             Text(
-              'Ajouter une dépense plaisir',
+              'Ajouter une dépense',
               style: Theme.of(context).textTheme.headlineSmall,
               textAlign: TextAlign.center,
             ),

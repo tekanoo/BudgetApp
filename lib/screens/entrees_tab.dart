@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/budget_data_service.dart';
 
 class EntreesTab extends StatefulWidget {
   const EntreesTab({super.key});
@@ -9,7 +9,11 @@ class EntreesTab extends StatefulWidget {
 }
 
 class _EntreesTabState extends State<EntreesTab> {
-  List<Map<String, String>> entrees = [];
+  final BudgetDataService _dataService = BudgetDataService();
+  List<Map<String, dynamic>> entrees = [];
+  bool isLoading = true;
+  String _sortBy = 'date'; // 'date', 'amount', 'description'
+  bool _ascending = false;
 
   @override
   void initState() {
@@ -18,57 +22,140 @@ class _EntreesTabState extends State<EntreesTab> {
   }
 
   Future<void> _loadEntrees() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = prefs.getStringList('entrees') ?? [];
-    final parsed = list.map((s) => _parseStringToMap(s)).toList();
     setState(() {
-      entrees = parsed;
+      isLoading = true;
+    });
+
+    try {
+      final data = await _dataService.getEntrees();
+      setState(() {
+        entrees = data;
+        isLoading = false;
+      });
+      _sortEntrees();
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de chargement: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _sortEntrees() {
+    setState(() {
+      entrees.sort((a, b) {
+        int comparison = 0;
+        switch (_sortBy) {
+          case 'date':
+            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
+            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
+            comparison = dateA.compareTo(dateB);
+            break;
+          case 'amount':
+            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
+            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
+            comparison = amountA.compareTo(amountB);
+            break;
+          case 'description':
+            final descA = a['description'] as String? ?? '';
+            final descB = b['description'] as String? ?? '';
+            comparison = descA.compareTo(descB);
+            break;
+        }
+        return _ascending ? comparison : -comparison;
+      });
     });
   }
 
-  Map<String, String> _parseStringToMap(String s) {
-    final clean = s.replaceAll(RegExp(r'[{}]'), '');
-    final parts = clean.split(',');
-    final map = <String, String>{};
-    for (var part in parts) {
-      final kv = part.split(':');
-      if (kv.length == 2) {
-        map[kv[0].trim()] = kv[1].trim();
-      }
+  double get totalEntrees {
+    double total = 0;
+    for (var entree in entrees) {
+      total += (entree['amount'] as num?)?.toDouble() ?? 0;
     }
-    return map;
+    return total;
   }
 
   Future<void> _addEntree() async {
     final result = await _showEntreeDialog();
     if (result != null) {
-      entrees.add(result);
-      await _saveEntrees();
+      try {
+        await _dataService.addEntree(
+          amount: result['amount'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Revenu ajouté avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _editEntree(int index) async {
-    final result = await _showEntreeDialog(entree: entrees[index]);
+    final entree = entrees[index];
+    final result = await _showEntreeDialog(
+      description: entree['description'] as String? ?? '',
+      amount: (entree['amount'] as num?)?.toDouble() ?? 0,
+      isEdit: true,
+    );
+    
     if (result != null) {
-      entrees[index] = result;
-      await _saveEntrees();
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Entrée modifiée avec succès'),
-          backgroundColor: Colors.blue,
-        ),
-      );
+      try {
+        await _dataService.updateEntree(
+          index: index,
+          amount: result['amount'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Revenu modifié avec succès'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la modification: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-  Future<Map<String, String>?> _showEntreeDialog({Map<String, String>? entree}) async {
-    final descriptionController = TextEditingController(text: entree?['description'] ?? '');
-    final montantController = TextEditingController(text: entree?['montant'] ?? '');
-    final isEdit = entree != null;
+  Future<Map<String, dynamic>?> _showEntreeDialog({
+    String? description,
+    double? amount,
+    bool isEdit = false,
+  }) async {
+    final descriptionController = TextEditingController(text: description ?? '');
+    final montantController = TextEditingController(text: amount?.toString() ?? '');
 
-    return await showDialog<Map<String, String>>(
+    return await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -78,7 +165,7 @@ class _EntreesTabState extends State<EntreesTab> {
               color: isEdit ? Colors.blue : Colors.green,
             ),
             const SizedBox(width: 8),
-            Text(isEdit ? 'Modifier l\'entrée' : 'Ajouter une entrée'),
+            Text(isEdit ? 'Modifier le revenu' : 'Ajouter un revenu'),
           ],
         ),
         content: Column(
@@ -90,6 +177,7 @@ class _EntreesTabState extends State<EntreesTab> {
                 labelText: 'Description',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.description),
+                helperText: 'Salaire, Prime, Freelance...',
               ),
             ),
             const SizedBox(height: 16),
@@ -110,14 +198,14 @@ class _EntreesTabState extends State<EntreesTab> {
             onPressed: () => Navigator.pop(context),
             child: const Text('Annuler'),
           ),
-          ElevatedButton(
+          FilledButton(
             onPressed: () {
               final desc = descriptionController.text.trim();
-              final montant = montantController.text.trim();
-              if (desc.isNotEmpty && montant.isNotEmpty && double.tryParse(montant) != null) {
+              final montant = double.tryParse(montantController.text.trim());
+              if (desc.isNotEmpty && montant != null && montant > 0) {
                 Navigator.pop(context, {
                   'description': desc,
-                  'montant': montant,
+                  'amount': montant,
                 });
               }
             },
@@ -133,214 +221,295 @@ class _EntreesTabState extends State<EntreesTab> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Supprimer'),
-        content: const Text('Voulez-vous vraiment supprimer cette entrée ?'),
+        content: const Text('Voulez-vous vraiment supprimer ce revenu ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Annuler'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Supprimer'),
           ),
         ],
       ),
     );
 
     if (confirmed == true) {
-      entrees.removeAt(index);
-      await _saveEntrees();
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Entrée supprimée'),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      try {
+        await _dataService.deleteEntree(index);
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Revenu supprimé'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la suppression: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
-  }
-
-  Future<void> _saveEntrees() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = entrees.map((e) => e.toString()).toList();
-    await prefs.setStringList('entrees', list);
-    setState(() {});
-  }
-
-  double get totalEntrees {
-    double total = 0;
-    for (var e in entrees) {
-      total += double.tryParse(e['montant'] ?? '0') ?? 0;
-    }
-    return total;
   }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Chargement des revenus...'),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
-      body: entrees.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+      body: RefreshIndicator(
+        onRefresh: _loadEntrees,
+        child: entrees.isEmpty
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.trending_up,
+                      size: 80,
+                      color: Colors.green.shade300,
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Aucun revenu enregistré',
+                      style: TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Ajoutez vos revenus pour commencer',
+                      style: TextStyle(color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 30),
+                    ElevatedButton.icon(
+                      onPressed: _addEntree,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Ajouter un revenu'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            : Column(
                 children: [
-                  Icon(
-                    Icons.trending_up,
-                    size: 80,
-                    color: Colors.green.shade300,
+                  // En-tête avec total
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.green.shade400, Colors.green.shade600],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.green.withValues(alpha: 0.3),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.trending_up,
+                              color: Colors.white,
+                              size: 40,
+                            ),
+                            const Spacer(),
+                            PopupMenuButton<String>(
+                              icon: const Icon(Icons.sort, color: Colors.white),
+                              onSelected: (value) {
+                                if (value == _sortBy) {
+                                  setState(() {
+                                    _ascending = !_ascending;
+                                  });
+                                } else {
+                                  setState(() {
+                                    _sortBy = value;
+                                    _ascending = false;
+                                  });
+                                }
+                                _sortEntrees();
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: 'date',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par date'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'amount',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par montant'),
+                                    ],
+                                  ),
+                                ),
+                                PopupMenuItem(
+                                  value: 'description',
+                                  child: Row(
+                                    children: [
+                                      Icon(_sortBy == 'description' ? Icons.check : Icons.description),
+                                      const SizedBox(width: 8),
+                                      const Text('Trier par description'),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            IconButton(
+                              onPressed: _addEntree,
+                              icon: const Icon(
+                                Icons.add,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                              tooltip: 'Ajouter un revenu',
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'Total Revenus',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          '${totalEntrees.toStringAsFixed(2)} €',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          '${entrees.length} revenu${entrees.length > 1 ? 's' : ''}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Aucune entrée enregistrée',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Ajoutez vos revenus pour commencer',
-                    style: TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 30),
-                  ElevatedButton.icon(
-                    onPressed: _addEntree,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Ajouter une entrée'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
+
+                  // Liste des revenus
+                  Expanded(
+                    child: ListView.builder(
+                      itemCount: entrees.length,
+                      itemBuilder: (context, index) {
+                        final entree = entrees[index];
+                        final amount = (entree['amount'] as num?)?.toDouble() ?? 0;
+                        final description = entree['description'] as String? ?? '';
+                        final dateStr = entree['date'] as String? ?? '';
+                        final date = DateTime.tryParse(dateStr);
+                        
+                        return Card(
+                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          child: ListTile(
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.green.shade100,
+                              child: Text(
+                                description.isNotEmpty ? description[0].toUpperCase() : '?',
+                                style: TextStyle(
+                                  color: Colors.green.shade700,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            title: Text(
+                              description,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w500,
+                                fontSize: 16,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${amount.toStringAsFixed(2)} €',
+                                  style: TextStyle(
+                                    color: Colors.green.shade600,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                if (date != null)
+                                  Text(
+                                    '${date.day}/${date.month}/${date.year}',
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Icon(Icons.edit, color: Colors.blue),
+                                  onPressed: () => _editEntree(index),
+                                  tooltip: 'Modifier',
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  onPressed: () => _deleteEntree(index),
+                                  tooltip: 'Supprimer',
+                                ),
+                              ],
+                            ),
+                            onTap: () => _editEntree(index),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
               ),
-            )
-          : Column(
-              children: [
-                // En-tête avec total
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade400, Colors.green.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.trending_up,
-                            color: Colors.white,
-                            size: 40,
-                          ),
-                          const Spacer(),
-                          IconButton(
-                            onPressed: _addEntree,
-                            icon: const Icon(
-                              Icons.add,
-                              color: Colors.white,
-                              size: 28,
-                            ),
-                            tooltip: 'Ajouter une entrée',
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        'Total Entrées',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        '${totalEntrees.toStringAsFixed(2)} €',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '${entrees.length} entrée${entrees.length > 1 ? 's' : ''}',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Liste des entrées
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: entrees.length,
-                    itemBuilder: (context, index) {
-                      final e = entrees[index];
-                      final montant = double.tryParse(e['montant'] ?? '0') ?? 0;
-                      
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.green.shade100,
-                            child: Icon(
-                              Icons.euro,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                          title: Text(
-                            e['description'] ?? '',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w500,
-                              fontSize: 16,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${montant.toStringAsFixed(2)} €',
-                            style: TextStyle(
-                              color: Colors.green.shade600,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                            ),
-                          ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () => _editEntree(index),
-                                tooltip: 'Modifier',
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _deleteEntree(index),
-                                tooltip: 'Supprimer',
-                              ),
-                            ],
-                          ),
-                          onTap: () => _editEntree(index),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
+      ),
     );
   }
-}
+  }
