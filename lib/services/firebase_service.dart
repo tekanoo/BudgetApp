@@ -349,4 +349,33 @@ class FirebaseService {
     }
     return _userBudgetCollection!.doc(docType).snapshots();
   }
+
+  /// SUPPRESSION COMPLÈTE DES DONNÉES
+  Future<void> deleteAllUserData() async {
+    if (!isSignedIn) throw Exception('Utilisateur non connecté');
+    
+    try {
+      final batch = _firestore.batch();
+      final userBudgetRef = _userBudgetCollection!;
+      
+      // Liste des documents à supprimer
+      final docsToDelete = ['entrees', 'sorties', 'plaisirs', 'settings'];
+      
+      for (String docName in docsToDelete) {
+        batch.delete(userBudgetRef.doc(docName));
+      }
+      
+      // Exécuter la suppression en lot
+      await batch.commit();
+      
+      if (kDebugMode) {
+        print('✅ Toutes les données utilisateur supprimées');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur suppression données: $e');
+      }
+      rethrow;
+    }
+  }
 }

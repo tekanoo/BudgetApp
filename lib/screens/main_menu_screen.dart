@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../services/firebase_service.dart';
-import '../services/encrypted_budget_service.dart'; // AJOUTÉ: import du service chiffré
+import '../services/encrypted_budget_service.dart' as encrypted; // MODIFIÉ: alias pour éviter le conflit
+// SUPPRIMÉ: import '../services/budget_data_service.dart'; 
 import 'home_tab.dart';
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
 import 'sorties_tab.dart';
 import 'analyse_tab.dart';
-import 'tags_management_tab.dart'; // NOUVEAU: import de l'onglet tags
+import 'tags_management_tab.dart';
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -20,6 +21,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
   final FirebaseService _firebaseService = FirebaseService();
+  final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService(); // MODIFIÉ: utilisation de l'alias
 
   final List<Widget> _tabs = const [
     HomeTab(),
@@ -66,31 +68,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   void initState() {
     super.initState();
-    _initializeApp();
+    _initializeServices();
   }
 
-  Future<void> _initializeApp() async {
+  Future<void> _initializeServices() async {
     try {
-      if (kDebugMode) {
-        print('📱 Application initialisée avec Firebase');
-        print('👤 Utilisateur: ${_firebaseService.currentUser?.displayName}');
-      }
-      
-      // NOUVEAU : Initialiser le service de chiffrement
-      final encryptedService = EncryptedBudgetDataService();
-      await encryptedService.initialize();
-      
-      // Migration optionnelle des données existantes (décommentez pour migrer une seule fois)
-      // await encryptedService.migrateToEncrypted();
-      
-      if (kDebugMode) {
-        print('🔐 Chiffrement des données financières activé');
-        print('🛡️ Vos données sont maintenant protégées');
-      }
-      
+      await _dataService.initialize();
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur initialisation: $e');
+        print('❌ Erreur initialisation services: $e');
       }
     }
   }
@@ -220,6 +206,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 _showHelpDialog();
               },
             ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.delete_forever, color: Colors.red),
+              title: const Text('Supprimer toutes les données'),
+              subtitle: const Text('Action irréversible'),
+              onTap: () {
+                Navigator.pop(context);
+                _confirmDeleteAllData();
+              },
+            ),
             ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
               title: const Text('Se déconnecter'),
@@ -317,6 +313,216 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _confirmDeleteAllData() async {
+    // PREMIÈRE ÉTAPE : Confirmation initiale
+    final firstConfirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Supprimer toutes les données'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '⚠️ ATTENTION : Cette action est IRRÉVERSIBLE !',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text('Cela supprimera définitivement :'),
+            SizedBox(height: 8),
+            Text('• Tous vos revenus'),
+            Text('• Toutes vos charges'),
+            Text('• Toutes vos dépenses'),
+            Text('• Votre solde bancaire'),
+            Text('• Vos catégories personnalisées'),
+            SizedBox(height: 16),
+            Text(
+              'Êtes-vous absolument certain de vouloir continuer ?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Continuer'),
+          ),
+        ],
+      ),
+    );
+
+    if (firstConfirm != true) return;
+
+    // DEUXIÈME ÉTAPE : Confirmation finale avec saisie
+    final secondConfirm = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        final confirmController = TextEditingController();
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Row(
+                children: [
+                  Icon(Icons.delete_forever, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Confirmation finale'),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red.shade200),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.warning, color: Colors.red, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'DERNIÈRE CHANCE ! Cette action ne peut pas être annulée.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Pour confirmer, tapez exactement le mot :',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'SUPPRIMER',
+                      style: TextStyle(
+                        fontFamily: 'monospace',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmController,
+                    decoration: const InputDecoration(
+                      labelText: 'Tapez SUPPRIMER ici',
+                      border: OutlineInputBorder(),
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (value) {
+                      setDialogState(() {}); // Mettre à jour l'état du bouton
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Annuler'),
+                ),
+                FilledButton(
+                  onPressed: confirmController.text == 'SUPPRIMER'
+                      ? () => Navigator.pop(context, true)
+                      : null,
+                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                  child: const Text('SUPPRIMER DÉFINITIVEMENT'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (secondConfirm != true) return;
+
+    // Exécuter la suppression
+    try {
+      // Afficher un indicateur de chargement
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Suppression en cours...'),
+            ],
+          ),
+        ),
+      );
+
+      await _dataService.deleteAllUserData();
+
+      if (!mounted) return;
+      Navigator.pop(context); // Fermer le dialog de chargement
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Toutes vos données ont été supprimées'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      // Recharger la page d'accueil pour refléter les changements
+      setState(() {
+        _selectedIndex = 0;
+      });
+      _pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Fermer le dialog de chargement
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Erreur lors de la suppression: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   @override

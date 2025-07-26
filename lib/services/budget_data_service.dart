@@ -845,4 +845,21 @@ class EncryptedBudgetDataService {
       return 0.0;
     }
   }
+
+  /// SUPPRESSION COMPLÈTE DES DONNÉES
+  Future<void> deleteAllUserData() async {
+    _ensureInitialized();
+    try {
+      await _firebaseService.deleteAllUserData();
+      
+      if (kDebugMode) {
+        print('✅ Suppression complète des données terminée');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur suppression complète: $e');
+      }
+      rethrow;
+    }
+  }
 }
