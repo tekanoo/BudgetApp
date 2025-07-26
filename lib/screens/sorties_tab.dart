@@ -67,21 +67,33 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
-  Future<void> _togglePointing(int index) async {
+  Future<void> _togglePointing(int displayIndex) async {
     try {
-      await _dataService.toggleSortiePointing(index);
+      // Trouver l'index réel dans la liste non triée
+      final sortieToToggle = sorties[displayIndex];
+      final sortieId = sortieToToggle['id'] ?? '';
+      
+      // Charger la liste originale pour trouver le vrai index
+      final originalSorties = await _dataService.getSorties();
+      final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
+      
+      if (realIndex == -1) {
+        throw Exception('Charge non trouvée');
+      }
+      
+      await _dataService.toggleSortiePointing(realIndex);
       await _loadSorties(); // Recharger pour mettre à jour les totaux
       
       if (!mounted) return;
-      final isPointed = sorties[index]['isPointed'] == true;
+      final isPointed = sortieToToggle['isPointed'] == true;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            isPointed 
+            !isPointed 
               ? '✅ Charge pointée - Solde mis à jour'
               : '↩️ Charge dépointée - Solde mis à jour'
           ),
-          backgroundColor: isPointed ? Colors.green : Colors.orange,
+          backgroundColor: !isPointed ? Colors.green : Colors.orange,
           duration: const Duration(seconds: 2),
         ),
       );
@@ -294,9 +306,25 @@ class _SortiesTabState extends State<SortiesTab> {
     });
 
     try {
-      // Traiter chaque sélection
-      for (int index in _selectedIndices.toList()..sort((a, b) => b.compareTo(a))) {
-        await _dataService.toggleSortiePointing(index);
+      // Convertir les index d'affichage en index réels
+      final originalSorties = await _dataService.getSorties();
+      List<int> realIndices = [];
+      
+      for (int displayIndex in _selectedIndices) {
+        final sortie = sorties[displayIndex];
+        final sortieId = sortie['id'] ?? '';
+        final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
+        
+        if (realIndex != -1) {
+          realIndices.add(realIndex);
+        }
+      }
+      
+      // Traiter dans l'ordre inverse pour éviter les décalages d'index
+      realIndices.sort((a, b) => b.compareTo(a));
+      
+      for (int realIndex in realIndices) {
+        await _dataService.toggleSortiePointing(realIndex);
       }
 
       // Recharger les données
@@ -312,7 +340,7 @@ class _SortiesTabState extends State<SortiesTab> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('✅ ${_selectedIndices.length} charge(s) mise(s) à jour'),
+          content: Text('✅ ${realIndices.length} charge(s) mise(s) à jour'),
           backgroundColor: Colors.green,
           duration: const Duration(seconds: 2),
         ),

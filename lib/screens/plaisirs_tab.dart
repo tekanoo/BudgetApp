@@ -77,9 +77,21 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
   // Suppression de la méthode _sortPlaisirs()
 
-  Future<void> _togglePointing(int index) async {
+  Future<void> _togglePointing(int displayIndex) async {
     try {
-      final newState = await _pointingService.togglePlaisirPointing(index);
+      // Trouver l'index réel dans la liste non triée
+      final plaisirToToggle = plaisirs[displayIndex];
+      final plaisirId = plaisirToToggle['id'] ?? '';
+      
+      // Charger la liste originale pour trouver le vrai index
+      final originalPlaisirs = await _dataService.getPlaisirs();
+      final realIndex = originalPlaisirs.indexWhere((p) => p['id'] == plaisirId);
+      
+      if (realIndex == -1) {
+        throw Exception('Dépense non trouvée');
+      }
+      
+      final newState = await _pointingService.togglePlaisirPointing(realIndex);
       await _loadPlaisirs(); // Recharger pour mettre à jour les totaux
       
       if (!mounted) return;
@@ -249,7 +261,21 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     });
 
     try {
-      final results = await _pointingService.batchTogglePlaisirs(_selectedIndices.toList());
+      // Convertir les index d'affichage en index réels
+      final originalPlaisirs = await _dataService.getPlaisirs();
+      List<int> realIndices = [];
+      
+      for (int displayIndex in _selectedIndices) {
+        final plaisir = plaisirs[displayIndex];
+        final plaisirId = plaisir['id'] ?? '';
+        final realIndex = originalPlaisirs.indexWhere((p) => p['id'] == plaisirId);
+        
+        if (realIndex != -1) {
+          realIndices.add(realIndex);
+        }
+      }
+      
+      final results = await _pointingService.batchTogglePlaisirs(realIndices);
       
       await _loadPlaisirs();
 

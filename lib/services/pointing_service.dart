@@ -6,34 +6,23 @@ class PointingService {
 
   PointingService(this._budgetService);
 
-  /// Basculer le pointage d'une dépense
+  /// Basculer le pointage d'une dépense - VERSION CORRIGÉE
   Future<bool> togglePlaisirPointing(int index) async {
     try {
+      // Utiliser directement la méthode du service principal qui gère correctement le pointage
+      await _budgetService.togglePlaisirPointing(index);
+      
+      // Récupérer l'état après modification pour le retourner
       final plaisirs = await _budgetService.getPlaisirs();
       if (index < 0 || index >= plaisirs.length) return false;
-
-      final plaisir = Map<String, dynamic>.from(plaisirs[index]);
-      final wasPointed = plaisir['isPointed'] == true;
       
-      // Basculer l'état
-      plaisir['isPointed'] = !wasPointed;
-      plaisir['pointedAt'] = !wasPointed 
-          ? DateTime.now().toIso8601String() 
-          : null;
-
-      // Sauvegarder via le service principal (sans isPointed et pointedAt pour l'instant)
-      await _budgetService.updatePlaisir(
-        index: index,
-        amountStr: plaisir['amount'].toString(),
-        tag: plaisir['tag'] ?? 'Sans catégorie',
-        date: DateTime.tryParse(plaisir['date'] ?? ''),
-      );
-
+      final newState = plaisirs[index]['isPointed'] == true;
+      
       if (kDebugMode) {
-        debugPrint('✅ Dépense ${!wasPointed ? 'pointée' : 'dépointée'}');
+        debugPrint('✅ Dépense ${newState ? 'pointée' : 'dépointée'}');
       }
 
-      return !wasPointed; // Retourne le nouvel état
+      return newState;
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Erreur pointage dépense: $e');
@@ -42,34 +31,23 @@ class PointingService {
     }
   }
 
-  /// Basculer le pointage d'une charge
+  /// Basculer le pointage d'une charge - VERSION CORRIGÉE
   Future<bool> toggleSortiePointing(int index) async {
     try {
+      // Utiliser directement la méthode du service principal qui gère correctement le pointage
+      await _budgetService.toggleSortiePointing(index);
+      
+      // Récupérer l'état après modification pour le retourner
       final sorties = await _budgetService.getSorties();
       if (index < 0 || index >= sorties.length) return false;
-
-      final sortie = Map<String, dynamic>.from(sorties[index]);
-      final wasPointed = sortie['isPointed'] == true;
       
-      // Basculer l'état
-      sortie['isPointed'] = !wasPointed;
-      sortie['pointedAt'] = !wasPointed 
-          ? DateTime.now().toIso8601String() 
-          : null;
-
-      // Sauvegarder via le service principal (sans isPointed et pointedAt pour l'instant)
-      await _budgetService.updateSortie(
-        index: index,
-        amountStr: sortie['amount'].toString(),
-        description: sortie['description'] ?? '',
-        type: sortie['type'] ?? 'variable',
-      );
+      final newState = sorties[index]['isPointed'] == true;
 
       if (kDebugMode) {
-        debugPrint('✅ Charge ${!wasPointed ? 'pointée' : 'dépointée'}');
+        debugPrint('✅ Charge ${newState ? 'pointée' : 'dépointée'}');
       }
 
-      return !wasPointed; // Retourne le nouvel état
+      return newState;
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Erreur pointage charge: $e');
@@ -78,13 +56,16 @@ class PointingService {
     }
   }
 
-  /// Pointer plusieurs dépenses en lot
+  /// Pointer plusieurs dépenses en lot - VERSION CORRIGÉE
   Future<Map<String, int>> batchTogglePlaisirs(List<int> indices) async {
     int pointed = 0;
     int unpointed = 0;
     List<String> errors = [];
 
-    for (int index in indices) {
+    // Trier les indices par ordre décroissant pour éviter les problèmes d'index
+    final sortedIndices = indices.toList()..sort((a, b) => b.compareTo(a));
+
+    for (int index in sortedIndices) {
       try {
         final newState = await togglePlaisirPointing(index);
         if (newState) {
@@ -108,13 +89,16 @@ class PointingService {
     };
   }
 
-  /// Pointer plusieurs charges en lot
+  /// Pointer plusieurs charges en lot - VERSION CORRIGÉE
   Future<Map<String, int>> batchToggleSorties(List<int> indices) async {
     int pointed = 0;
     int unpointed = 0;
     List<String> errors = [];
 
-    for (int index in indices) {
+    // Trier les indices par ordre décroissant pour éviter les problèmes d'index
+    final sortedIndices = indices.toList()..sort((a, b) => b.compareTo(a));
+
+    for (int index in sortedIndices) {
       try {
         final newState = await toggleSortiePointing(index);
         if (newState) {
