@@ -377,7 +377,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
@@ -488,7 +488,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     onTap: () async {
                       try {
                         await _firebaseService.signOut();
-                        if (mounted) Navigator.of(context).pop();
+                        if (context.mounted) Navigator.of(context).pop();
                       } catch (e) {
                         if (kDebugMode) print('❌ Erreur déconnexion: $e');
                       }
@@ -551,32 +551,32 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 await _dataService.deleteAllData();
                 
                 // Fermer l'indicateur de chargement
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                
-                // Afficher le message de succès
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('🗑️ Toutes les données ont été supprimées'),
-                    backgroundColor: Colors.orange,
-                    duration: Duration(seconds: 3),
-                  ),
-                );
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                  
+                  // Afficher le message de succès
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('🗑️ Toutes les données ont été supprimées'),
+                      backgroundColor: Colors.orange,
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
               } catch (e) {
                 // Fermer l'indicateur de chargement
-                if (!mounted) return;
-                Navigator.of(context).pop();
-                
-                // Afficher l'erreur
-                if (!mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Erreur lors de la suppression: $e'),
-                    backgroundColor: Colors.red,
-                    duration: const Duration(seconds: 5),
-                  ),
-                );
+                if (context.mounted) {
+                  Navigator.of(context).pop();
+                  
+                  // Afficher l'erreur
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur lors de la suppression: $e'),
+                      backgroundColor: Colors.red,
+                      duration: const Duration(seconds: 5),
+                    ),
+                  );
+                }
               }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),

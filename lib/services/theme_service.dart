@@ -159,7 +159,9 @@ class ThemeService extends ChangeNotifier {
     
     // Couleurs des surfaces pour un meilleur contraste
     cardColor: const Color(0xFF1E1E1E),
-    dialogBackgroundColor: const Color(0xFF1E1E1E),
+    dialogTheme: const DialogThemeData(
+      backgroundColor: Color(0xFF1E1E1E),
+    ),
     
     // Navigation bar adaptée au mode sombre
     bottomNavigationBarTheme: const BottomNavigationBarThemeData(

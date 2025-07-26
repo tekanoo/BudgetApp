@@ -216,7 +216,7 @@ class _SortiesTabState extends State<SortiesTab> {
         await _dataService.deleteSortie(realIndex);
         await _loadSorties();
         
-        if (!mounted) return; // Protection async ajoutée
+        if (!mounted) return; // Protection async
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Charge supprimée'),
@@ -224,7 +224,7 @@ class _SortiesTabState extends State<SortiesTab> {
           ),
         );
       } catch (e) {
-        if (!mounted) return; // Protection async ajoutée
+        if (!mounted) return; // Protection async
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la suppression: $e'),
