@@ -14,6 +14,7 @@ import 'entrees_tab.dart';
 import 'sorties_tab.dart';
 import 'analyse_tab.dart';
 import 'tags_management_tab.dart';
+import 'projections_tab.dart'; // AJOUT
 
 class MainMenuScreen extends StatefulWidget {
   const MainMenuScreen({super.key});
@@ -76,6 +77,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       'icon': Icons.tag,
       'color': Colors.indigo,
       'index': 5,
+    },
+    {
+      'title': 'Projections',
+      'icon': Icons.calendar_month,
+      'color': Colors.teal,
+      'index': 6,
     },
   ];
 
@@ -175,6 +182,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           targetScreen = const TagsManagementTab();
           title = 'Catégories';
           break;
+        case 6:
+          targetScreen = const ProjectionsTab();
+          title = 'Projections';
+          break;
         default:
           targetScreen = const HomeTab();
           title = 'Dashboard';
@@ -209,7 +220,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Future<void> _trackTabChange(int index) async {
-    final tabNames = ['home', 'plaisirs', 'entrees', 'sorties', 'analyse', 'tags'];
+    final tabNames = ['home', 'plaisirs', 'entrees', 'sorties', 'analyse', 'tags', 'projections']; // AJOUT
     if (index < tabNames.length) {
       try {
         await _analytics.logEvent(
