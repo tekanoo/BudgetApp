@@ -20,7 +20,7 @@ class _HomeTabState extends State<HomeTab> {
   double _currentBalance = 0.0;
   double _soldeDisponible = 0.0;
   double _totalPointe = 0.0;
-
+  bool _isCredit = false;
   @override
   void initState() {
     super.initState();
@@ -106,6 +106,7 @@ class _HomeTabState extends State<HomeTab> {
         amountStr: _amountController.text,
         tag: tag,
         date: _selectedDate,
+        isCredit: _isCredit, // NOUVEAU paramètre
       );
 
       // Réinitialiser le formulaire

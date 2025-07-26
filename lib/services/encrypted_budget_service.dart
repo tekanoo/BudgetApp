@@ -129,18 +129,30 @@ Future<void> togglePlaisirPointing(int index) async {
 
   /// Calcule le solde disponible (solde compte - dépenses pointées)
   Future<double> getSoldeDisponible() async {
-    try {
-      final soldeCompte = await getBankBalance();
-      final totalPlaisirs = await getTotalPlaisirsTotaux();
-      final totalSorties = await getTotalSortiesTotaux();
-      return soldeCompte - totalPlaisirs - totalSorties;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur calcul solde disponible: $e');
+  try {
+    final soldeCompte = await getBankBalance();
+    final plaisirs = await getPlaisirs();
+    final totalSortiesPointe = await getTotalSortiesTotaux();
+    
+    double totalDepensesPointe = 0.0;
+    double totalCreditsPointes = 0.0;
+    
+    for (var plaisir in plaisirs) {
+      if (plaisir['isPointed'] == true) {
+        final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+        if (plaisir['isCredit'] == true) {
+          totalCreditsPointes += amount; // Les crédits s'ajoutent
+        } else {
+          totalDepensesPointe += amount; // Les dépenses se soustraient
+        }
       }
-      return 0.0;
     }
+    
+    return soldeCompte + totalCreditsPointes - totalDepensesPointe - totalSortiesPointe;
+  } catch (e) {
+    return 0.0;
   }
+}
 
   /// GESTION DES ENTRÉES (REVENUS) CHIFFRÉES
 
@@ -393,6 +405,7 @@ Future<void> togglePlaisirPointing(int index) async {
     required String amountStr,
     String? tag,
     DateTime? date,
+    bool isCredit = false, // NOUVEAU paramètre
   }) async {
     _ensureInitialized();
     try {
@@ -406,6 +419,7 @@ Future<void> togglePlaisirPointing(int index) async {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'isPointed': false, // Par défaut, non pointé
+        'isCredit': isCredit, // NOUVEAU champ
       };
       
       // Chiffre avant d'ajouter
@@ -435,6 +449,7 @@ Future<void> togglePlaisirPointing(int index) async {
     required String amountStr,
     String? tag,
     DateTime? date,
+    bool? isCredit, // NOUVEAU paramètre
   }) async {
     _ensureInitialized();
     try {
@@ -451,6 +466,7 @@ Future<void> togglePlaisirPointing(int index) async {
           'id': oldPlaisir['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
           // Préserve le statut de pointage
           'isPointed': oldPlaisir['isPointed'] ?? false,
+          'isCredit': isCredit ?? oldPlaisir['isCredit'] ?? false, // NOUVEAU
         };
         
         // Préserve la date de pointage si elle existe
