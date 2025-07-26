@@ -188,7 +188,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.85, // Légèrement plus grand
+                childAspectRatio: 0.8, // Rapport hauteur/largeur pour plus de hauteur
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
@@ -211,7 +211,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 return GestureDetector(
                   onTap: () => _showMonthDetails(monthDate, monthData),
                   child: Container(
-                    padding: const EdgeInsets.all(12), // Padding plus grand
+                    padding: const EdgeInsets.all(8), // Padding optimisé
                     decoration: BoxDecoration(
                       color: isCurrentMonth 
                           ? Colors.orange.withValues(alpha: 0.15)
@@ -232,115 +232,118 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                       ] : null,
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center, // Centrer tout le contenu
                       children: [
                         // Nom du mois avec indicateur mois actuel
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center, // Centrer le nom du mois
-                          children: [
-                            Text(
-                              monthNames[monthDate.month - 1],
-                              style: TextStyle(
-                                fontSize: 15, // Plus grand
-                                fontWeight: FontWeight.bold,
-                                color: isCurrentMonth 
-                                    ? Colors.orange.shade800 
-                                    : (hasData ? Colors.blue.shade700 : Colors.black87),
-                              ),
-                            ),
-                            if (isCurrentMonth) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.all(3),
-                                decoration: BoxDecoration(
-                                  color: Colors.orange,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Icon(
-                                  Icons.today,
-                                  size: 12, // Plus grand
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 8), // Plus d'espace
-                        
-                        // Affichage conditionnel des données financières
-                        if (hasData) ...[
-                          // Revenus
-                          if (monthData['revenus']! > 0) ...[
-                            _buildCompactDataRow('R', monthData['revenus']!, Colors.green),
-                            const SizedBox(height: 3), // Plus d'espace
-                          ],
-                          
-                          // Charges
-                          if (monthData['charges']! > 0) ...[
-                            _buildCompactDataRow('C', monthData['charges']!, Colors.red),
-                            const SizedBox(height: 3),
-                          ],
-                          
-                          // Dépenses
-                          if (monthData['depenses']! > 0) ...[
-                            _buildCompactDataRow('D', monthData['depenses']!, Colors.purple),
-                          ],
-                        ] else ...[
-                          // Si pas de données, afficher un message centré
-                          Expanded(
-                            child: Center(
-                              child: Text(
-                                'Aucune\ndonnée',
-                                textAlign: TextAlign.center,
+                        Container(
+                          width: double.infinity,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                monthNames[monthDate.month - 1],
                                 style: TextStyle(
-                                  fontSize: 11, // Plus grand
-                                  color: Colors.grey.shade600,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16, // Plus grand
+                                  fontWeight: FontWeight.bold,
+                                  color: isCurrentMonth 
+                                      ? Colors.orange.shade800 
+                                      : (hasData ? Colors.blue.shade700 : Colors.black87),
                                 ),
                               ),
-                            ),
-                          ),
-                        ],
-                        
-                        // Espacement flexible
-                        const Spacer(),
-                        
-                        // Solde - affiché seulement s'il y a des données ou si c'est le mois actuel
-                        if (hasData || isCurrentMonth)
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8), // Plus de padding
-                            decoration: BoxDecoration(
-                              color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8), // Plus arrondi
-                              border: Border.all(
-                                color: solde >= 0 ? Colors.green.shade300 : Colors.red.shade300,
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  'SOLDE',
-                                  style: TextStyle(
-                                    fontSize: 10, // Plus grand
-                                    fontWeight: FontWeight.bold,
-                                    color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                              if (isCurrentMonth) ...[
+                                const SizedBox(width: 4),
+                                Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.orange,
+                                    borderRadius: BorderRadius.circular(6),
                                   ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  '${_formatAmount(solde)}€',
-                                  style: TextStyle(
-                                    fontSize: 12, // Plus grand
-                                    fontWeight: FontWeight.bold,
-                                    color: solde >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                                  child: const Icon(
+                                    Icons.today,
+                                    size: 10,
+                                    color: Colors.white,
                                   ),
-                                  textAlign: TextAlign.center,
                                 ),
                               ],
-                            ),
+                            ],
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        
+                        // Zone de données financières - utilise l'espace disponible
+                        Expanded(
+                          child: Column(
+                            children: [
+                              if (hasData) ...[
+                                // Revenus
+                                if (monthData['revenus']! > 0)
+                                  _buildCompactDataRow('R', monthData['revenus']!, Colors.green),
+                                
+                                // Charges
+                                if (monthData['charges']! > 0)
+                                  _buildCompactDataRow('C', monthData['charges']!, Colors.red),
+                                
+                                // Dépenses
+                                if (monthData['depenses']! > 0)
+                                  _buildCompactDataRow('D', monthData['depenses']!, Colors.purple),
+                              ] else ...[
+                                // Message centré pour pas de données
+                                Expanded(
+                                  child: Center(
+                                    child: Text(
+                                      'Aucune\ndonnée',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                              
+                              // Espacement automatique
+                              const Spacer(),
+                              
+                              // Solde en bas - prend plus de place
+                              if (hasData || isCurrentMonth)
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                                  decoration: BoxDecoration(
+                                    color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: solde >= 0 ? Colors.green.shade300 : Colors.red.shade300,
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      Text(
+                                        'SOLDE',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        '${_formatAmount(solde)}€',
+                                        style: TextStyle(
+                                          fontSize: 13, // Plus grand
+                                          fontWeight: FontWeight.bold,
+                                          color: solde >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                                        ),
+                                        textAlign: TextAlign.center,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -356,36 +359,41 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
   Widget _buildCompactDataRow(String prefix, double amount, Color color) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+      margin: const EdgeInsets.symmetric(vertical: 2), // Marge verticale réduite
+      padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1), // Fond coloré léger
+        borderRadius: BorderRadius.circular(6),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center, // Centrer la ligne
         children: [
           Container(
-            width: 8, // Plus grand
-            height: 8,
+            width: 10, // Plus grand point
+            height: 10,
             decoration: BoxDecoration(
               color: color,
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(5),
             ),
           ),
           const SizedBox(width: 6),
           Text(
-            '$prefix: ',
+            '$prefix:',
             style: TextStyle(
-              fontSize: 11, // Plus grand
+              fontSize: 12, // Plus grand
               color: color,
               fontWeight: FontWeight.w600,
             ),
           ),
-          Flexible(
+          const SizedBox(width: 4),
+          Expanded(
             child: Text(
               '${_formatAmount(amount)}€',
               style: TextStyle(
-                fontSize: 11, // Plus grand
+                fontSize: 12, // Plus grand
                 color: color,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.right, // Aligné à droite
               overflow: TextOverflow.ellipsis,
             ),
           ),
