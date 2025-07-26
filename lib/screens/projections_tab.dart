@@ -43,6 +43,11 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
 
       Map<String, Map<String, double>> monthlyData = {};
 
+      print('DEBUG: Chargement des données...');
+      print('Entrées: ${entrees.length}');
+      print('Sorties: ${sorties.length}');
+      print('Plaisirs: ${plaisirs.length}');
+
       // Analyser les revenus par mois
       for (var entree in entrees) {
         final dateStr = entree['date'] as String? ?? '';
@@ -53,6 +58,8 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
           
           monthlyData[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
           monthlyData[monthKey]!['revenus'] = monthlyData[monthKey]!['revenus']! + amount;
+          
+          print('Revenus $monthKey: +$amount = ${monthlyData[monthKey]!['revenus']}');
         }
       }
 
@@ -66,6 +73,8 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
           
           monthlyData[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
           monthlyData[monthKey]!['charges'] = monthlyData[monthKey]!['charges']! + amount;
+          
+          print('Charges $monthKey: +$amount = ${monthlyData[monthKey]!['charges']}');
         }
       }
 
@@ -84,14 +93,19 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
           } else {
             monthlyData[monthKey]!['depenses'] = monthlyData[monthKey]!['depenses']! + amount;
           }
+          
+          print('Dépenses $monthKey: ${isCredit ? '-' : '+'}$amount = ${monthlyData[monthKey]!['depenses']}');
         }
       }
+
+      print('Données mensuelles finales: $monthlyData');
 
       setState(() {
         _monthlyData = monthlyData;
         _isLoading = false;
       });
     } catch (e) {
+      print('Erreur chargement: $e');
       setState(() {
         _isLoading = false;
       });
@@ -153,6 +167,15 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                     color: Colors.white,
                     size: 20,
                   ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'ANNÉE ACTUELLE',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -166,7 +189,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.8,
+                childAspectRatio: 0.7, // Réduit pour plus de hauteur
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
@@ -178,10 +201,15 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 final isCurrentMonth = DateTime.now().year == year && DateTime.now().month == monthDate.month;
                 final solde = monthData['revenus']! - monthData['charges']! - monthData['depenses']!;
                 
+                // Debug pour voir les données
+                if (monthData['revenus']! > 0 || monthData['charges']! > 0 || monthData['depenses']! > 0) {
+                  print('Mois $monthKey: R=${monthData['revenus']}, C=${monthData['charges']}, D=${monthData['depenses']}');
+                }
+                
                 return GestureDetector(
                   onTap: () => _showMonthDetails(monthDate, monthData),
                   child: Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: isCurrentMonth 
                           ? Colors.orange.withValues(alpha: 0.1)
@@ -191,8 +219,15 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                         color: isCurrentMonth 
                             ? Colors.orange
                             : Colors.grey.shade300,
-                        width: isCurrentMonth ? 2 : 1,
+                        width: isCurrentMonth ? 3 : 1,
                       ),
+                      boxShadow: isCurrentMonth ? [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ] : null,
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,69 +238,105 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                           children: [
                             Expanded(
                               child: Text(
-                                DateFormat('MMMM', 'fr_FR').format(monthDate),
+                                DateFormat('MMM', 'fr_FR').format(monthDate).toUpperCase(),
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color: isCurrentMonth ? Colors.orange.shade700 : Colors.black87,
+                                  color: isCurrentMonth ? Colors.orange.shade800 : Colors.black87,
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
                             if (isCurrentMonth)
-                              Icon(
-                                Icons.today,
-                                size: 14,
-                                color: Colors.orange.shade600,
+                              Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: BoxDecoration(
+                                  color: Colors.orange,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.today,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         
                         // Revenus
-                        _buildCompactDataRow('R', monthData['revenus']!, Colors.green),
-                        const SizedBox(height: 2),
+                        if (monthData['revenus']! > 0)
+                          _buildCompactDataRow('R', monthData['revenus']!, Colors.green),
+                        if (monthData['revenus']! > 0)
+                          const SizedBox(height: 3),
                         
                         // Charges
-                        _buildCompactDataRow('C', monthData['charges']!, Colors.red),
-                        const SizedBox(height: 2),
+                        if (monthData['charges']! > 0)
+                          _buildCompactDataRow('C', monthData['charges']!, Colors.red),
+                        if (monthData['charges']! > 0)
+                          const SizedBox(height: 3),
                         
                         // Dépenses
-                        _buildCompactDataRow('D', monthData['depenses']!, Colors.purple),
-                        const SizedBox(height: 6),
+                        if (monthData['depenses']! > 0)
+                          _buildCompactDataRow('D', monthData['depenses']!, Colors.purple),
                         
-                        // Solde
+                        // Espacement flexible
+                        const Spacer(),
+                        
+                        // Solde - toujours affiché
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                           decoration: BoxDecoration(
                             color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(6),
+                            borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: solde >= 0 ? Colors.green.shade200 : Colors.red.shade200,
+                              color: solde >= 0 ? Colors.green.shade300 : Colors.red.shade300,
+                              width: 1.5,
                             ),
                           ),
                           child: Column(
                             children: [
                               Text(
-                                'Solde',
+                                'SOLDE',
                                 style: TextStyle(
                                   fontSize: 9,
-                                  fontWeight: FontWeight.w500,
+                                  fontWeight: FontWeight.bold,
                                   color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
                                 ),
                               ),
+                              const SizedBox(height: 2),
                               Text(
-                                '${_formatAmount(solde)} €',
+                                '${_formatAmount(solde)}€',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: solde >= 0 ? Colors.green : Colors.red,
+                                  color: solde >= 0 ? Colors.green.shade800 : Colors.red.shade800,
                                 ),
+                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
                         ),
+                        
+                        // Indicateur de données
+                        if (monthData['revenus']! > 0 || monthData['charges']! > 0 || monthData['depenses']! > 0)
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade100,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'Données',
+                              style: TextStyle(
+                                fontSize: 8,
+                                color: Colors.blue.shade700,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ),
@@ -282,27 +353,27 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
     return Row(
       children: [
         Container(
-          width: 6,
-          height: 6,
+          width: 8,
+          height: 8,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(4),
           ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         Text(
           '$prefix: ',
           style: TextStyle(
-            fontSize: 9,
+            fontSize: 10,
             color: color,
-            fontWeight: FontWeight.w500,
+            fontWeight: FontWeight.w600,
           ),
         ),
         Expanded(
           child: Text(
             '${_formatAmount(amount)}€',
             style: TextStyle(
-              fontSize: 9,
+              fontSize: 10,
               color: color,
               fontWeight: FontWeight.bold,
             ),
@@ -467,23 +538,19 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
       );
     }
 
-    // Générer les années : année actuelle en premier, puis les autres
+    // Générer les années en ordre décroissant : 2025, 2024, 2023...
     final currentYear = DateTime.now().year;
-    final years = [currentYear]; // Commencer par l'année actuelle
+    final years = <int>[];
     
-    // Ajouter les autres années (2020 à 2030, en excluant l'année actuelle)
-    for (int year = 2020; year <= 2030; year++) {
-      if (year != currentYear) {
-        years.add(year);
-      }
+    // Commencer par l'année en cours et aller vers le futur (jusqu'à 2030)
+    for (int year = currentYear; year <= 2030; year++) {
+      years.add(year);
     }
     
-    // Trier les années : actuelle en premier, puis ordre croissant
-    years.sort((a, b) {
-      if (a == currentYear) return -1;
-      if (b == currentYear) return 1;
-      return a.compareTo(b);
-    });
+    // Puis ajouter les années passées (jusqu'à 2020)
+    for (int year = currentYear - 1; year >= 2020; year--) {
+      years.add(year);
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -521,7 +588,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Visualisez vos finances mois par mois. L\'année en cours est affichée en premier. Tapez sur un mois pour voir les détails.',
+                        'Projections par année (${currentYear} en premier). Les montants sont calculés à partir de vos données réelles.',
                         style: TextStyle(
                           color: Colors.blue.shade700,
                           fontSize: 14,
@@ -532,7 +599,47 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 ),
               ),
               
-              // Années avec leurs mois (année actuelle en premier)
+              // Résumé des données totales
+              Card(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: FutureBuilder<Map<String, double>>(
+                    future: _dataService.getTotals(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        final totals = snapshot.data!;
+                        return Column(
+                          children: [
+                            Text(
+                              'Totaux globaux',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildTotalItem('Revenus', totals['entrees'] ?? 0, Colors.green),
+                                _buildTotalItem('Charges', totals['sorties'] ?? 0, Colors.red),
+                                _buildTotalItem('Dépenses', totals['plaisirs'] ?? 0, Colors.purple),
+                              ],
+                            ),
+                          ],
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Années avec leurs mois (ordre décroissant)
               ...years.map((year) => _buildYearCard(year)),
               
               const SizedBox(height: 20),
@@ -540,6 +647,29 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildTotalItem(String label, double amount, Color color) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: color,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        Text(
+          '${_formatAmount(amount)}€',
+          style: TextStyle(
+            fontSize: 14,
+            color: color,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
     );
   }
 }
