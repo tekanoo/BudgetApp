@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/encrypted_budget_service.dart';
+import '../services/budget_data_service.dart';
 import '../services/encryption_service.dart';
 
 class HomeTab extends StatefulWidget {
@@ -17,17 +17,13 @@ class _HomeTabState extends State<HomeTab> {
   List<String> _availableTags = [];
   List<String> _filteredTags = [];
   bool _isLoading = false;
-  double _currentBalance = 0.0;
-  double _soldeDisponible = 0.0;
-  double _totalPointe = 0.0;
-  bool _isCredit = false;
+
   @override
   void initState() {
     super.initState();
     _selectedDate = DateTime.now();
     _loadAvailableTags();
     _tagController.addListener(_onTagTextChanged);
-    _loadBalance();
   }
 
   @override
@@ -106,7 +102,6 @@ class _HomeTabState extends State<HomeTab> {
         amountStr: _amountController.text,
         tag: tag,
         date: _selectedDate,
-        isCredit: _isCredit, // NOUVEAU paramètre
       );
 
       // Réinitialiser le formulaire
@@ -116,9 +111,8 @@ class _HomeTabState extends State<HomeTab> {
         _selectedDate = DateTime.now();
       });
 
-      // Recharger les tags disponibles et les soldes
+      // Recharger les tags disponibles
       await _loadAvailableTags();
-      await _loadBalance();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -166,121 +160,6 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
 
-  Future<void> _loadBalance() async {
-    try {
-      final balance = await _dataService.getBankBalance();
-      final solde = await _dataService.getSoldeDisponible();
-      final totals = await _dataService.getTotals();
-      
-      setState(() {
-        _currentBalance = balance;
-        _soldeDisponible = solde;
-        _totalPointe = totals['plaisirsTotaux'] ?? 0.0;
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur chargement solde: $e'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _updateBalance() async {
-    final TextEditingController controller = TextEditingController(
-      text: AmountParser.formatAmount(_currentBalance),
-    );
-
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.account_balance_wallet),
-            SizedBox(width: 8),
-            Text('Mettre à jour le solde'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Nouveau solde',
-                prefixText: '€ ',
-                border: OutlineInputBorder(),
-                helperText: 'Utilisez , ou . pour les décimales',
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.security, color: Colors.green.shade700, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Ce montant sera automatiquement chiffré',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              try {
-                await _dataService.setBankBalance(controller.text);
-                await _loadBalance();
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('🔐 Solde mis à jour et chiffré avec succès'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erreur: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Enregistrer'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -289,129 +168,52 @@ class _HomeTabState extends State<HomeTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // En-tête avec soldes
+            // Section des soldes
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              margin: const EdgeInsets.only(bottom: 20),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.blue.shade400, Colors.blue.shade600],
+                  colors: [Colors.blue.shade600, Colors.blue.shade800],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-                borderRadius: BorderRadius.circular(15),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, 5),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 children: [
                   Row(
-                    children: [
-                      const Icon(
-                        Icons.account_balance_wallet,
-                        color: Colors.white,
-                        size: 32,
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.lock, color: Colors.white, size: 14),
-                            SizedBox(width: 4),
-                            Text(
-                              'Chiffré',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        onPressed: _updateBalance,
-                        icon: const Icon(
-                          Icons.edit,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                        tooltip: 'Modifier le solde',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 15),
-                  
-                  // Ligne des soldes
-                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Column(
                           children: [
                             const Text(
-                              'Solde du compte',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
+                              'Solde prévisionnel',
+                              style: TextStyle(color: Colors.white70, fontSize: 12),
                             ),
-                            Text(
-                              '${AmountParser.formatAmount(_currentBalance)} €',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: Colors.white.withValues(alpha: 0.3),
-                      ),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  'Pointé',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 12,
+                            const SizedBox(height: 4),
+                            FutureBuilder<double>(
+                              future: _dataService.getSoldePrevisionnel(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData) {
+                                  return Text(
+                                    '${AmountParser.formatAmount(snapshot.data!)} €',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                }
+                                return const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                   ),
-                                ),
-                                SizedBox(width: 4),
-                                Icon(
-                                  Icons.check_circle,
-                                  color: Colors.white70,
-                                  size: 12,
-                                ),
-                              ],
-                            ),
-                            Text(
-                              '${AmountParser.formatAmount(_totalPointe)} €',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -419,25 +221,38 @@ class _HomeTabState extends State<HomeTab> {
                       Container(
                         width: 1,
                         height: 40,
-                        color: Colors.white.withValues(alpha: 0.3),
+                        color: Colors.white.withOpacity(0.3),
                       ),
                       Expanded(
                         child: Column(
                           children: [
                             const Text(
-                              'Disponible',
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                              ),
+                              'Solde pointé',
+                              style: TextStyle(color: Colors.white70, fontSize: 12),
                             ),
-                            Text(
-                              '${AmountParser.formatAmount(_soldeDisponible)} €',
-                              style: TextStyle(
-                                color: _soldeDisponible >= 0 ? Colors.greenAccent : Colors.redAccent,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            const SizedBox(height: 4),
+                            FutureBuilder<double>(
+                              future: _dataService.getSoldePointe(),
+                              builder: (context, snapshot) {
+                                if (snapshot.hasData) {
+                                  return Text(
+                                    '${AmountParser.formatAmount(snapshot.data!)} €',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  );
+                                }
+                                return const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                );
+                              },
                             ),
                           ],
                         ),
@@ -447,6 +262,7 @@ class _HomeTabState extends State<HomeTab> {
                 ],
               ),
             ),
+            const SizedBox(height: 20),
 
             // Icône et titre
             Icon(

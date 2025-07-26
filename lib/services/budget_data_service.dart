@@ -722,5 +722,127 @@ class EncryptedBudgetDataService {
       }
     }
   }
-}
+
+  Future<double> getSoldePrevisionnel() async {
+    try {
+      final entrees = await getEntrees();
+      final sorties = await getSorties();
+      final plaisirs = await getPlaisirs();
       
+      double totalEntrees = 0.0;
+      for (var entree in entrees) {
+        totalEntrees += (entree['amount'] as num).toDouble();
+      }
+      
+      double totalSorties = 0.0;
+      for (var sortie in sorties) {
+        totalSorties += (sortie['amount'] as num).toDouble();
+      }
+      
+      double totalPlaisirs = 0.0;
+      for (var plaisir in plaisirs) {
+        totalPlaisirs += (plaisir['amount'] as num).toDouble();
+      }
+      
+      return totalEntrees - totalSorties - totalPlaisirs;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul solde prévisionnel: $e');
+      }
+      return 0.0;
+    }
+  }
+
+  Future<double> getSoldePointe() async {
+    try {
+      final entrees = await getEntrees();
+      final sorties = await getSorties();
+      final plaisirs = await getPlaisirs();
+      
+      double totalEntrees = 0.0;
+      for (var entree in entrees) {
+        if (entree['isPointed'] == true) {
+          totalEntrees += (entree['amount'] as num).toDouble();
+        }
+      }
+      
+      double totalSorties = 0.0;
+      for (var sortie in sorties) {
+        if (sortie['isPointed'] == true) {
+          totalSorties += (sortie['amount'] as num).toDouble();
+        }
+      }
+      
+      double totalPlaisirs = 0.0;
+      for (var plaisir in plaisirs) {
+        if (plaisir['isPointed'] == true) {
+          totalPlaisirs += (plaisir['amount'] as num).toDouble();
+        }
+      }
+      
+      return totalEntrees - totalSorties - totalPlaisirs;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul solde pointé: $e');
+      }
+      return 0.0;
+    }
+  }
+
+  Future<void> toggleSortiePointing(int index) async {
+    _ensureInitialized();
+    try {
+      final sorties = await _firebaseService.loadSorties();
+      if (index >= 0 && index < sorties.length) {
+        // Déchiffrer la transaction avant modification
+        final sortie = _encryption.decryptTransaction(sorties[index]);
+        final bool currentlyPointed = sortie['isPointed'] == true;
+        
+        // Bascule le statut
+        sortie['isPointed'] = !currentlyPointed;
+        
+        if (!currentlyPointed) {
+          // Si on pointe, on ajoute la date
+          sortie['pointedAt'] = DateTime.now().toIso8601String();
+        } else {
+          // Si on dépointe, on supprime la date
+          sortie.remove('pointedAt');
+        }
+        
+        // Rechiffrer et sauvegarder
+        sorties[index] = _encryption.encryptTransaction(sortie);
+        await _firebaseService.saveSorties(sorties);
+        
+        if (kDebugMode) {
+          print('✅ Charge ${currentlyPointed ? 'dépointée' : 'pointée'}');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur basculement pointage charge: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Calcule le total des charges pointées
+  Future<double> getTotalSortiesTotaux() async {
+    try {
+      final sorties = await getSorties();
+      double total = 0.0;
+      
+      for (var sortie in sorties) {
+        if (sortie['isPointed'] == true) {
+          total += (sortie['amount'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+      
+      return total;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul total charges pointées: $e');
+      }
+      return 0.0;
+    }
+  }
+}
