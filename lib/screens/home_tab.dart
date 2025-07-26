@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../services/budget_data_service.dart';
+import '../services/encrypted_budget_service.dart';
 import '../services/encryption_service.dart';
 
 class HomeTab extends StatefulWidget {
@@ -17,6 +17,13 @@ class _HomeTabState extends State<HomeTab> {
   List<String> _availableTags = [];
   List<String> _filteredTags = [];
   bool _isLoading = false;
+  
+  // Variables manquantes ajoutées
+  bool isLoading = false;
+  double totalEntrees = 0.0;
+  double totalSorties = 0.0;
+  double totalPlaisirs = 0.0;
+  double soldeDisponible = 0.0;
 
   @override
   void initState() {
@@ -193,7 +200,7 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                             const SizedBox(height: 4),
                             FutureBuilder<double>(
-                              future: _dataService.getSoldePrevisionnel(),
+                              future: _dataService.getTotals().then((totals) => totals['solde'] ?? 0.0), // Utilise la méthode existante
                               builder: (context, snapshot) {
                                 if (snapshot.hasData) {
                                   return Text(
@@ -227,12 +234,12 @@ class _HomeTabState extends State<HomeTab> {
                         child: Column(
                           children: [
                             const Text(
-                              'Solde pointé',
+                              'Solde disponible',
                               style: TextStyle(color: Colors.white70, fontSize: 12),
                             ),
                             const SizedBox(height: 4),
                             FutureBuilder<double>(
-                              future: _dataService.getSoldePointe(),
+                              future: _dataService.getSoldeDisponible(), // Utilise getSoldeDisponible au lieu de getSoldePointe
                               builder: (context, snapshot) {
                                 if (snapshot.hasData) {
                                   return Text(
