@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_analytics/firebase_analytics.dart'; // AJOUT
 import '../services/firebase_service.dart';
 import '../services/encrypted_budget_service.dart' as encrypted; // MODIFIÉ: alias pour éviter le conflit
 // SUPPRIMÉ: import '../services/budget_data_service.dart'; 
@@ -22,6 +23,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final PageController _pageController = PageController();
   final FirebaseService _firebaseService = FirebaseService();
   final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService(); // MODIFIÉ: utilisation de l'alias
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance; // AJOUT
 
   final List<Widget> _tabs = const [
     HomeTab(),
@@ -69,6 +71,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void initState() {
     super.initState();
     _initializeServices();
+    _trackScreenView(); // AJOUT
+  }
+
+  // AJOUT: Tracker l'ouverture de l'écran principal
+  Future<void> _trackScreenView() async {
+    await _analytics.logScreenView(
+      screenName: 'main_menu',
+      screenClass: 'MainMenuScreen',
+    );
   }
 
   Future<void> _initializeServices() async {
@@ -90,6 +101,22 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
+    
+    // AJOUT: Tracker la navigation entre onglets
+    _trackTabChange(index);
+  }
+
+  Future<void> _trackTabChange(int index) async {
+    final tabNames = ['home', 'entrees', 'sorties', 'plaisirs', 'analyse', 'tags'];
+    if (index < tabNames.length) {
+      await _analytics.logEvent(
+        name: 'tab_changed',
+        parameters: {
+          'tab_name': tabNames[index],
+          'tab_index': index,
+        },
+      );
+    }
   }
 
   Future<void> _showProfileMenu() async {

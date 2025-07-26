@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_analytics/firebase_analytics.dart'; // AJOUT
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart';
 
@@ -10,6 +11,7 @@ class FirebaseService {
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance; // AJOUT
   
   // GoogleSignIn initialisé directement
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -68,6 +70,11 @@ class FirebaseService {
         print('✅ Connexion Firebase réussie: ${userCredential.user?.displayName}');
       }
 
+      // AJOUT: Tracker l'événement de connexion
+      await _analytics.logLogin(loginMethod: 'google');
+      await _analytics.setUserId(id: userCredential.user?.uid);
+      await _analytics.setUserProperty(name: 'login_method', value: 'google');
+
       // Créer/mettre à jour le profil utilisateur
       if (userCredential.user != null) {
         await _createUserProfile(userCredential.user!);
@@ -86,6 +93,9 @@ class FirebaseService {
   // Déconnexion
   Future<void> signOut() async {
     try {
+      // AJOUT: Tracker la déconnexion
+      await _analytics.logEvent(name: 'user_logout');
+      
       await Future.wait([
         _googleSignIn.signOut(),
         _auth.signOut(),
