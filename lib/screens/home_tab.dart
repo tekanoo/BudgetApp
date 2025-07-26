@@ -73,10 +73,11 @@ class _HomeTabState extends State<HomeTab> {
     });
   }
 
-  Future<void> _saveTransaction() async {
+  // CORRECTION: Renommer _saveTransaction en _addExpense
+  Future<void> _addExpense() async {
     if (_amountController.text.trim().isEmpty || _selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Veuillez remplir le montant et la date.'),
           backgroundColor: Colors.orange,
         ),
@@ -88,7 +89,7 @@ class _HomeTabState extends State<HomeTab> {
     final amount = AmountParser.parseAmount(_amountController.text);
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Veuillez entrer un montant valide.'),
           backgroundColor: Colors.red,
         ),
@@ -124,8 +125,8 @@ class _HomeTabState extends State<HomeTab> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('🔐 Dépense ajoutée et chiffrée.'),
+        const SnackBar(
+          content: Text('✅ Dépense ajoutée avec succès'),
           backgroundColor: Colors.green,
         ),
       );
@@ -163,7 +164,6 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Rebuild automatique lors du changement de langue
     return Scaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -284,10 +284,10 @@ class _HomeTabState extends State<HomeTab> {
             TextField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
+              decoration: const InputDecoration(
                 labelText: 'Montant *',
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.euro),
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
                 helperText: 'Utilisez , ou . pour les décimales (ex: 15,50 ou 15.50)',
               ),
@@ -300,10 +300,10 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 TextField(
                   controller: _tagController,
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     labelText: 'Catégorie',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.tag),
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.tag),
                     helperText: 'Restaurant, Shopping, Loisirs...',
                   ),
                 ),
@@ -372,105 +372,31 @@ class _HomeTabState extends State<HomeTab> {
             SizedBox(
               height: 56,
               child: FilledButton.icon(
-                onPressed: _isLoading ? null : _saveTransaction,
-                icon: _isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Icon(Icons.add),
+                onPressed: _isLoading ? null : _addExpense,
+                icon: _isLoading 
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.add),
                 label: Text(
                   _isLoading 
-                    ? 'En cours de chiffrement et sauvegarde...' 
+                    ? 'Enregistrement...'
                     : 'Ajouter une dépense',
                   style: const TextStyle(fontSize: 16),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
             
-            // Informations sur le système de pointage
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.info,
-                        color: Colors.blue.shade600,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Système de pointage',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue.shade700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ce système vous permet de suivre vos dépenses et revenus de manière sécurisée.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.blue.shade700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            
-            // Informations sur la sécurité
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.security,
-                    color: Colors.green.shade600,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Chiffrement des données',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
             Text(
               '* Champs obligatoires',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.grey.shade600,
               ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),
