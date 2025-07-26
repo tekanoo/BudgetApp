@@ -3,132 +3,84 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_service.dart';
 import 'encryption_service.dart';
 
-class EncryptedBudgetDataService {
-  static final EncryptedBudgetDataService _instance = EncryptedBudgetDataService._internal();
-  factory EncryptedBudgetDataService() => _instance;
-  EncryptedBudgetDataService._internal();
-
-  final FirebaseService _firebaseService = FirebaseService();
-  final FinancialDataEncryption _encryption = FinancialDataEncryption();
-  
-  bool _isInitialized = false;
-
-  /// Initialise le service avec l'utilisateur connecté
-  Future<void> initialize() async {
-    if (_firebaseService.currentUser == null) {
-      throw Exception('Aucun utilisateur connecté');
+// Parser pour les montants avec support des virgules
+class AmountParser {
+  static double parseAmount(String amountStr) {
+    // Remplace les virgules par des points
+    String normalized = amountStr.replaceAll(',', '.');
+    
+    // Gère le cas où il y a plusieurs points (erreur de saisie)
+    List<String> parts = normalized.split('.');
+    if (parts.length > 2) {
+      // Garde seulement les deux derniers chiffres après le dernier point
+      normalized = '${parts.sublist(0, parts.length - 1).join('')}.${parts.last}';
     }
     
-    // Initialise le chiffrement pour cet utilisateur
-    _encryption.initializeForUser(_firebaseService.currentUser!.uid);
-    _isInitialized = true;
-    
-    if (kDebugMode) {
-      print('🔐 Service de budget chiffré initialisé');
-    }
-  }
-
-  void _ensureInitialized() {
-    if (!_isInitialized) {
-      throw Exception('Service non initialisé. Appelez initialize() d\'abord.');
-    }
-  }
-
-  /// Collection de référence pour l'utilisateur actuel
-  CollectionReference? get _userBudgetCollection {
-    if (!_firebaseService.isSignedIn) return null;
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(_firebaseService.currentUser!.uid)
-        .collection('budget');
-  }
-
-  /// SYSTÈME DE POINTAGE DES DÉPENSES
-
-  /// Bascule le statut de pointage d'une dépense
-Future<void> togglePlaisirPointing(int index) async {
-  _ensureInitialized();
-  try {
-    final plaisirs = await _firebaseService.loadPlaisirs();
-    if (index >= 0 && index < plaisirs.length) {
-      // Déchiffrer d'abord la transaction pour la modifier
-      final decryptedPlaisir = _encryption.decryptTransaction(plaisirs[index]);
-      
-      final bool currentlyPointed = decryptedPlaisir['isPointed'] == true;
-      
-      // Bascule le statut
-      decryptedPlaisir['isPointed'] = !currentlyPointed;
-      
-      if (!currentlyPointed) {
-        // Si on pointe, on ajoute la date
-        decryptedPlaisir['pointedAt'] = DateTime.now().toIso8601String();
-      } else {
-        // Si on dépointe, on supprime la date
-        decryptedPlaisir.remove('pointedAt');
-      }
-      
-      // Rechiffrer la transaction modifiée
-      plaisirs[index] = _encryption.encryptTransaction(decryptedPlaisir);
-      
-      // Sauvegarder
-      await _firebaseService.savePlaisirs(plaisirs);
-      
-      if (kDebugMode) {
-        print('✅ Dépense ${currentlyPointed ? 'dépointée' : 'pointée'}');
-      }
-    }
-  } catch (e) {
-    if (kDebugMode) {
-      print('❌ Erreur basculement pointage: $e');
-    }
-    rethrow;
+    return double.tryParse(normalized) ?? 0.0;
   }
 }
 
-  /// Calcule le total des dépenses pointées
-  Future<double> getTotalPlaisirsTotaux() async {
-    try {
-      final plaisirs = await getPlaisirs();
-      double total = 0.0;
-      
-      for (var plaisir in plaisirs) {
-        if (plaisir['isPointed'] == true) {
-          total += (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
-        }
+class EncryptedBudgetDataService {
+  final FirebaseService _firebaseService = FirebaseService();
+  late final EncryptionService _encryption;
+  bool _isInitialized = false;
+
+  /// Initialise le service avec l'utilisateur connecté
+  void _ensureInitialized() {
+    if (!_isInitialized) {
+      final user = _firebaseService.currentUser;
+      if (user == null) {
+        throw Exception('Utilisateur non connecté');
       }
-      
-      return total;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur calcul total pointé: $e');
-      }
-      return 0.0;
+      _encryption = EncryptionService(user.uid);
+      _isInitialized = true;
     }
   }
 
-  /// Calcule le total des sorties pointées
-  Future<double> getTotalSortiesTotaux() async {
+  /// GESTION DU POINTAGE DES PLAISIRS (DÉPENSES)
+
+  Future<void> togglePlaisirPointing(int index) async {
+    _ensureInitialized();
     try {
-      final sorties = await getSorties();
-      double total = 0.0;
-      
-      for (var sortie in sorties) {
-        if (sortie['isPointed'] == true) {
-          total += (sortie['amount'] as num?)?.toDouble() ?? 0.0;
+      final plaisirs = await _firebaseService.loadPlaisirs();
+      if (index >= 0 && index < plaisirs.length) {
+        // Déchiffrer la transaction
+        final decryptedPlaisir = _encryption.decryptTransaction(plaisirs[index]);
+        
+        final bool currentlyPointed = decryptedPlaisir['isPointed'] == true;
+        
+        // Bascule le statut
+        decryptedPlaisir['isPointed'] = !currentlyPointed;
+        
+        if (!currentlyPointed) {
+          // Si on pointe, on ajoute la date
+          decryptedPlaisir['pointedAt'] = DateTime.now().toIso8601String();
+        } else {
+          // Si on dépointe, on supprime la date
+          decryptedPlaisir.remove('pointedAt');
+        }
+        
+        // Rechiffrer la transaction modifiée
+        plaisirs[index] = _encryption.encryptTransaction(decryptedPlaisir);
+        
+        // Sauvegarder
+        await _firebaseService.savePlaisirs(plaisirs);
+        
+        if (kDebugMode) {
+          print('✅ Dépense ${currentlyPointed ? 'dépointée' : 'pointée'}');
         }
       }
-      
-      return total;
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur calcul total sorties pointées: $e');
+        print('❌ Erreur basculement pointage: $e');
       }
-      return 0.0;
+      rethrow;
     }
   }
 
-  /// Calcule le solde débité (revenus - charges pointées - dépenses pointées)
+  /// Calcule le solde disponible basé sur les éléments pointés
   Future<double> getSoldeDisponible() async {
+    _ensureInitialized();
     try {
       final entrees = await getEntrees();
       final sorties = await getSorties();
@@ -162,20 +114,19 @@ Future<void> togglePlaisirPointing(int index) async {
       }
       
       // Formule : Revenus - Charges pointées - Dépenses pointées
-      final result = totalRevenus - totalChargesPointees - totalDepensesPointees;
+      final solde = totalRevenus - totalChargesPointees - totalDepensesPointees;
       
       if (kDebugMode) {
-        print('🔍 CALCUL SOLDE DÉBITÉ:');
-        print('  - Total revenus: $totalRevenus €');
-        print('  - Charges pointées: $totalChargesPointees €');
-        print('  - Dépenses pointées: $totalDepensesPointees €');
-        print('  - FORMULE: $totalRevenus - $totalChargesPointees - $totalDepensesPointees = $result €');
+        print('💰 Solde disponible calculé: $solde€');
+        print('   - Revenus: $totalRevenus€');
+        print('   - Charges pointées: $totalChargesPointees€');
+        print('   - Dépenses pointées: $totalDepensesPointees€');
       }
       
-      return result;
+      return solde;
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur calcul solde débité: $e');
+        print('❌ Erreur calcul solde disponible: $e');
       }
       return 0.0;
     }
@@ -210,11 +161,8 @@ Future<void> togglePlaisirPointing(int index) async {
     _ensureInitialized();
     try {
       final entrees = await _firebaseService.loadEntrees();
-      
-      // Parse le montant avec support des virgules
       final double amount = AmountParser.parseAmount(amountStr);
       
-      // Crée la nouvelle entrée
       final newEntree = {
         'amount': amount,
         'description': description,
@@ -495,6 +443,7 @@ Future<void> togglePlaisirPointing(int index) async {
           'amount': amount,
           'tag': tag,
           'date': (date ?? DateTime.now()).toIso8601String(),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
           'id': oldPlaisir['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
           'isPointed': isPointed ?? oldPlaisir['isPointed'] ?? false,
         };
@@ -553,34 +502,47 @@ Future<void> togglePlaisirPointing(int index) async {
     _ensureInitialized();
     try {
       // Charge les données chiffrées
-      final data = await _userBudgetCollection!.doc('settings').get();
-      if (data.exists && data.data() != null) {
-        final settings = data.data() as Map<String, dynamic>;
+      final doc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_firebaseService.currentUser!.uid)
+          .collection('budget')
+          .doc('settings')
+          .get();
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data() as Map<String, dynamic>;
         
-        // Vérifie si le solde est chiffré
-        if (settings.containsKey('encryptedBankBalance')) {
-          return _encryption.decryptAmount(settings['encryptedBankBalance']);
+        // Vérifie d'abord s'il y a une version chiffrée
+        if (data.containsKey('encryptedBankBalance')) {
+          final encryptedBalance = data['encryptedBankBalance'] as String;
+          return _encryption.decryptAmount(encryptedBalance);
         }
         
-        // Fallback vers l'ancien format non chiffré
-        return (settings['bankBalance'] ?? 0.0).toDouble();
+        // Sinon utilise la version non chiffrée (pour compatibilité)
+        return (data['bankBalance'] as num?)?.toDouble() ?? 0.0;
       }
+      
       return 0.0;
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur chargement solde chiffré: $e');
+        print('❌ Erreur chargement solde bancaire chiffré: $e');
       }
       return 0.0;
     }
   }
 
-  Future<void> setBankBalance(String balanceStr) async {
+  Future<void> saveBankBalance(double balance) async {
     _ensureInitialized();
     try {
-      final double balance = AmountParser.parseAmount(balanceStr);
+      final encryptedBalance = _encryption.encryptAmount(balance);
       
-      await _userBudgetCollection!.doc('settings').set({
-        'encryptedBankBalance': _encryption.encryptAmount(balance),
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_firebaseService.currentUser!.uid)
+          .collection('budget')
+          .doc('settings')
+          .set({
+        'encryptedBankBalance': encryptedBalance,
         'updatedAt': FieldValue.serverTimestamp(),
         // Supprime l'ancien champ non chiffré
         'bankBalance': FieldValue.delete(),
@@ -649,31 +611,35 @@ Future<void> togglePlaisirPointing(int index) async {
 
       double totalEntrees = 0;
       for (var entree in entrees) {
-        totalEntrees += (entree['amount'] as num).toDouble();
+        totalEntrees += (entree['amount'] as num?)?.toDouble() ?? 0.0;
       }
 
       double totalSorties = 0;
       for (var sortie in sorties) {
-        totalSorties += (sortie['amount'] as num).toDouble();
+        totalSorties += (sortie['amount'] as num?)?.toDouble() ?? 0.0;
       }
 
       double totalPlaisirs = 0;
-      double totalPlaisirsTotaux = 0; // Total des dépenses pointées
+      double totalPlaisirsTotaux = 0; // Nouveau: total avec crédits
       for (var plaisir in plaisirs) {
-        final amount = (plaisir['amount'] as num).toDouble();
-        totalPlaisirs += amount;
-        
-        if (plaisir['isPointed'] == true) {
+        final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+        if (plaisir['isCredit'] == true) {
+          totalPlaisirs -= amount; // Les crédits s'ajoutent (donc réduisent les dépenses)
+          totalPlaisirsTotaux += amount; // Mais on les compte dans le total absolu
+        } else {
+          totalPlaisirs += amount; // Les dépenses normales
           totalPlaisirsTotaux += amount;
         }
       }
 
+      final solde = totalEntrees - totalSorties - totalPlaisirs;
+
       return {
         'entrees': totalEntrees,
         'sorties': totalSorties,
-        'plaisirs': totalPlaisirs,
-        'plaisirsTotaux': totalPlaisirsTotaux, // Nouveau : total pointé
-        'solde': totalEntrees - totalSorties - totalPlaisirs,
+        'plaisirs': totalPlaisirs, // Total net (avec crédits)
+        'plaisirsTotaux': totalPlaisirsTotaux, // Total absolu
+        'solde': solde,
       };
     } catch (e) {
       if (kDebugMode) {

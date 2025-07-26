@@ -1,10 +1,40 @@
 import 'package:flutter/foundation.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'encrypted_budget_service.dart';
 
 class PointingService {
   final EncryptedBudgetDataService _budgetService;
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
   PointingService(this._budgetService);
+
+  /// NOUVELLES MÉTHODES ANALYTICS - POINTAGE EN LOT
+
+  /// Tracker les opérations de pointage en lot
+  Future<void> _trackBatchPointing(String itemType, int itemsCount, Map<String, int> results) async {
+    try {
+      await _analytics.logEvent(
+        name: 'budget_batch_pointing',
+        parameters: {
+          'item_type': itemType, // 'expenses' ou 'charges'
+          'items_selected': itemsCount,
+          'items_pointed': results['pointed'] ?? 0,
+          'items_unpointed': results['unpointed'] ?? 0,
+          'errors_count': results['errors'] ?? 0,
+          'success_rate': itemsCount > 0 ? ((results['pointed'] ?? 0) + (results['unpointed'] ?? 0)) / itemsCount * 100 : 0,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+      
+      if (kDebugMode) {
+        print('📊 Analytics: Pointage lot $itemType tracké');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur tracking pointage lot: $e');
+      }
+    }
+  }
 
   /// Basculer le pointage d'une dépense - VERSION CORRIGÉE
   Future<bool> togglePlaisirPointing(int index) async {
@@ -56,8 +86,18 @@ class PointingService {
     }
   }
 
-  /// Pointer plusieurs dépenses en lot - VERSION CORRIGÉE
+  /// Pointer plusieurs dépenses en lot - VERSION CORRIGÉE avec Analytics
   Future<Map<String, int>> batchTogglePlaisirs(List<int> indices) async {
+    // AJOUT: Tracker le début de l'opération
+    await _analytics.logEvent(
+      name: 'budget_batch_operation_started',
+      parameters: {
+        'operation_type': 'pointing',
+        'item_type': 'expenses',
+        'items_count': indices.length,
+      },
+    );
+
     int pointed = 0;
     int unpointed = 0;
     List<String> errors = [];
@@ -82,15 +122,30 @@ class PointingService {
       debugPrint('❌ Erreurs traitement lot: ${errors.join(', ')}');
     }
 
-    return {
+    final results = {
       'pointed': pointed,
       'unpointed': unpointed,
       'errors': errors.length,
     };
+
+    // AJOUT: Tracker les résultats
+    await _trackBatchPointing('expenses', indices.length, results);
+
+    return results;
   }
 
-  /// Pointer plusieurs charges en lot - VERSION CORRIGÉE
+  /// Pointer plusieurs charges en lot - VERSION CORRIGÉE avec Analytics
   Future<Map<String, int>> batchToggleSorties(List<int> indices) async {
+    // AJOUT: Tracker le début de l'opération
+    await _analytics.logEvent(
+      name: 'budget_batch_operation_started',
+      parameters: {
+        'operation_type': 'pointing',
+        'item_type': 'charges',
+        'items_count': indices.length,
+      },
+    );
+
     int pointed = 0;
     int unpointed = 0;
     List<String> errors = [];
@@ -115,11 +170,16 @@ class PointingService {
       debugPrint('❌ Erreurs traitement lot: ${errors.join(', ')}');
     }
 
-    return {
+    final results = {
       'pointed': pointed,
       'unpointed': unpointed,
       'errors': errors.length,
     };
+
+    // AJOUT: Tracker les résultats
+    await _trackBatchPointing('charges', indices.length, results);
+
+    return results;
   }
 
   /// Calculer les statistiques de pointage

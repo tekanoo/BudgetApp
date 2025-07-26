@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_analytics/firebase_analytics.dart'; // AJOUT
 import '../services/firebase_service.dart';
-import '../services/encrypted_budget_service.dart' as encrypted; // MODIFIÉ: alias pour éviter le conflit
-// SUPPRIMÉ: import '../services/budget_data_service.dart'; 
+import '../services/encrypted_budget_service.dart' as encrypted;
 import 'home_tab.dart';
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
@@ -22,7 +21,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   int _selectedIndex = 0;
   final PageController _pageController = PageController();
   final FirebaseService _firebaseService = FirebaseService();
-  final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService(); // MODIFIÉ: utilisation de l'alias
+  final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService();
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance; // AJOUT
 
   final List<Widget> _tabs = const [
