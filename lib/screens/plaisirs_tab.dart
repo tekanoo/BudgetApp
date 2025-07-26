@@ -9,15 +9,20 @@ class PlaisirsTab extends StatefulWidget {
   State<PlaisirsTab> createState() => _PlaisirsTabState();
 }
 
-class _PlaisirsTabState extends State<PlaisirsTab> {
+class _PlaisirsTabState extends State<PlaisirsTab> { // Correction: PlaisirsTab au lieu de PlaisirTab
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> plaisirs = [];
-  bool isLoading = true;
-  String _sortBy = 'date'; // 'date', 'amount', 'tag', 'pointed'
-  bool _ascending = false;
   double totalPlaisirs = 0.0;
   double totalPointe = 0.0;
   double soldeDisponible = 0.0;
+  bool isLoading = false;
+  String _sortBy = 'date';
+  bool _sortAscending = false;
+
+  // Nouveaux états pour la sélection multiple
+  bool _isSelectionMode = false;
+  Set<int> _selectedIndices = {};
+  bool _isProcessingBatch = false;
 
   @override
   void initState() {
@@ -84,7 +89,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             comparison = pointedA.compareTo(pointedB);
             break;
         }
-        return _ascending ? comparison : -comparison;
+        return _sortAscending ? comparison : -comparison;
       });
     });
   }
@@ -331,6 +336,84 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     }
   }
 
+  // Nouvelles méthodes pour la sélection multiple
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIndices.clear();
+      }
+    });
+  }
+
+  void _toggleSelection(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        _selectedIndices.add(index);
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      if (_selectedIndices.length == plaisirs.length) {
+        _selectedIndices.clear();
+      } else {
+        _selectedIndices = Set.from(List.generate(plaisirs.length, (index) => index));
+      }
+    });
+  }
+
+  Future<void> _batchTogglePointing() async {
+    if (_selectedIndices.isEmpty) return;
+
+    setState(() {
+      _isProcessingBatch = true;
+    });
+
+    try {
+      // Traiter chaque sélection
+      for (int index in _selectedIndices.toList()..sort((a, b) => b.compareTo(a))) {
+        await _dataService.togglePlaisirPointing(index);
+      }
+
+      // Recharger les données
+      await _loadPlaisirs();
+
+      if (!mounted) return;
+      
+      // Sortir du mode sélection
+      setState(() {
+        _isSelectionMode = false;
+        _selectedIndices.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${_selectedIndices.length} dépense(s) mises à jour'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du traitement: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingBatch = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -373,96 +456,159 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
               )
             : Column(
                 children: [
-                  // En-tête avec totaux et solde
+                  // En-tête avec totaux et boutons
                   Container(
                     width: double.infinity,
                     margin: const EdgeInsets.all(16),
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Colors.purple.shade400, Colors.pink.shade400],
+                        colors: [Colors.purple.shade600, Colors.purple.shade800],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(15),
+                      borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.purple.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                     child: Column(
                       children: [
+                        // Boutons de contrôle
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Icon(
-                              Icons.shopping_cart,
-                              color: Colors.white,
-                              size: 40,
+                            // Mode sélection
+                            Row(
+                              children: [
+                                IconButton(
+                                  onPressed: _toggleSelectionMode,
+                                  icon: Icon(
+                                    _isSelectionMode ? Icons.close : Icons.checklist,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                  tooltip: _isSelectionMode ? 'Annuler sélection' : 'Sélection multiple',
+                                ),
+                                if (_isSelectionMode) ...[
+                                  IconButton(
+                                    onPressed: _selectAll,
+                                    icon: Icon(
+                                      _selectedIndices.length == plaisirs.length 
+                                          ? Icons.deselect 
+                                          : Icons.select_all,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                    tooltip: _selectedIndices.length == plaisirs.length 
+                                        ? 'Tout désélectionner' 
+                                        : 'Tout sélectionner',
+                                  ),
+                                ],
+                              ],
                             ),
-                            const Spacer(),
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.sort, color: Colors.white),
-                              onSelected: (value) {
-                                if (value == _sortBy) {
-                                  setState(() {
-                                    _ascending = !_ascending;
-                                  });
-                                } else {
-                                  setState(() {
-                                    _sortBy = value;
-                                    _ascending = false;
-                                  });
-                                }
-                                _sortPlaisirs();
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'date',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par date'),
+                            
+                            // Tri et autres actions
+                            Row(
+                              children: [
+                                if (!_isSelectionMode)
+                                  PopupMenuButton<String>(
+                                    icon: const Icon(Icons.sort, color: Colors.white),
+                                    onSelected: (value) {
+                                      setState(() {
+                                        if (_sortBy == value) {
+                                          _sortAscending = !_sortAscending;
+                                        } else {
+                                          _sortBy = value;
+                                          _sortAscending = false;
+                                        }
+                                      });
+                                      _sortPlaisirs();
+                                    },
+                                    itemBuilder: (context) => [
+                                      PopupMenuItem(
+                                        value: 'date',
+                                        child: Row(
+                                          children: [
+                                            Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
+                                            const SizedBox(width: 8),
+                                            const Text('Trier par date'),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'amount',
+                                        child: Row(
+                                          children: [
+                                            Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
+                                            const SizedBox(width: 8),
+                                            const Text('Trier par montant'),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'tag',
+                                        child: Row(
+                                          children: [
+                                            Icon(_sortBy == 'tag' ? Icons.check : Icons.tag),
+                                            const SizedBox(width: 8),
+                                            const Text('Trier par catégorie'),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'pointed',
+                                        child: Row(
+                                          children: [
+                                            Icon(_sortBy == 'pointed' ? Icons.check : Icons.check_circle),
+                                            const SizedBox(width: 8),
+                                            const Text('Trier par pointage'),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'amount',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par montant'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'tag',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'tag' ? Icons.check : Icons.tag),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par catégorie'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'pointed',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'pointed' ? Icons.check : Icons.check_circle),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par pointage'),
-                                    ],
-                                  ),
-                                ),
                               ],
                             ),
                           ],
                         ),
+
+                        // Bouton d'action pour la sélection multiple
+                        if (_isSelectionMode && _selectedIndices.isNotEmpty) ...[
+                          const SizedBox(height: 16),
+                          SizedBox( // Changement: Container vers SizedBox
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _isProcessingBatch ? null : _batchTogglePointing,
+                              icon: _isProcessingBatch
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_circle),
+                              label: Text(
+                                _isProcessingBatch
+                                    ? 'Traitement en cours...'
+                                    : 'Pointer ${_selectedIndices.length} dépense(s)',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+
                         const SizedBox(height: 15),
                         
                         // Ligne des totaux
@@ -567,6 +713,35 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                     ),
                   ),
 
+                  // Texte d'information pour la sélection
+                  if (_isSelectionMode)
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, color: Colors.blue.shade600, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${_selectedIndices.length} dépense(s) sélectionnée(s). Appuyez sur les cases pour sélectionner/désélectionner.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.blue.shade700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  const SizedBox(height: 10),
+
                   // Liste des dépenses
                   Expanded(
                     child: ListView.builder(
@@ -578,63 +753,69 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                         final dateStr = plaisir['date'] as String? ?? '';
                         final date = DateTime.tryParse(dateStr);
                         final isPointed = plaisir['isPointed'] == true;
-                        final pointedAt = plaisir['pointedAt'] != null 
-                            ? DateTime.tryParse(plaisir['pointedAt']) 
-                            : null;
-                        
-                        return Card(
+                        final isSelected = _selectedIndices.contains(index);
+
+                        return Container(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          elevation: isPointed ? 3 : 1,
-                          color: isPointed ? Colors.green.shade50 : null,
-                          child: ListTile(
-                            leading: GestureDetector(
-                              onTap: () => _togglePointing(index),
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: isPointed ? Colors.green.shade100 : Colors.purple.shade100,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(
-                                    color: isPointed ? Colors.green.shade300 : Colors.purple.shade300,
-                                    width: 2,
-                                  ),
-                                ),
-                                child: Icon(
-                                  isPointed ? Icons.check_circle : Icons.radio_button_unchecked,
-                                  color: isPointed ? Colors.green.shade700 : Colors.purple.shade700,
-                                  size: 24,
-                                ),
-                              ),
+                          decoration: BoxDecoration(
+                            color: isSelected 
+                                ? Colors.blue.shade50 
+                                : (isPointed ? Colors.green.shade50 : Colors.white),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected 
+                                  ? Colors.blue.shade300
+                                  : (isPointed ? Colors.green.shade300 : Colors.grey.shade200),
+                              width: isSelected ? 2 : 1,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withValues(alpha: 0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: ListTile(
+                            // Case à cocher en mode sélection
+                            leading: _isSelectionMode
+                                ? Checkbox(
+                                    value: isSelected,
+                                    onChanged: (value) => _toggleSelection(index),
+                                    activeColor: Colors.blue,
+                                  )
+                                : CircleAvatar(
+                                    backgroundColor: isPointed ? Colors.green : Colors.purple.shade100,
+                                    child: Icon(
+                                      isPointed ? Icons.check_circle : Icons.shopping_cart,
+                                      color: isPointed ? Colors.white : Colors.purple,
+                                      size: 20,
+                                    ),
+                                  ),
                             title: Row(
                               children: [
+                                Expanded(
+                                  child: Text(
+                                    tag,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: isPointed ? Colors.green.shade700 : Colors.black87,
+                                    ),
+                                  ),
+                                ),
                                 Text(
                                   '${AmountParser.formatAmount(amount)} €',
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
+                                    color: isPointed ? Colors.green.shade700 : Colors.purple.shade700,
                                     fontSize: 16,
-                                    color: isPointed ? Colors.green.shade700 : null,
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.lock_open,
-                                  size: 12,
-                                  color: isPointed ? Colors.green.shade400 : Colors.purple.shade400,
                                 ),
                               ],
                             ),
                             subtitle: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  tag,
-                                  style: TextStyle(
-                                    color: isPointed ? Colors.green.shade600 : Colors.purple.shade600,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
                                 if (date != null)
                                   Text(
                                     '${date.day}/${date.month}/${date.year}',
@@ -643,98 +824,80 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                       fontSize: 12,
                                     ),
                                   ),
-                                if (isPointed && pointedAt != null)
-                                  Text(
-                                    'Pointé le ${pointedAt.day}/${pointedAt.month} à ${pointedAt.hour}:${pointedAt.minute.toString().padLeft(2, '0')}',
-                                    style: TextStyle(
-                                      color: Colors.green.shade600,
-                                      fontSize: 10,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
                                 if (isPointed)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green.shade100,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.green.shade300),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.check, size: 12, color: Colors.green.shade700),
-                                        const SizedBox(width: 2),
-                                        Text(
-                                          'Pointé',
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.green.shade700,
-                                            fontWeight: FontWeight.w500,
-                                          ),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle,
+                                        size: 14,
+                                        color: Colors.green.shade600,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Pointée',
+                                        style: TextStyle(
+                                          color: Colors.green.shade600,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
                                         ),
-                                      ],
-                                    ),
+                                      ),
+                                    ],
                                   ),
-                                const SizedBox(width: 8),
-                                PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    switch (value) {
-                                      case 'toggle':
-                                        _togglePointing(index);
-                                        break;
-                                      case 'edit':
-                                        _editPlaisir(index);
-                                        break;
-                                      case 'delete':
-                                        _deletePlaisir(index);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'toggle',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
-                                            color: isPointed ? Colors.orange : Colors.green,
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(isPointed ? 'Dépointer' : 'Pointer'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.edit, color: Colors.blue),
-                                          SizedBox(width: 8),
-                                          Text('Modifier'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete, color: Colors.red),
-                                          SizedBox(width: 8),
-                                          Text('Supprimer'),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ],
                             ),
-                            onTap: () => _togglePointing(index),
+                            trailing: !_isSelectionMode
+                                ? PopupMenuButton(
+                                    icon: const Icon(Icons.more_vert),
+                                    itemBuilder: (context) => const [
+                                      PopupMenuItem(
+                                        value: 'toggle',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.radio_button_unchecked, color: Colors.orange),
+                                            SizedBox(width: 8),
+                                            Text('Dépointer'),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, color: Colors.blue),
+                                            SizedBox(width: 8),
+                                            Text('Modifier'),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('Supprimer'),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                    onSelected: (value) async {
+                                      switch (value) {
+                                        case 'toggle':
+                                          await _togglePointing(index);
+                                          break;
+                                        case 'edit':
+                                          await _editPlaisir(index);
+                                          break;
+                                        case 'delete':
+                                          await _deletePlaisir(index);
+                                          break;
+                                      }
+                                    },
+                                  )
+                                : null,
+                            onTap: _isSelectionMode
+                                ? () => _toggleSelection(index)
+                                : () => _togglePointing(index),
                           ),
                         );
                       },
@@ -743,7 +906,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 ],
               ),
       ),
-      // Le floatingActionButton a été supprimé d'ici
     );
   }
 }
