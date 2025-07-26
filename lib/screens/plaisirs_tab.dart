@@ -127,150 +127,33 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     }
   }
 
-  Future<void> _editPlaisir(int index) async {
-    final plaisir = plaisirs[index];
-    final amountController = TextEditingController(
-      text: AmountParser.formatAmount((plaisir['amount'] as num?)?.toDouble() ?? 0)
-    );
-    final tagController = TextEditingController(
-      text: plaisir['tag'] as String? ?? ''
-    );
-    DateTime? selectedDate = DateTime.tryParse(plaisir['date'] ?? '');
+  Future<void> _editPlaisir(int displayIndex) async {
+    final plaisir = plaisirs[displayIndex];
+    final plaisirId = plaisir['id'] ?? '';
+    
+    // Trouver l'index réel
+    final originalPlaisirs = await _dataService.getPlaisirs();
+    final realIndex = originalPlaisirs.indexWhere((p) => p['id'] == plaisirId);
+    
+    if (realIndex == -1) return;
+    
+    final result = await _showPlaisirDialog(
+      isEdit: true,
+      tag: plaisir['tag'],
+      amount: plaisir['amount'],
+      date: DateTime.tryParse(plaisir['date'] ?? ''),
 
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.edit, color: Colors.blue),
-              SizedBox(width: 8),
-              Text('Modifier la dépense'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Montant',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.euro),
-                  suffixText: '€',
-                  helperText: 'Utilisez , ou . pour les décimales',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: tagController,
-                decoration: const InputDecoration(
-                  labelText: 'Catégorie',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.tag),
-                ),
-              ),
-              const SizedBox(height: 16),
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate ?? DateTime.now(),
-                    firstDate: DateTime(DateTime.now().year - 5),
-                    lastDate: DateTime(DateTime.now().year + 1),
-                  );
-                  if (picked != null) {
-                    setDialogState(() {
-                      selectedDate = picked;
-                    });
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today),
-                      const SizedBox(width: 12),
-                      Text(
-                        selectedDate == null
-                            ? 'Sélectionner une date'
-                            : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
-                      ),
-                      const Spacer(),
-                      const Icon(Icons.arrow_drop_down),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE3F2FD),
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                  border: Border.fromBorderSide(BorderSide(color: Color(0xFFBBDEFB))),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.info,
-                      color: Color(0xFF1976D2),
-                      size: 16
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Le statut de pointage sera préservé lors de la modification',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF1976D2),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Annuler'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final amountStr = amountController.text.trim();
-                final tag = tagController.text.trim();
-                
-                if (amountStr.isNotEmpty && selectedDate != null) {
-                  Navigator.pop(context, {
-                    'amountStr': amountStr,
-                    'tag': tag.isEmpty ? 'Sans catégorie' : tag,
-                    'date': selectedDate,
-                  });
-                }
-              },
-              child: const Text('Modifier'),
-            ),
-          ],
-        ),
-      ),
     );
 
     if (result != null) {
-      await _updatePlaisir(index, result);
+      await _updatePlaisir(realIndex, result); // Utiliser realIndex au lieu de index
     }
   }
 
-  Future<void> _updatePlaisir(int index, Map<String, dynamic> newData) async {
+  Future<void> _updatePlaisir(int realIndex, Map<String, dynamic> newData) async {
     try {
       await _dataService.updatePlaisir(
-        index: index,
+        index: realIndex,
         amountStr: newData['amountStr'],
         tag: newData['tag'],
         date: newData['date'],
@@ -278,7 +161,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
       
       await _loadPlaisirs();
       
-      if (!mounted) return;
+      if (!mounted) return; // Protection async
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✅ Dépense modifiée avec succès'),
@@ -286,7 +169,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return; // Protection async
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Erreur lors de la modification: $e'),
@@ -296,7 +179,16 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     }
   }
 
-  Future<void> _deletePlaisir(int index) async {
+  Future<void> _deletePlaisir(int displayIndex) async {
+    final plaisir = plaisirs[displayIndex];
+    final plaisirId = plaisir['id'] ?? '';
+    
+    // Trouver l'index réel
+    final originalPlaisirs = await _dataService.getPlaisirs();
+    final realIndex = originalPlaisirs.indexWhere((p) => p['id'] == plaisirId);
+    
+    if (realIndex == -1) return;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -318,18 +210,18 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
     if (confirmed == true) {
       try {
-        await _dataService.deletePlaisir(index);
+        await _dataService.deletePlaisir(realIndex);
         await _loadPlaisirs();
         
-        if (!mounted) return;
+        if (!mounted) return; // Protection async
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🗑️ Dépense supprimée'),
+            content: Text('Dépense supprimée'),
             backgroundColor: Colors.orange,
           ),
         );
       } catch (e) {
-        if (!mounted) return;
+        if (!mounted) return; // Protection async
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la suppression: $e'),
@@ -424,6 +316,148 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
         _selectedIndices = Set.from(List.generate(plaisirs.length, (index) => index));
       }
     });
+  }
+
+  Future<Map<String, dynamic>?> _showPlaisirDialog({
+    String? tag,
+    double? amount,
+    DateTime? date,
+    bool isEdit = false,
+  }) async {
+    final tagController = TextEditingController(text: tag ?? '');
+    final amountController = TextEditingController(
+      text: amount != null ? AmountParser.formatAmount(amount) : ''
+    );
+    DateTime? selectedDate = date ?? DateTime.now();
+
+    return await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                isEdit ? Icons.edit : Icons.add,
+                color: isEdit ? Colors.blue : Colors.purple,
+              ),
+              const SizedBox(width: 8),
+              Text(isEdit ? 'Modifier la dépense' : 'Ajouter une dépense'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Montant',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.euro),
+                  suffixText: '€',
+                  helperText: 'Utilisez , ou . pour les décimales',
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: tagController,
+                decoration: const InputDecoration(
+                  labelText: 'Catégorie',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.tag),
+                  helperText: 'Restaurant, Shopping, Transport...',
+                ),
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      selectedDate = pickedDate;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today),
+                      const SizedBox(width: 12),
+                      Text(
+                        selectedDate == null
+                            ? 'Sélectionner une date'
+                            : '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.arrow_drop_down),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE3F2FD),
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  border: Border.fromBorderSide(BorderSide(color: Color(0xFFBBDEFB))),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.info,
+                      color: Color(0xFF1976D2),
+                      size: 16
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Le statut de pointage sera préservé lors de la modification',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF1976D2),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final amountStr = amountController.text.trim();
+                final tag = tagController.text.trim();
+                
+                if (amountStr.isNotEmpty && selectedDate != null) {
+                  Navigator.pop(context, {
+                    'amountStr': amountStr,
+                    'tag': tag.isEmpty ? 'Sans catégorie' : tag,
+                    'date': selectedDate,
+                  });
+                }
+              },
+              child: Text(isEdit ? 'Modifier' : 'Ajouter'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override

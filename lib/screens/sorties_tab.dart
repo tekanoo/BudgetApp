@@ -155,39 +155,210 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
-  Future<void> _editSortie(int index) async {
-    final sortie = sorties[index];
+  Future<void> _editSortie(int displayIndex) async {
+    final sortie = sorties[displayIndex];
+    final sortieId = sortie['id'] ?? '';
+    
+    // Trouver l'index réel
+    final originalSorties = await _dataService.getSorties();
+    final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
+    
+    if (realIndex == -1) return;
+    
     final result = await _showSortieDialog(
-      description: sortie['description'] as String? ?? '',
-      amount: (sortie['amount'] as num?)?.toDouble() ?? 0,
       isEdit: true,
+      description: sortie['description'],
+      amount: sortie['amount'], // Utiliser amount au lieu de amountStr
     );
     
     if (result != null) {
       try {
-        // Données automatiquement rechiffrées avant mise à jour
         await _dataService.updateSortie(
-          index: index,
+          index: realIndex,
           amountStr: result['amountStr'],
           description: result['description'],
         );
         await _loadSorties();
         
-        if (!mounted) return;
+        if (!mounted) return; // Protection async
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🔐 Charge modifiée et rechiffrée avec succès'),
+            content: Text('🔐 Charge modifiée et chiffrée avec succès'),
             backgroundColor: Colors.blue,
           ),
         );
       } catch (e) {
-        if (!mounted) return;
+        if (!mounted) return; // Protection async
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la modification: $e'),
             backgroundColor: Colors.red,
           ),
         );
+      }
+    }
+  }
+
+  Future<void> _deleteSortie(int displayIndex) async {
+    final sortie = sorties[displayIndex];
+    final sortieId = sortie['id'] ?? '';
+    
+    // Trouver l'index réel
+    final originalSorties = await _dataService.getSorties();
+    final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
+    
+    if (realIndex == -1) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Supprimer'),
+        content: const Text('Voulez-vous vraiment supprimer cette charge ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _dataService.deleteSortie(realIndex);
+        await _loadSorties();
+        
+        if (!mounted) return; // Protection async
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Charge supprimée'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return; // Protection async
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la suppression: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleSortieType(int index) async {
+    try {
+      final sortie = sorties[index];
+      final currentType = sortie['type'] as String? ?? 'variable';
+      final newType = currentType == 'fixe' ? 'variable' : 'fixe';
+      
+      await _dataService.updateSortie(
+        index: index,
+        amountStr: sortie['amount'].toString(),
+        description: sortie['description'],
+        type: newType,
+      );
+      
+      await _loadSorties();
+      
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Charge passée en ${newType == 'fixe' ? 'fixe' : 'variable'}'),
+          backgroundColor: newType == 'fixe' ? Colors.red : Colors.orange,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du changement de type: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // Nouvelles méthodes pour la sélection multiple (identiques à plaisirs_tab.dart)
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIndices.clear();
+      }
+    });
+  }
+
+  void _toggleSelection(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        _selectedIndices.add(index);
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      if (_selectedIndices.length == sorties.length) {
+        _selectedIndices.clear();
+      } else {
+        _selectedIndices = Set.from(List.generate(sorties.length, (index) => index));
+      }
+    });
+  }
+
+  Future<void> _batchTogglePointing() async {
+    if (_selectedIndices.isEmpty) return;
+
+    setState(() {
+      _isProcessingBatch = true;
+    });
+
+    try {
+      // Traiter chaque sélection
+      for (int index in _selectedIndices.toList()..sort((a, b) => b.compareTo(a))) {
+        await _dataService.toggleSortiePointing(index);
+      }
+
+      // Recharger les données
+      await _loadSorties();
+
+      if (!mounted) return;
+      
+      // Sortir du mode sélection
+      setState(() {
+        _isSelectionMode = false;
+        _selectedIndices.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${_selectedIndices.length} charge(s) mise(s) à jour'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du traitement: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingBatch = false;
+        });
       }
     }
   }
@@ -318,161 +489,6 @@ class _SortiesTabState extends State<SortiesTab> {
         ],
       ),
     );
-  }
-
-  Future<void> _deleteSortie(int index) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Supprimer'),
-        content: const Text('Voulez-vous vraiment supprimer cette charge ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await _dataService.deleteSortie(index);
-        await _loadSorties();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Charge supprimée'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la suppression: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _toggleSortieType(int index) async {
-    try {
-      final sortie = sorties[index];
-      final currentType = sortie['type'] as String? ?? 'variable';
-      final newType = currentType == 'fixe' ? 'variable' : 'fixe';
-      
-      await _dataService.updateSortie(
-        index: index,
-        amountStr: sortie['amount'].toString(),
-        description: sortie['description'],
-        type: newType,
-      );
-      
-      await _loadSorties();
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Charge passée en ${newType == 'fixe' ? 'fixe' : 'variable'}'),
-          backgroundColor: newType == 'fixe' ? Colors.red : Colors.orange,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors du changement de type: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  // Nouvelles méthodes pour la sélection multiple (identiques à plaisirs_tab.dart)
-  void _toggleSelectionMode() {
-    setState(() {
-      _isSelectionMode = !_isSelectionMode;
-      if (!_isSelectionMode) {
-        _selectedIndices.clear();
-      }
-    });
-  }
-
-  void _toggleSelection(int index) {
-    setState(() {
-      if (_selectedIndices.contains(index)) {
-        _selectedIndices.remove(index);
-      } else {
-        _selectedIndices.add(index);
-      }
-    });
-  }
-
-  void _selectAll() {
-    setState(() {
-      if (_selectedIndices.length == sorties.length) {
-        _selectedIndices.clear();
-      } else {
-        _selectedIndices = Set.from(List.generate(sorties.length, (index) => index));
-      }
-    });
-  }
-
-  Future<void> _batchTogglePointing() async {
-    if (_selectedIndices.isEmpty) return;
-
-    setState(() {
-      _isProcessingBatch = true;
-    });
-
-    try {
-      // Traiter chaque sélection
-      for (int index in _selectedIndices.toList()..sort((a, b) => b.compareTo(a))) {
-        await _dataService.toggleSortiePointing(index);
-      }
-
-      // Recharger les données
-      await _loadSorties();
-
-      if (!mounted) return;
-      
-      // Sortir du mode sélection
-      setState(() {
-        _isSelectionMode = false;
-        _selectedIndices.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ ${_selectedIndices.length} charge(s) mise(s) à jour'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors du traitement: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessingBatch = false;
-        });
-      }
-    }
   }
 
   @override
