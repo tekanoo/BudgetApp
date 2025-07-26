@@ -683,7 +683,7 @@ class _SortiesTabState extends State<SortiesTab> {
                               child: Column(
                                 children: [
                                   const Text(
-                                    'Solde Disponible',
+                                    'Solde Débité',
                                     style: TextStyle(
                                       color: Colors.white70,
                                       fontSize: 12,
@@ -696,6 +696,38 @@ class _SortiesTabState extends State<SortiesTab> {
                                       fontSize: 18,
                                       fontWeight: FontWeight.bold,
                                     ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 40,
+                              color: Colors.white.withValues(alpha: 0.3),
+                            ),
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const Text(
+                                    'Solde Prévisionnel',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  FutureBuilder<double>(
+                                    future: _dataService.getTotals().then((totals) => totals['solde'] ?? 0.0),
+                                    builder: (context, snapshot) {
+                                      final soldePrevi = snapshot.data ?? 0.0;
+                                      return Text(
+                                        '${AmountParser.formatAmount(soldePrevi)} €',
+                                        style: TextStyle(
+                                          color: soldePrevi >= 0 ? Colors.greenAccent : Colors.redAccent,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
