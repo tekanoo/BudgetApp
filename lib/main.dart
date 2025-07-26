@@ -1,41 +1,59 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/auth_wrapper.dart';
+import 'services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
+  // Initialiser Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Initialiser Firebase Analytics
-  FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  // Initialiser le service de thème
+  final themeService = ThemeService();
+  await themeService.initialize();
   
-  runApp(MyApp(analytics: analytics));
+  runApp(
+    ChangeNotifierProvider.value(
+      value: themeService,
+      child: const BudgetApp(),
+    ),
+  );
 }
 
-class MyApp extends StatelessWidget {
-  final FirebaseAnalytics analytics;
-  
-  const MyApp({super.key, required this.analytics});
+class BudgetApp extends StatelessWidget {
+  const BudgetApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Budget App Pro',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
-      // Ajouter l'observer Analytics
-      navigatorObservers: [
-        FirebaseAnalyticsObserver(analytics: analytics),
-      ],
-      home: const AuthWrapper(),
-      debugShowCheckedModeBanner: false,
+    return Consumer<ThemeService>(
+      builder: (context, themeService, child) {
+        return MaterialApp(
+          title: 'Gestion Budget Pro',
+          debugShowCheckedModeBanner: false,
+          
+          // Configuration du thème
+          theme: ThemeService.lightTheme,
+          darkTheme: ThemeService.darkTheme,
+          themeMode: themeService.themeMode,
+          
+          // Interface adaptée au mode sombre
+          builder: (context, child) {
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(1.0),
+              ),
+              child: child!,
+            );
+          },
+          
+          home: const AuthWrapper(),
+        );
+      },
     );
   }
 }

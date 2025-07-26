@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:provider/provider.dart';
 import '../services/firebase_service.dart';
 import '../services/encrypted_budget_service.dart' as encrypted;
+import '../services/theme_service.dart';
+import '../widgets/theme_selector.dart'; // AJOUT
 
 // AJOUTER ces imports manquants
 import 'home_tab.dart';
@@ -337,119 +340,174 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // Titre
-            const Row(
-              children: [
-                Icon(Icons.person, color: Colors.blue),
-                SizedBox(width: 12),
-                Text(
-                  'Profil',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
+      builder: (context) => Consumer<ThemeService>(
+        builder: (context, themeService, child) => Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            
-            // Informations de sécurité
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.shade200),
               ),
-              child: Column(
+              const SizedBox(height: 20),
+              
+              // Titre
+              const Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.security, color: Colors.green.shade600),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Données chiffrées',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Vos données financières sont automatiquement chiffrées avant d\'être envoyées dans le cloud. Même le développeur ne peut pas voir vos montants !',
-                    style: TextStyle(fontSize: 12),
+                  Icon(Icons.person, color: Colors.blue),
+                  SizedBox(width: 12),
+                  Text(
+                    'Profil',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Actions
-            Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.orange),
-                  title: const Text('Se déconnecter'),
-                  onTap: () async {
-                    try {
-                      // Fermer le bottom sheet d'abord
-                      Navigator.of(context).pop();
-                      
-                      await _firebaseService.signOut();
-                      
-                      // Vérifier que le widget est toujours monté avant d'utiliser le context
-                      if (!mounted) return;
-                      
-                      // Optionnel: Naviguer vers l'écran de connexion
-                      // Navigator.of(context).pushReplacementNamed('/login');
-                      
-                    } catch (e) {
-                      if (kDebugMode) print('❌ Erreur déconnexion: $e');
-                      
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Erreur de déconnexion: $e'),
-                          backgroundColor: Colors.red,
+              const SizedBox(height: 20),
+
+              // NOUVEAU: Section Apparence
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          _getThemeIcon(themeService.themeMode),
+                          color: Theme.of(context).colorScheme.primary,
                         ),
-                      );
-                    }
-                  },
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Apparence',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildThemeOption(
+                            context,
+                            themeService,
+                            ThemeMode.light,
+                            'Clair',
+                            Icons.light_mode,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildThemeOption(
+                            context,
+                            themeService,
+                            ThemeMode.dark,
+                            'Sombre',
+                            Icons.dark_mode,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildThemeOption(
+                            context,
+                            themeService,
+                            ThemeMode.system,
+                            'Auto',
+                            Icons.brightness_auto,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-                ListTile(
-                  leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  title: const Text('Supprimer toutes les données'),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    _showDeleteAllDataDialog();
-                  },
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Informations de sécurité (existant)
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
                 ),
-              ],
-            ),
-            
-            const SizedBox(height: 20),
-          ],
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.security, color: Colors.green.shade600),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Données chiffrées',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Vos données financières sont automatiquement chiffrées avant d\'être envoyées dans le cloud. Même le développeur ne peut pas voir vos montants !',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Actions (existant)
+              Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.logout, color: Colors.orange),
+                    title: const Text('Se déconnecter'),
+                    onTap: () async {
+                      try {
+                        await _firebaseService.signOut();
+                        if (mounted) Navigator.of(context).pop();
+                      } catch (e) {
+                        if (kDebugMode) print('❌ Erreur déconnexion: $e');
+                      }
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_forever, color: Colors.red),
+                    title: const Text('Supprimer toutes les données'),
+                    onTap: () async {
+                      Navigator.of(context).pop();
+                      _showDeleteAllDataDialog();
+                    },
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -529,6 +587,70 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
+  // NOUVEAU: Widget pour les options de thème
+  Widget _buildThemeOption(
+    BuildContext context,
+    ThemeService themeService,
+    ThemeMode mode,
+    String label,
+    IconData icon,
+  ) {
+    final isSelected = themeService.themeMode == mode;
+    
+    return GestureDetector(
+      onTap: () => themeService.setThemeMode(mode),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+        decoration: BoxDecoration(
+          color: isSelected 
+              ? Theme.of(context).colorScheme.primary 
+              : Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected 
+                ? Theme.of(context).colorScheme.primary 
+                : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isSelected 
+                  ? Theme.of(context).colorScheme.onPrimary 
+                  : Theme.of(context).colorScheme.onSurface,
+              size: 20,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                color: isSelected 
+                    ? Theme.of(context).colorScheme.onPrimary 
+                    : Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NOUVEAU: Helper pour l'icône du thème
+  IconData _getThemeIcon(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.light:
+        return Icons.light_mode;
+      case ThemeMode.dark:
+        return Icons.dark_mode;
+      case ThemeMode.system:
+        return Icons.brightness_auto;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = _firebaseService.currentUser;
@@ -553,6 +675,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           tooltip: 'Navigation',
         ),
         actions: [
+          // AJOUT: Sélecteur de thème
+          const ThemeSelector(),
+          
           // Profil utilisateur
           if (user != null)
             IconButton(

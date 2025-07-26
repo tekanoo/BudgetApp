@@ -175,7 +175,9 @@ class _HomeTabState extends State<HomeTab> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.blue.shade600, Colors.blue.shade800],
+                  colors: Theme.of(context).brightness == Brightness.dark
+                      ? [Colors.blue.shade800, Colors.blue.shade900]
+                      : [Colors.blue.shade600, Colors.blue.shade800],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
