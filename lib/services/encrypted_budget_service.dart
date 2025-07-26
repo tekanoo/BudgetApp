@@ -362,16 +362,18 @@ Future<void> togglePlaisirPointing(int index) async {
     try {
       final sorties = await _firebaseService.loadSorties();
       if (index >= 0 && index < sorties.length) {
-        final decryptedSortie = _encryption.decryptTransaction(sorties[index]);
+        final double amount = AmountParser.parseAmount(amountStr);
         
-        final amount = AmountParser.parseAmount(amountStr);
-        decryptedSortie['amount'] = amount;
-        decryptedSortie['description'] = description;
-        if (type != null) {
-          decryptedSortie['type'] = type;
-        }
+        final updatedSortie = {
+          'amount': amount,
+          'description': description,
+          'date': DateTime.now().toIso8601String(),
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'id': sorties[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+        };
         
-        sorties[index] = _encryption.encryptTransaction(decryptedSortie);
+        // Chiffre avant de remplacer
+        sorties[index] = _encryption.encryptTransaction(updatedSortie);
         await _firebaseService.saveSorties(sorties);
         
         if (kDebugMode) {
@@ -471,52 +473,55 @@ Future<void> togglePlaisirPointing(int index) async {
     }
   }
 
+  /// Mettre à jour un plaisir avec support du pointage
   Future<void> updatePlaisir({
     required int index,
     required String amountStr,
-    String? tag,
+    required String tag,
     DateTime? date,
-    bool? isCredit, // NOUVEAU paramètre
+    bool? isPointed,
+    String? pointedAt,
   }) async {
     _ensureInitialized();
     try {
       final plaisirs = await _firebaseService.loadPlaisirs();
       if (index >= 0 && index < plaisirs.length) {
-        final double amount = AmountParser.parseAmount(amountStr);
-        final oldPlaisir = plaisirs[index];
+        // Récupérer l'ancien plaisir pour préserver certaines données
+        final oldPlaisir = _encryption.decryptTransaction(plaisirs[index]);
+        
+        final amount = AmountParser.parseAmount(amountStr);
         
         final updatedPlaisir = {
           'amount': amount,
-          'tag': tag ?? 'Sans catégorie',
+          'tag': tag,
           'date': (date ?? DateTime.now()).toIso8601String(),
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
           'id': oldPlaisir['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          // Préserve le statut de pointage
-          'isPointed': oldPlaisir['isPointed'] ?? false,
-          'isCredit': isCredit ?? oldPlaisir['isCredit'] ?? false, // NOUVEAU
+          'isPointed': isPointed ?? oldPlaisir['isPointed'] ?? false,
         };
-        
-        // Préserve la date de pointage si elle existe
-        if (oldPlaisir['pointedAt'] != null) {
+
+        // Ajouter pointedAt si fourni
+        if (pointedAt != null) {
+          updatedPlaisir['pointedAt'] = pointedAt;
+        } else if (oldPlaisir['pointedAt'] != null) {
           updatedPlaisir['pointedAt'] = oldPlaisir['pointedAt'];
         }
         
-        // Chiffre avant de remplacer
+        // Chiffrer et sauvegarder
         plaisirs[index] = _encryption.encryptTransaction(updatedPlaisir);
         await _firebaseService.savePlaisirs(plaisirs);
         
         // Sauvegarder le tag s'il est nouveau
-        if (tag != null && tag.isNotEmpty) {
+        if (tag.isNotEmpty) {
           await _addTagIfNew(tag);
         }
         
         if (kDebugMode) {
-          print('✅ Plaisir chiffré modifié: [MONTANT_CHIFFRÉ] - ${tag ?? "Sans catégorie"}');
+          print('✅ Plaisir chiffré mis à jour: [MONTANT_CHIFFRÉ] - $tag');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur modification plaisir chiffré: $e');
+        print('❌ Erreur mise à jour plaisir: $e');
       }
       rethrow;
     }
