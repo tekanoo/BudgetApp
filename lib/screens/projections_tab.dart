@@ -188,7 +188,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.75,
+                childAspectRatio: 0.85, // Légèrement plus grand
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
@@ -211,7 +211,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 return GestureDetector(
                   onTap: () => _showMonthDetails(monthDate, monthData),
                   child: Container(
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(12), // Padding plus grand
                     decoration: BoxDecoration(
                       color: isCurrentMonth 
                           ? Colors.orange.withValues(alpha: 0.15)
@@ -232,54 +232,53 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                       ] : null,
                     ),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                      crossAxisAlignment: CrossAxisAlignment.center, // Centrer tout le contenu
                       children: [
                         // Nom du mois avec indicateur mois actuel
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          mainAxisAlignment: MainAxisAlignment.center, // Centrer le nom du mois
                           children: [
-                            Expanded(
-                              child: Text(
-                                monthNames[monthDate.month - 1],
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isCurrentMonth 
-                                      ? Colors.orange.shade800 
-                                      : (hasData ? Colors.blue.shade700 : Colors.black87),
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                            Text(
+                              monthNames[monthDate.month - 1],
+                              style: TextStyle(
+                                fontSize: 15, // Plus grand
+                                fontWeight: FontWeight.bold,
+                                color: isCurrentMonth 
+                                    ? Colors.orange.shade800 
+                                    : (hasData ? Colors.blue.shade700 : Colors.black87),
                               ),
                             ),
-                            if (isCurrentMonth)
+                            if (isCurrentMonth) ...[
+                              const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.all(2),
+                                padding: const EdgeInsets.all(3),
                                 decoration: BoxDecoration(
                                   color: Colors.orange,
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(
                                   Icons.today,
-                                  size: 10,
+                                  size: 12, // Plus grand
                                   color: Colors.white,
                                 ),
                               ),
+                            ],
                           ],
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8), // Plus d'espace
                         
                         // Affichage conditionnel des données financières
                         if (hasData) ...[
                           // Revenus
                           if (monthData['revenus']! > 0) ...[
                             _buildCompactDataRow('R', monthData['revenus']!, Colors.green),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 3), // Plus d'espace
                           ],
                           
                           // Charges
                           if (monthData['charges']! > 0) ...[
                             _buildCompactDataRow('C', monthData['charges']!, Colors.red),
-                            const SizedBox(height: 2),
+                            const SizedBox(height: 3),
                           ],
                           
                           // Dépenses
@@ -287,15 +286,16 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                             _buildCompactDataRow('D', monthData['depenses']!, Colors.purple),
                           ],
                         ] else ...[
-                          // Si pas de données, afficher un message
-                          const Expanded(
+                          // Si pas de données, afficher un message centré
+                          Expanded(
                             child: Center(
                               child: Text(
                                 'Aucune\ndonnée',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.grey,
+                                  fontSize: 11, // Plus grand
+                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.w500,
                                 ),
                               ),
                             ),
@@ -309,13 +309,13 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                         if (hasData || isCurrentMonth)
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8), // Plus de padding
                             decoration: BoxDecoration(
                               color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: BorderRadius.circular(8), // Plus arrondi
                               border: Border.all(
                                 color: solde >= 0 ? Colors.green.shade300 : Colors.red.shade300,
-                                width: 1,
+                                width: 1.5,
                               ),
                             ),
                             child: Column(
@@ -323,15 +323,16 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                                 Text(
                                   'SOLDE',
                                   style: TextStyle(
-                                    fontSize: 8,
+                                    fontSize: 10, // Plus grand
                                     fontWeight: FontWeight.bold,
                                     color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
                                   ),
                                 ),
+                                const SizedBox(height: 2),
                                 Text(
                                   '${_formatAmount(solde)}€',
                                   style: TextStyle(
-                                    fontSize: 10,
+                                    fontSize: 12, // Plus grand
                                     fontWeight: FontWeight.bold,
                                     color: solde >= 0 ? Colors.green.shade800 : Colors.red.shade800,
                                   ),
@@ -353,38 +354,43 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
   }
 
   Widget _buildCompactDataRow(String prefix, double amount, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(
-            color: color,
-            borderRadius: BorderRadius.circular(3),
-          ),
-        ),
-        const SizedBox(width: 4),
-        Text(
-          '$prefix:',
-          style: TextStyle(
-            fontSize: 9,
-            color: color,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 2),
-        Expanded(
-          child: Text(
-            '${_formatAmount(amount)}€',
-            style: TextStyle(
-              fontSize: 9,
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center, // Centrer la ligne
+        children: [
+          Container(
+            width: 8, // Plus grand
+            height: 8,
+            decoration: BoxDecoration(
               color: color,
-              fontWeight: FontWeight.bold,
+              borderRadius: BorderRadius.circular(4),
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-      ],
+          const SizedBox(width: 6),
+          Text(
+            '$prefix: ',
+            style: TextStyle(
+              fontSize: 11, // Plus grand
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Flexible(
+            child: Text(
+              '${_formatAmount(amount)}€',
+              style: TextStyle(
+                fontSize: 11, // Plus grand
+                color: color,
+                fontWeight: FontWeight.bold,
+              ),
+              textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
