@@ -12,9 +12,9 @@ class EntreesTab extends StatefulWidget {
 class _EntreesTabState extends State<EntreesTab> {
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> entrees = [];
-  bool isLoading = true;
-  String _sortBy = 'date'; // 'date', 'amount', 'description'
-  bool _ascending = false;
+  double totalEntrees = 0.0;
+  double soldeDisponible = 0.0;
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -29,11 +29,20 @@ class _EntreesTabState extends State<EntreesTab> {
 
     try {
       final data = await _dataService.getEntrees();
+      final totals = await _dataService.getTotals();
+      final solde = await _dataService.getSoldeDisponible();
+      
       setState(() {
-        entrees = data;
+        // Tri par défaut : plus récent en haut (par date de création)
+        entrees = data..sort((a, b) {
+          final aDate = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
+          final bDate = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
+          return bDate.compareTo(aDate); // Plus récent en premier
+        });
+        totalEntrees = totals['entrees'] ?? 0.0;
+        soldeDisponible = solde;
         isLoading = false;
       });
-      _sortEntrees();
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -42,6 +51,73 @@ class _EntreesTabState extends State<EntreesTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur de chargement: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Ajout de la méthode _addEntree manquante
+  Future<void> _addEntree() async {
+    final result = await _showEntreeDialog();
+    if (result != null) {
+      try {
+        await _dataService.addEntree(
+          amountStr: result['amountStr'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Revenu ajouté avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Ajout de la méthode _editEntree manquante
+  Future<void> _editEntree(int index) async {
+    final entree = entrees[index];
+    final result = await _showEntreeDialog(
+      isEdit: true,
+      description: entree['description'],
+      amount: entree['amount'],
+    );
+
+    if (result != null) {
+      try {
+        await _dataService.updateEntree(
+          index: index,
+          amountStr: result['amountStr'],
+          description: result['description'],
+        );
+        await _loadEntrees();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Revenu modifié avec succès'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de la modification: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -81,7 +157,7 @@ class _EntreesTabState extends State<EntreesTab> {
                 labelText: 'Description',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.description),
-                helperText: 'Salaire, Prime, Freelance...',
+                helperText: 'Salaire, Freelance, Prime...',
               ),
             ),
             const SizedBox(height: 16),
@@ -93,10 +169,11 @@ class _EntreesTabState extends State<EntreesTab> {
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.euro),
                 suffixText: '€',
-                helperText: 'Utilisez , ou . pour les décimales (ex: 1500,50)',
+                helperText: 'Utilisez , ou . pour les décimales',
               ),
             ),
             const SizedBox(height: 16),
+            // Indicateur de sécurité
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -183,105 +260,6 @@ class _EntreesTabState extends State<EntreesTab> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la suppression: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _sortEntrees() {
-    setState(() {
-      entrees.sort((a, b) {
-        int comparison = 0;
-        switch (_sortBy) {
-          case 'date':
-            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
-            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
-            comparison = dateA.compareTo(dateB);
-            break;
-          case 'amount':
-            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
-            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
-            comparison = amountA.compareTo(amountB);
-            break;
-          case 'description':
-            final descA = a['description'] as String? ?? '';
-            final descB = b['description'] as String? ?? '';
-            comparison = descA.compareTo(descB);
-            break;
-        }
-        return _ascending ? comparison : -comparison;
-      });
-    });
-  }
-
-  double get totalEntrees {
-    double total = 0;
-    for (var entree in entrees) {
-      total += (entree['amount'] as num?)?.toDouble() ?? 0;
-    }
-    return total;
-  }
-
-  Future<void> _addEntree() async {
-    final result = await _showEntreeDialog();
-    if (result != null) {
-      try {
-        await _dataService.addEntree(
-          amountStr: result['amountStr'],
-          description: result['description'],
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('💰 Revenu de ${result['amountStr']} € ajouté et chiffré avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de l\'ajout: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _editEntree(int index) async {
-    final entree = entrees[index];
-    final result = await _showEntreeDialog(
-      description: entree['description'] as String? ?? '',
-      amount: (entree['amount'] as num?)?.toDouble() ?? 0,
-      isEdit: true,
-    );
-    
-    if (result != null) {
-      try {
-        await _dataService.updateEntree(
-          index: index,
-          amountStr: result['amountStr'],
-          description: result['description'],
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔐 Revenu modifié et rechiffré avec succès'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la modification: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -398,54 +376,6 @@ class _EntreesTabState extends State<EntreesTab> {
                               ),
                             ),
                             const Spacer(),
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.sort, color: Colors.white),
-                              onSelected: (value) {
-                                if (value == _sortBy) {
-                                  setState(() {
-                                    _ascending = !_ascending;
-                                  });
-                                } else {
-                                  setState(() {
-                                    _sortBy = value;
-                                    _ascending = false;
-                                  });
-                                }
-                                _sortEntrees();
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'date',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par date'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'amount',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par montant'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'description',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'description' ? Icons.check : Icons.description),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par description'),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
                             IconButton(
                               onPressed: _addEntree,
                               icon: const Icon(

@@ -20,10 +20,8 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   double totalPointe = 0.0;
   double soldeDisponible = 0.0;
   bool isLoading = false;
-  String _sortBy = 'date';
-  bool _sortAscending = false;
 
-  // Sélection multiple
+  // Sélection multiple (suppression des variables de tri)
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
@@ -45,14 +43,23 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
       final totals = await _dataService.getTotals();
       final solde = await _dataService.getSoldeDisponible();
       
+      // Calculer le total pointé directement
+      final totalPlaisirsPointe = data
+          .where((p) => p['isPointed'] == true)
+          .fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+      
       setState(() {
-        plaisirs = data;
+        // Tri par défaut : plus récent en haut (par date de création)
+        plaisirs = data..sort((a, b) {
+          final aDate = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
+          final bDate = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
+          return bDate.compareTo(aDate); // Plus récent en premier
+        });
         totalPlaisirs = totals['plaisirs'] ?? 0.0;
-        totalPointe = totals['plaisirsTotaux'] ?? 0.0;
+        totalPointe = totalPlaisirsPointe;
         soldeDisponible = solde;
         isLoading = false;
       });
-      _sortPlaisirs();
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -68,36 +75,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     }
   }
 
-  void _sortPlaisirs() {
-    setState(() {
-      plaisirs.sort((a, b) {
-        int comparison = 0;
-        switch (_sortBy) {
-          case 'date':
-            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
-            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
-            comparison = dateA.compareTo(dateB);
-            break;
-          case 'amount':
-            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
-            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
-            comparison = amountA.compareTo(amountB);
-            break;
-          case 'tag':
-            final tagA = a['tag'] as String? ?? '';
-            final tagB = b['tag'] as String? ?? '';
-            comparison = tagA.compareTo(tagB);
-            break;
-          case 'pointed':
-            final pointedA = a['isPointed'] == true ? 1 : 0;
-            final pointedB = b['isPointed'] == true ? 1 : 0;
-            comparison = pointedA.compareTo(pointedB);
-            break;
-        }
-        return _sortAscending ? comparison : -comparison;
-      });
-    });
-  }
+  // Suppression de la méthode _sortPlaisirs()
 
   Future<void> _togglePointing(int index) async {
     try {
@@ -147,6 +125,37 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
     if (result != null) {
       await _updatePlaisir(realIndex, result); // Utiliser realIndex au lieu de index
+    }
+  }
+
+  // Ajout de la méthode _addPlaisir manquante
+  Future<void> _addPlaisir() async {
+    final result = await _showPlaisirDialog();
+    if (result != null) {
+      try {
+        await _dataService.addPlaisir(
+          amountStr: result['amountStr'],
+          tag: result['tag'],
+          date: result['date'],
+        );
+        await _loadPlaisirs();
+        
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Dépense ajoutée avec succès'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur lors de l\'ajout: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -536,65 +545,18 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                       ],
                     ),
                     
-                    // Tri et autres actions
+                    // Tri et autres actions (suppression du bouton de tri)
                     Row(
                       children: [
                         if (!_isSelectionMode)
-                          PopupMenuButton<String>(
-                            icon: const Icon(Icons.sort, color: Colors.white),
-                            onSelected: (value) {
-                              setState(() {
-                                if (_sortBy == value) {
-                                  _sortAscending = !_sortAscending;
-                                } else {
-                                  _sortBy = value;
-                                  _sortAscending = false;
-                                }
-                              });
-                              _sortPlaisirs();
-                            },
-                            itemBuilder: (context) => [
-                              PopupMenuItem(
-                                value: 'date',
-                                child: Row(
-                                  children: [
-                                    Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
-                                    const SizedBox(width: 8),
-                                    const Text('Trier par date'),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'amount',
-                                child: Row(
-                                  children: [
-                                    Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
-                                    const SizedBox(width: 8),
-                                    const Text('Trier par montant'),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'tag',
-                                child: Row(
-                                  children: [
-                                    Icon(_sortBy == 'tag' ? Icons.check : Icons.tag),
-                                    const SizedBox(width: 8),
-                                    const Text('Trier par catégorie'),
-                                  ],
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'pointed',
-                                child: Row(
-                                  children: [
-                                    Icon(_sortBy == 'pointed' ? Icons.check : Icons.check_circle),
-                                    const SizedBox(width: 8),
-                                    const Text('Trier par pointage'),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          IconButton(
+                            onPressed: _addPlaisir,
+                            icon: const Icon(
+                              Icons.add,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                            tooltip: 'Ajouter une dépense',
                           ),
                       ],
                     ),

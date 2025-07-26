@@ -17,10 +17,8 @@ class _SortiesTabState extends State<SortiesTab> {
   double totalPointe = 0.0;
   double soldeDisponible = 0.0;
   bool isLoading = false;
-  String _sortBy = 'date';
-  bool _sortAscending = false;
 
-  // Nouveaux états pour la sélection multiple
+  // Nouveaux états pour la sélection multiple (suppression des variables de tri)
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
@@ -43,13 +41,17 @@ class _SortiesTabState extends State<SortiesTab> {
       final totalSortiesPointe = await _dataService.getTotalSortiesTotaux();
       
       setState(() {
-        sorties = data;
+        // Tri par défaut : plus récent en haut (par date de création)
+        sorties = data..sort((a, b) {
+          final aDate = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
+          final bDate = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
+          return bDate.compareTo(aDate); // Plus récent en premier
+        });
         totalSorties = totals['sorties'] ?? 0.0;
         totalPointe = totalSortiesPointe;
         soldeDisponible = solde;
         isLoading = false;
       });
-      _sortSorties();
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -63,37 +65,6 @@ class _SortiesTabState extends State<SortiesTab> {
         );
       }
     }
-  }
-
-  void _sortSorties() {
-    setState(() {
-      sorties.sort((a, b) {
-        int comparison = 0;
-        switch (_sortBy) {
-          case 'date':
-            final dateA = DateTime.tryParse(a['date'] ?? '') ?? DateTime.now();
-            final dateB = DateTime.tryParse(b['date'] ?? '') ?? DateTime.now();
-            comparison = dateA.compareTo(dateB);
-            break;
-          case 'amount':
-            final amountA = (a['amount'] as num?)?.toDouble() ?? 0;
-            final amountB = (b['amount'] as num?)?.toDouble() ?? 0;
-            comparison = amountA.compareTo(amountB);
-            break;
-          case 'description':
-            final descA = a['description'] as String? ?? '';
-            final descB = b['description'] as String? ?? '';
-            comparison = descA.compareTo(descB);
-            break;
-          case 'pointed':
-            final pointedA = a['isPointed'] == true ? 1 : 0;
-            final pointedB = b['isPointed'] == true ? 1 : 0;
-            comparison = pointedA.compareTo(pointedB);
-            break;
-        }
-        return _sortAscending ? comparison : -comparison;
-      });
-    });
   }
 
   Future<void> _togglePointing(int index) async {
@@ -233,7 +204,7 @@ class _SortiesTabState extends State<SortiesTab> {
         await _dataService.deleteSortie(realIndex);
         await _loadSorties();
         
-        if (!mounted) return; // Protection async
+        if (!mounted) return; // Protection async ajoutée
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Charge supprimée'),
@@ -241,7 +212,7 @@ class _SortiesTabState extends State<SortiesTab> {
           ),
         );
       } catch (e) {
-        if (!mounted) return; // Protection async
+        if (!mounted) return; // Protection async ajoutée
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la suppression: $e'),
@@ -601,64 +572,6 @@ class _SortiesTabState extends State<SortiesTab> {
                               ),
                             ),
                             const Spacer(),
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.sort, color: Colors.white),
-                              onSelected: (value) {
-                                if (value == _sortBy) {
-                                  setState(() {
-                                    _sortAscending = !_sortAscending;
-                                  });
-                                } else {
-                                  setState(() {
-                                    _sortBy = value;
-                                    _sortAscending = false;
-                                  });
-                                }
-                                _sortSorties();
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'date',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par date'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'amount',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par montant'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'description',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'description' ? Icons.check : Icons.description),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par description'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'pointed',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'pointed' ? Icons.check : Icons.check_circle),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par pointage'),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
                             IconButton(
                               onPressed: _addSortie,
                               icon: const Icon(
@@ -807,68 +720,9 @@ class _SortiesTabState extends State<SortiesTab> {
                         ],
                       ),
                       
-                      // Tri et autres actions
+                      // Tri et autres actions (suppression du bouton de tri)
                       Row(
                         children: [
-                          if (!_isSelectionMode)
-                            PopupMenuButton<String>(
-                              icon: const Icon(Icons.sort, color: Colors.white),
-                              onSelected: (value) {
-                                if (value == _sortBy) {
-                                  setState(() {
-                                    _sortAscending = !_sortAscending;
-                                  });
-                                } else {
-                                  setState(() {
-                                    _sortBy = value;
-                                    _sortAscending = false;
-                                  });
-                                }
-                                _sortSorties();
-                              },
-                              itemBuilder: (context) => [
-                                PopupMenuItem(
-                                  value: 'date',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'date' ? Icons.check : Icons.calendar_today),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par date'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'amount',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'amount' ? Icons.check : Icons.euro),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par montant'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'description',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'description' ? Icons.check : Icons.description),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par description'),
-                                    ],
-                                  ),
-                                ),
-                                PopupMenuItem(
-                                  value: 'pointed',
-                                  child: Row(
-                                    children: [
-                                      Icon(_sortBy == 'pointed' ? Icons.check : Icons.check_circle),
-                                      const SizedBox(width: 8),
-                                      const Text('Trier par pointage'),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
                           if (!_isSelectionMode)
                             IconButton(
                               onPressed: _addSortie,

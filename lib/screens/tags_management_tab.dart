@@ -47,23 +47,24 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
     });
 
     try {
-      final loadedTags = await _dataService.getTags();
-      if (!mounted) return;  // Add this check
+      final data = await _dataService.getTags();
       setState(() {
-        tags = loadedTags;
+        // Tri alphabétique simple pour les tags
+        tags = data..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
         isLoading = false;
       });
     } catch (e) {
-      if (!mounted) return;  // Add this check
       setState(() {
         isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur de chargement: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur de chargement des catégories: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
