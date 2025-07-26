@@ -221,7 +221,7 @@ class _HomeTabState extends State<HomeTab> {
                       Container(
                         width: 1,
                         height: 40,
-                        color: Colors.white.withOpacity(0.3),
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                       Expanded(
                         child: Column(

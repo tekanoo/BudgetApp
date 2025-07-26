@@ -165,6 +165,9 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
     // Compter les utilisations du tag
     final usageCount = await _countTagUsage(tagToDelete);
     
+    // Ajouter une vérification mounted avant d'utiliser context
+    if (!mounted) return;
+    
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
