@@ -189,7 +189,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.7, // Réduit pour plus de hauteur
+                childAspectRatio: 0.75,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
@@ -201,30 +201,33 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 final isCurrentMonth = DateTime.now().year == year && DateTime.now().month == monthDate.month;
                 final solde = monthData['revenus']! - monthData['charges']! - monthData['depenses']!;
                 
-                // Debug pour voir les données
-                if (monthData['revenus']! > 0 || monthData['charges']! > 0 || monthData['depenses']! > 0) {
-                  print('Mois $monthKey: R=${monthData['revenus']}, C=${monthData['charges']}, D=${monthData['depenses']}');
-                }
+                // Utiliser les noms des mois en français sans dépendance d'intl
+                final monthNames = [
+                  'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUN',
+                  'JUL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'
+                ];
+                
+                final hasData = monthData['revenus']! > 0 || monthData['charges']! > 0 || monthData['depenses']! > 0;
                 
                 return GestureDetector(
                   onTap: () => _showMonthDetails(monthDate, monthData),
                   child: Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: isCurrentMonth 
-                          ? Colors.orange.withValues(alpha: 0.1)
-                          : Colors.grey.shade50,
+                          ? Colors.orange.withValues(alpha: 0.15)
+                          : (hasData ? Colors.blue.withValues(alpha: 0.05) : Colors.grey.shade50),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isCurrentMonth 
                             ? Colors.orange
-                            : Colors.grey.shade300,
-                        width: isCurrentMonth ? 3 : 1,
+                            : (hasData ? Colors.blue.shade300 : Colors.grey.shade300),
+                        width: isCurrentMonth ? 2 : 1,
                       ),
                       boxShadow: isCurrentMonth ? [
                         BoxShadow(
                           color: Colors.orange.withValues(alpha: 0.3),
-                          blurRadius: 8,
+                          blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
                       ] : null,
@@ -238,11 +241,13 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                           children: [
                             Expanded(
                               child: Text(
-                                DateFormat('MMM', 'fr_FR').format(monthDate).toUpperCase(),
+                                monthNames[monthDate.month - 1],
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.bold,
-                                  color: isCurrentMonth ? Colors.orange.shade800 : Colors.black87,
+                                  color: isCurrentMonth 
+                                      ? Colors.orange.shade800 
+                                      : (hasData ? Colors.blue.shade700 : Colors.black87),
                                 ),
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -252,89 +257,88 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(
                                   color: Colors.orange,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: const Icon(
                                   Icons.today,
-                                  size: 12,
+                                  size: 10,
                                   color: Colors.white,
                                 ),
                               ),
                           ],
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
                         
-                        // Revenus
-                        if (monthData['revenus']! > 0)
-                          _buildCompactDataRow('R', monthData['revenus']!, Colors.green),
-                        if (monthData['revenus']! > 0)
-                          const SizedBox(height: 3),
-                        
-                        // Charges
-                        if (monthData['charges']! > 0)
-                          _buildCompactDataRow('C', monthData['charges']!, Colors.red),
-                        if (monthData['charges']! > 0)
-                          const SizedBox(height: 3),
-                        
-                        // Dépenses
-                        if (monthData['depenses']! > 0)
-                          _buildCompactDataRow('D', monthData['depenses']!, Colors.purple),
+                        // Affichage conditionnel des données financières
+                        if (hasData) ...[
+                          // Revenus
+                          if (monthData['revenus']! > 0) ...[
+                            _buildCompactDataRow('R', monthData['revenus']!, Colors.green),
+                            const SizedBox(height: 2),
+                          ],
+                          
+                          // Charges
+                          if (monthData['charges']! > 0) ...[
+                            _buildCompactDataRow('C', monthData['charges']!, Colors.red),
+                            const SizedBox(height: 2),
+                          ],
+                          
+                          // Dépenses
+                          if (monthData['depenses']! > 0) ...[
+                            _buildCompactDataRow('D', monthData['depenses']!, Colors.purple),
+                          ],
+                        ] else ...[
+                          // Si pas de données, afficher un message
+                          const Expanded(
+                            child: Center(
+                              child: Text(
+                                'Aucune\ndonnée',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                         
                         // Espacement flexible
                         const Spacer(),
                         
-                        // Solde - toujours affiché
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: solde >= 0 ? Colors.green.shade300 : Colors.red.shade300,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                'SOLDE',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${_formatAmount(solde)}€',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: solde >= 0 ? Colors.green.shade800 : Colors.red.shade800,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                            ],
-                          ),
-                        ),
-                        
-                        // Indicateur de données
-                        if (monthData['revenus']! > 0 || monthData['charges']! > 0 || monthData['depenses']! > 0)
+                        // Solde - affiché seulement s'il y a des données ou si c'est le mois actuel
+                        if (hasData || isCurrentMonth)
                           Container(
-                            margin: const EdgeInsets.only(top: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade100,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'Données',
-                              style: TextStyle(
-                                fontSize: 8,
-                                color: Colors.blue.shade700,
-                                fontWeight: FontWeight.w600,
+                              color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: solde >= 0 ? Colors.green.shade300 : Colors.red.shade300,
+                                width: 1,
                               ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  'SOLDE',
+                                  style: TextStyle(
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                    color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                  ),
+                                ),
+                                Text(
+                                  '${_formatAmount(solde)}€',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: solde >= 0 ? Colors.green.shade800 : Colors.red.shade800,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
                             ),
                           ),
                       ],
@@ -353,27 +357,28 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
     return Row(
       children: [
         Container(
-          width: 8,
-          height: 8,
+          width: 6,
+          height: 6,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(3),
           ),
         ),
-        const SizedBox(width: 6),
+        const SizedBox(width: 4),
         Text(
-          '$prefix: ',
+          '$prefix:',
           style: TextStyle(
-            fontSize: 10,
+            fontSize: 9,
             color: color,
             fontWeight: FontWeight.w600,
           ),
         ),
+        const SizedBox(width: 2),
         Expanded(
           child: Text(
             '${_formatAmount(amount)}€',
             style: TextStyle(
-              fontSize: 10,
+              fontSize: 9,
               color: color,
               fontWeight: FontWeight.bold,
             ),
@@ -386,6 +391,10 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
 
   void _showMonthDetails(DateTime monthDate, Map<String, double> monthData) {
     final solde = monthData['revenus']! - monthData['charges']! - monthData['depenses']!;
+    final monthNames = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
     
     showModalBottomSheet(
       context: context,
@@ -411,7 +420,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
             
             // Titre
             Text(
-              DateFormat('MMMM yyyy', 'fr_FR').format(monthDate),
+              '${monthNames[monthDate.month - 1]} ${monthDate.year}',
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
