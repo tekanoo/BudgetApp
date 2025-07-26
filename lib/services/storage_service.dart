@@ -95,10 +95,15 @@ class StorageService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(_storageKey);
       await prefs.remove(_lastUpdateKey);
+      
+      if (kDebugMode) {
+        print('✅ Données locales supprimées');
+      }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur suppression: $e');
+        print('❌ Erreur suppression locale: $e');
       }
+      rethrow;
     }
   }
 

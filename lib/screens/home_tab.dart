@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../services/encryption_service.dart';
 
@@ -50,9 +51,9 @@ class _HomeTabState extends State<HomeTab> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur chargement tags: $e'),
-            backgroundColor: Colors.orange,
+          const SnackBar(
+            content: Text('Erreur de chargement des tags'),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -73,10 +74,10 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Future<void> _saveTransaction() async {
-    if (_amountController.text.isEmpty || _selectedDate == null) {
+    if (_amountController.text.trim().isEmpty || _selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez remplir le montant et sélectionner une date'),
+        SnackBar(
+          content: Text('Veuillez remplir le montant et la date.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -87,8 +88,8 @@ class _HomeTabState extends State<HomeTab> {
     final amount = AmountParser.parseAmount(_amountController.text);
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez entrer un montant valide (utilisez , ou . pour les décimales)'),
+        SnackBar(
+          content: Text('Veuillez entrer un montant valide.'),
           backgroundColor: Colors.red,
         ),
       );
@@ -124,15 +125,8 @@ class _HomeTabState extends State<HomeTab> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('💰 Dépense de ${AmountParser.formatAmount(amount)} € ajoutée avec succès !'),
+          content: Text('🔐 Dépense ajoutée et chiffrée.'),
           backgroundColor: Colors.green,
-          action: SnackBarAction(
-            label: 'Voir',
-            onPressed: () {
-              // Naviguer vers l'onglet des dépenses
-              DefaultTabController.of(context).animateTo(1);
-            },
-          ),
         ),
       );
     } catch (e) {
@@ -169,6 +163,7 @@ class _HomeTabState extends State<HomeTab> {
 
   @override
   Widget build(BuildContext context) {
+    // Rebuild automatique lors du changement de langue
     return Scaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
@@ -200,7 +195,7 @@ class _HomeTabState extends State<HomeTab> {
                             ),
                             const SizedBox(height: 4),
                             FutureBuilder<double>(
-                              future: _dataService.getTotals().then((totals) => totals['solde'] ?? 0.0), // Utilise la méthode existante
+                              future: _dataService.getTotals().then((totals) => totals['solde'] ?? 0.0),
                               builder: (context, snapshot) {
                                 if (snapshot.hasData) {
                                   return Text(
@@ -234,12 +229,12 @@ class _HomeTabState extends State<HomeTab> {
                         child: Column(
                           children: [
                             const Text(
-                              'Solde débité', // Changement de nom
+                              'Solde débité',
                               style: TextStyle(color: Colors.white70, fontSize: 12),
                             ),
                             const SizedBox(height: 4),
                             FutureBuilder<double>(
-                              future: _dataService.getSoldeDisponible(), // Utilise getSoldeDisponible au lieu de getSoldePointe
+                              future: _dataService.getSoldeDisponible(),
                               builder: (context, snapshot) {
                                 if (snapshot.hasData) {
                                   return Text(
@@ -278,9 +273,9 @@ class _HomeTabState extends State<HomeTab> {
               color: Theme.of(context).primaryColor,
             ),
             const SizedBox(height: 20),
-            Text(
+            const Text(
               'Ajouter une dépense',
-              style: Theme.of(context).textTheme.headlineSmall,
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 30),
@@ -289,10 +284,10 @@ class _HomeTabState extends State<HomeTab> {
             TextField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: 'Montant *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.euro),
+                border: const OutlineInputBorder(),
+                prefixIcon: const Icon(Icons.euro),
                 suffixText: '€',
                 helperText: 'Utilisez , ou . pour les décimales (ex: 15,50 ou 15.50)',
               ),
@@ -305,10 +300,10 @@ class _HomeTabState extends State<HomeTab> {
               children: [
                 TextField(
                   controller: _tagController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Catégorie',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.tag),
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.tag),
                     helperText: 'Restaurant, Shopping, Loisirs...',
                   ),
                 ),
@@ -358,8 +353,8 @@ class _HomeTabState extends State<HomeTab> {
                     const SizedBox(width: 12),
                     Text(
                       _selectedDate == null
-                          ? 'Sélectionner une date *'
-                          : 'Date: ${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}',
+                          ? 'Sélectionner une date'
+                          : 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}',
                       style: TextStyle(
                         fontSize: 16,
                         color: _selectedDate == null ? Colors.grey.shade600 : null,
@@ -389,7 +384,9 @@ class _HomeTabState extends State<HomeTab> {
                       )
                     : const Icon(Icons.add),
                 label: Text(
-                  _isLoading ? 'Chiffrement et sauvegarde...' : 'Ajouter la dépense',
+                  _isLoading 
+                    ? 'En cours de chiffrement et sauvegarde...' 
+                    : 'Ajouter une dépense',
                   style: const TextStyle(fontSize: 16),
                 ),
               ),
@@ -416,7 +413,7 @@ class _HomeTabState extends State<HomeTab> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Système de pointage des dépenses',
+                          'Système de pointage',
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -428,7 +425,7 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Après avoir ajouté une dépense, vous pouvez la "pointer" dans l\'onglet Dépenses en appuyant dessus. Les dépenses pointées sont déduites de votre solde débité (revenus - charges pointées - dépenses pointées).',
+                    'Ce système vous permet de suivre vos dépenses et revenus de manière sécurisée.',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.blue.shade700,
@@ -457,7 +454,7 @@ class _HomeTabState extends State<HomeTab> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '🔐 Vos données financières sont automatiquement chiffrées avant d\'être envoyées dans le cloud. Même le développeur ne peut pas voir vos montants !',
+                      'Chiffrement des données',
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.green.shade700,

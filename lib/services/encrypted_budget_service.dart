@@ -846,4 +846,25 @@ Future<void> togglePlaisirPointing(int index) async {
       rethrow;
     }
   }
+
+  /// Ajouter cette méthode à la fin de la classe EncryptedBudgetDataService
+  Future<void> deleteAllData() async {
+    _ensureInitialized();
+    try {
+      // Effacer les données dans Firebase si connecté
+      final user = _firebaseService.currentUser;
+      if (user != null) {
+        await _firebaseService.deleteUserData();
+      }
+      
+      if (kDebugMode) {
+        print('✅ Toutes les données ont été supprimées');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur lors de la suppression des données: $e');
+      }
+      rethrow;
+    }
+  }
 }

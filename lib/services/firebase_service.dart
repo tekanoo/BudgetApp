@@ -388,4 +388,36 @@ class FirebaseService {
       rethrow;
     }
   }
+
+  /// Supprimer toutes les données de l'utilisateur connecté
+  Future<void> deleteUserData() async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return;
+
+      // Supprimer tous les documents de la collection budget
+      final budgetCollection = _firestore
+          .collection('users')
+          .doc(user.uid)
+          .collection('budget');
+
+      // Supprimer tous les documents de la sous-collection budget
+      final docs = await budgetCollection.get();
+      for (var doc in docs.docs) {
+        await doc.reference.delete();
+      }
+
+      // Supprimer le document principal de l'utilisateur (optionnel)
+      // await _firestore.collection('users').doc(user.uid).delete();
+      
+      if (kDebugMode) {
+        print('✅ Données utilisateur supprimées de Firebase');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur suppression Firebase: $e');
+      }
+      rethrow;
+    }
+  }
 }
