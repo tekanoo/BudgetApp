@@ -10,36 +10,21 @@ class ProjectionsTab extends StatefulWidget {
 }
 
 class _ProjectionsTabState extends State<ProjectionsTab> {
-  DateTime _currentDate = DateTime.now();
-  PageController _pageController = PageController();
+  final ScrollController _scrollController = ScrollController();
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
-  Map<String, Map<String, double>> _monthlyData = {}; // Format: "2024-01" -> {revenus, charges, depenses}
+  Map<String, Map<String, double>> _monthlyData = {};
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    // Initialiser le contrôleur de page au mois actuel (index 50 pour avoir de la marge)
-    _pageController = PageController(initialPage: _getMonthIndex(_currentDate));
     _loadAllData();
   }
 
   @override
   void dispose() {
-    _pageController.dispose();
+    _scrollController.dispose();
     super.dispose();
-  }
-
-  int _getMonthIndex(DateTime date) {
-    // Index basé sur le nombre de mois depuis janvier 2020
-    return (date.year - 2020) * 12 + date.month - 1;
-  }
-
-  DateTime _getDateFromIndex(int index) {
-    // Convertir l'index en date
-    int year = 2020 + (index ~/ 12);
-    int month = (index % 12) + 1;
-    return DateTime(year, month, 1);
   }
 
   String _getMonthKey(DateTime date) {
@@ -52,7 +37,6 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
     });
 
     try {
-      // Charger toutes les données
       final entrees = await _dataService.getEntrees();
       final sorties = await _dataService.getSorties();
       final plaisirs = await _dataService.getPlaisirs();
@@ -122,114 +106,32 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
     }
   }
 
-  void _previousMonth() {
-    _pageController.previousPage(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+  String _formatAmount(double amount) {
+    return amount.toStringAsFixed(2).replaceAll('.', ',');
   }
 
-  void _nextMonth() {
-    _pageController.nextPage(
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
-  }
-
-  void _goToToday() {
-    DateTime today = DateTime.now();
-    int todayIndex = _getMonthIndex(today);
-    _pageController.animateToPage(
-      todayIndex,
-      duration: const Duration(milliseconds: 500),
-      curve: Curves.easeInOut,
-    );
-  }
-
-  Widget _buildCalendarHeader(DateTime date) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.indigo.shade600, Colors.indigo.shade800],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.indigo.withValues(alpha: 0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            onPressed: _previousMonth,
-            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
-          ),
-          Expanded(
-            child: Column(
-              children: [
-                Text(
-                  DateFormat('MMMM yyyy', 'fr_FR').format(date),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                GestureDetector(
-                  onTap: _goToToday,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'Aujourd\'hui',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: _nextMonth,
-            icon: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildYearGrid(int year) {
-    return Container(
+  Widget _buildYearCard(int year) {
+    final months = List.generate(12, (index) => DateTime(year, index + 1, 1));
+    
+    return Card(
       margin: const EdgeInsets.all(16),
+      elevation: 4,
       child: Column(
         children: [
           // En-tête de l'année
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.teal.shade600, Colors.teal.shade800],
+                colors: [Color(0xFF3F51B5), Color(0xFF1A237E)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(12),
+                topRight: Radius.circular(12),
+              ),
             ),
             child: Text(
               year.toString(),
@@ -242,48 +144,42 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
             ),
           ),
           
-          // Grille des mois (3 colonnes x 4 lignes)
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              childAspectRatio: 0.8,
-              crossAxisSpacing: 8,
-              mainAxisSpacing: 8,
-            ),
-            itemCount: 12,
-            itemBuilder: (context, index) {
-              final month = index + 1;
-              final monthDate = DateTime(year, month, 1);
-              final monthKey = _getMonthKey(monthDate);
-              final monthData = _monthlyData[monthKey] ?? {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
-              final isCurrentMonth = DateTime.now().year == year && DateTime.now().month == month;
-              
-              return GestureDetector(
-                onTap: () => _showMonthDetails(monthDate, monthData),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: isCurrentMonth 
-                        ? Colors.indigo.withValues(alpha: 0.1)
-                        : Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isCurrentMonth 
-                          ? Colors.indigo
-                          : Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                      width: isCurrentMonth ? 2 : 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.05),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
+          // Grille des mois
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 3,
+                childAspectRatio: 0.75,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: 12,
+              itemBuilder: (context, index) {
+                final monthDate = months[index];
+                final monthKey = _getMonthKey(monthDate);
+                final monthData = _monthlyData[monthKey] ?? {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
+                final isCurrentMonth = DateTime.now().year == year && DateTime.now().month == monthDate.month;
+                final solde = monthData['revenus']! - monthData['charges']! - monthData['depenses']!;
+                
+                return GestureDetector(
+                  onTap: () => _showMonthDetails(monthDate, monthData),
+                  child: Container(
                     padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isCurrentMonth 
+                          ? Colors.indigo.withValues(alpha: 0.1)
+                          : Colors.grey.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isCurrentMonth 
+                            ? Colors.indigo
+                            : Colors.grey.shade300,
+                        width: isCurrentMonth ? 2 : 1,
+                      ),
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -296,11 +192,11 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: isCurrentMonth ? Colors.indigo : null,
+                                color: isCurrentMonth ? Colors.indigo : Colors.black87,
                               ),
                             ),
                             if (isCurrentMonth)
-                              Icon(
+                              const Icon(
                                 Icons.today,
                                 size: 16,
                                 color: Colors.indigo,
@@ -310,86 +206,73 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                         const SizedBox(height: 8),
                         
                         // Revenus
-                        _buildMonthDataRow(
-                          'Revenus',
-                          monthData['revenus']!,
-                          Colors.green,
-                          Icons.trending_up,
-                        ),
+                        _buildDataRow('Revenus', monthData['revenus']!, Colors.green),
                         const SizedBox(height: 4),
                         
                         // Charges
-                        _buildMonthDataRow(
-                          'Charges',
-                          monthData['charges']!,
-                          Colors.red,
-                          Icons.receipt_long,
-                        ),
+                        _buildDataRow('Charges', monthData['charges']!, Colors.red),
                         const SizedBox(height: 4),
                         
                         // Dépenses
-                        _buildMonthDataRow(
-                          'Dépenses',
-                          monthData['depenses']!,
-                          Colors.purple,
-                          Icons.shopping_cart,
-                        ),
+                        _buildDataRow('Dépenses', monthData['depenses']!, Colors.purple),
                         const SizedBox(height: 8),
                         
-                        // Solde du mois
-                        Divider(height: 1, color: Colors.grey.shade300),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.account_balance_wallet,
-                              size: 12,
-                              color: Colors.blue,
+                        // Solde
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                          decoration: BoxDecoration(
+                            color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: solde >= 0 ? Colors.green.shade200 : Colors.red.shade200,
                             ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
                                 'Solde',
                                 style: TextStyle(
-                                  fontSize: 11,
+                                  fontSize: 10,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.blue,
+                                  color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          '${_formatAmount(monthData['revenus']! - monthData['charges']! - monthData['depenses']!)} €',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: (monthData['revenus']! - monthData['charges']! - monthData['depenses']!) >= 0 
-                                ? Colors.green 
-                                : Colors.red,
+                              Text(
+                                '${_formatAmount(solde)} €',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: solde >= 0 ? Colors.green : Colors.red,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMonthDataRow(String label, double amount, Color color, IconData icon) {
+  Widget _buildDataRow(String label, double amount, Color color) {
     return Row(
       children: [
-        Icon(
-          icon,
-          size: 12,
-          color: color,
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+          ),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 6),
         Expanded(
           child: Text(
             label,
@@ -404,11 +287,9 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
     );
   }
 
-  String _formatAmount(double amount) {
-    return amount.toStringAsFixed(2).replaceAll('.', ',');
-  }
-
   void _showMonthDetails(DateTime monthDate, Map<String, double> monthData) {
+    final solde = monthData['revenus']! - monthData['charges']! - monthData['depenses']!;
+    
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -420,6 +301,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
         height: MediaQuery.of(context).size.height * 0.6,
         child: Column(
           children: [
+            // Handle
             Container(
               width: 40,
               height: 4,
@@ -429,6 +311,8 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
               ),
             ),
             const SizedBox(height: 20),
+            
+            // Titre
             Text(
               DateFormat('MMMM yyyy', 'fr_FR').format(monthDate),
               style: const TextStyle(
@@ -442,80 +326,46 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
             Expanded(
               child: Column(
                 children: [
-                  _buildDetailRow(
-                    'Revenus',
-                    monthData['revenus']!,
-                    Colors.green,
-                    Icons.trending_up,
-                  ),
+                  _buildDetailCard('Revenus', monthData['revenus']!, Colors.green, Icons.trending_up),
                   const SizedBox(height: 16),
-                  _buildDetailRow(
-                    'Charges',
-                    monthData['charges']!,
-                    Colors.red,
-                    Icons.receipt_long,
-                  ),
+                  _buildDetailCard('Charges', monthData['charges']!, Colors.red, Icons.receipt_long),
                   const SizedBox(height: 16),
-                  _buildDetailRow(
-                    'Dépenses',
-                    monthData['depenses']!,
-                    Colors.purple,
-                    Icons.shopping_cart,
-                  ),
+                  _buildDetailCard('Dépenses', monthData['depenses']!, Colors.purple, Icons.shopping_cart),
                   const SizedBox(height: 24),
-                  
-                  Divider(thickness: 2),
-                  const SizedBox(height: 16),
                   
                   // Solde total
                   Container(
-                    padding: const EdgeInsets.all(16),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: (monthData['revenus']! - monthData['charges']! - monthData['depenses']!) >= 0
-                          ? Colors.green.shade50
-                          : Colors.red.shade50,
+                      color: solde >= 0 ? Colors.green.shade50 : Colors.red.shade50,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: (monthData['revenus']! - monthData['charges']! - monthData['depenses']!) >= 0
-                            ? Colors.green.shade200
-                            : Colors.red.shade200,
+                        color: solde >= 0 ? Colors.green.shade200 : Colors.red.shade200,
                       ),
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
                         Icon(
                           Icons.account_balance_wallet,
-                          color: (monthData['revenus']! - monthData['charges']! - monthData['depenses']!) >= 0
-                              ? Colors.green
-                              : Colors.red,
+                          color: solde >= 0 ? Colors.green : Colors.red,
                           size: 32,
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Solde du mois',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w500,
-                                  color: (monthData['revenus']! - monthData['charges']! - monthData['depenses']!) >= 0
-                                      ? Colors.green.shade700
-                                      : Colors.red.shade700,
-                                ),
-                              ),
-                              Text(
-                                '${_formatAmount(monthData['revenus']! - monthData['charges']! - monthData['depenses']!)} €',
-                                style: TextStyle(
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold,
-                                  color: (monthData['revenus']! - monthData['charges']! - monthData['depenses']!) >= 0
-                                      ? Colors.green
-                                      : Colors.red,
-                                ),
-                              ),
-                            ],
+                        const SizedBox(height: 8),
+                        Text(
+                          'Solde du mois',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: solde >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                          ),
+                        ),
+                        Text(
+                          '${_formatAmount(solde)} €',
+                          style: TextStyle(
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                            color: solde >= 0 ? Colors.green : Colors.red,
                           ),
                         ),
                       ],
@@ -530,8 +380,9 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
     );
   }
 
-  Widget _buildDetailRow(String label, double amount, Color color, IconData icon) {
+  Widget _buildDetailCard(String label, double amount, Color color, IconData icon) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
@@ -580,44 +431,73 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
             children: [
               CircularProgressIndicator(),
               SizedBox(height: 16),
-              Text('Chargement des projections...'),
+              Text(
+                'Chargement des projections...',
+                style: TextStyle(fontSize: 16),
+              ),
             ],
           ),
         ),
       );
     }
 
+    // Générer les années de 2020 à 2030
+    final years = List.generate(11, (index) => 2020 + index);
+
     return Scaffold(
-      body: Column(
-        children: [
-          // En-tête avec navigation
-          Container(
-            margin: const EdgeInsets.all(16),
-            child: _buildCalendarHeader(_currentDate),
-          ),
-          
-          // Vue par années avec défilement
-          Expanded(
-            child: PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentDate = _getDateFromIndex(index);
-                });
-              },
-              itemBuilder: (context, index) {
-                final date = _getDateFromIndex(index);
-                return RefreshIndicator(
-                  onRefresh: _loadAllData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: _buildYearGrid(date.year),
-                  ),
-                );
-              },
-            ),
+      appBar: AppBar(
+        title: const Text('Projections'),
+        centerTitle: true,
+        backgroundColor: Colors.indigo,
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadAllData,
+            tooltip: 'Actualiser',
           ),
         ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _loadAllData,
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            children: [
+              // En-tête informatif
+              Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info, color: Colors.blue.shade600),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Visualisez vos finances mois par mois. Tapez sur un mois pour voir les détails.',
+                        style: TextStyle(
+                          color: Colors.blue.shade700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Années avec leurs mois
+              ...years.map((year) => _buildYearCard(year)),
+              
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
