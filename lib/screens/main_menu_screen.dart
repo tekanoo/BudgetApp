@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import '../services/firebase_service.dart';
 import '../services/encrypted_budget_service.dart' as encrypted;
+import '../services/translation_service.dart';
+import '../widgets/language_selector.dart';
 import 'home_tab.dart';
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
@@ -42,68 +44,68 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     SortiesTab(),
   ];
 
-  // Navigation du bas (simplifiée)
-  final List<NavigationDestination> _mainDestinations = const [
-    NavigationDestination(
-      icon: Icon(Icons.dashboard_outlined),
-      selectedIcon: Icon(Icons.dashboard),
-      label: 'Dashboard',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.shopping_cart_outlined),
-      selectedIcon: Icon(Icons.shopping_cart),
-      label: 'Dépenses',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.trending_up_outlined),
-      selectedIcon: Icon(Icons.trending_up),
-      label: 'Revenus',
-    ),
-    NavigationDestination(
-      icon: Icon(Icons.receipt_long_outlined),
-      selectedIcon: Icon(Icons.receipt_long),
-      label: 'Charges',
-    ),
-  ];
-
-  // Options du menu de sélection
-  final List<Map<String, dynamic>> _menuOptions = [
+  // Options du menu de sélection - utilisant le service de traduction
+  List<Map<String, dynamic>> get _menuOptions => [
     {
-      'title': 'Dashboard',
+      'title': TranslationService.t('dashboard'),
       'icon': Icons.dashboard,
       'color': Colors.blue,
       'index': 0,
     },
     {
-      'title': 'Dépenses',
+      'title': TranslationService.t('expenses'),
       'icon': Icons.shopping_cart,
       'color': Colors.purple,
       'index': 1,
     },
     {
-      'title': 'Revenus',
+      'title': TranslationService.t('revenues'),
       'icon': Icons.trending_up,
       'color': Colors.green,
       'index': 2,
     },
     {
-      'title': 'Charges',
+      'title': TranslationService.t('charges'),
       'icon': Icons.receipt_long,
       'color': Colors.red,
       'index': 3,
     },
     {
-      'title': 'Analyse',
+      'title': TranslationService.t('analysis'),
       'icon': Icons.analytics,
       'color': Colors.orange,
       'index': 4,
     },
     {
-      'title': 'Catégories',
+      'title': TranslationService.t('categories'),
       'icon': Icons.tag,
       'color': Colors.indigo,
       'index': 5,
     },
+  ];
+
+  // Navigation du bas (simplifiée) - utilisant le service de traduction
+  List<NavigationDestination> get _mainDestinations => [
+    NavigationDestination(
+      icon: const Icon(Icons.dashboard_outlined),
+      selectedIcon: const Icon(Icons.dashboard),
+      label: TranslationService.t('dashboard'),
+    ),
+    NavigationDestination(
+      icon: const Icon(Icons.shopping_cart_outlined),
+      selectedIcon: const Icon(Icons.shopping_cart),
+      label: TranslationService.t('expenses'),
+    ),
+    NavigationDestination(
+      icon: const Icon(Icons.trending_up_outlined),
+      selectedIcon: const Icon(Icons.trending_up),
+      label: TranslationService.t('revenues'),
+    ),
+    NavigationDestination(
+      icon: const Icon(Icons.receipt_long_outlined),
+      selectedIcon: const Icon(Icons.receipt_long),
+      label: TranslationService.t('charges'),
+    ),
   ];
 
   @override
@@ -131,7 +133,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _onItemTapped(int index) {
-    // Si l'index correspond aux onglets principaux
     if (index < _mainTabs.length) {
       setState(() {
         _selectedIndex = index;
@@ -155,7 +156,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       curve: Curves.easeInOut,
     );
     _trackTabChange(tabIndex);
-    Navigator.pop(context); // Fermer le menu
+    Navigator.pop(context);
   }
 
   Future<void> _trackTabChange(int index) async {
@@ -169,6 +170,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         },
       );
     }
+  }
+
+  void _onLanguageChanged() {
+    setState(() {
+      // Déclenche un rebuild pour mettre à jour les traductions
+    });
   }
 
   void _showTabSelectionMenu() {
@@ -199,7 +206,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 Icon(Icons.menu, color: Colors.grey.shade600),
                 const SizedBox(width: 12),
                 Text(
-                  'Navigation',
+                  TranslationService.t('navigation'),
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
               ],
@@ -337,7 +344,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                '🔐 Données chiffrées',
+                '🔐 ${TranslationService.t('encrypted_data')}',
                 style: TextStyle(
                   fontSize: 12,
                   color: Colors.green.shade700,
@@ -350,7 +357,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             // Options
             _buildMenuOption(
               icon: Icons.delete_forever,
-              title: 'Supprimer toutes les données',
+              title: TranslationService.t('delete_all_data'),
               subtitle: 'Action irréversible',
               color: Colors.red,
               onTap: _confirmDeleteAllData,
@@ -358,7 +365,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             const SizedBox(height: 16),
             _buildMenuOption(
               icon: Icons.logout,
-              title: 'Se déconnecter',
+              title: TranslationService.t('logout'),
               subtitle: 'Retour à l\'écran de connexion',
               color: Colors.orange,
               onTap: () async {
@@ -433,17 +440,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Future<void> _confirmDeleteAllData() async {
-    Navigator.pop(context); // Fermer le menu profil
+    Navigator.pop(context);
     
     final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.warning, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Supprimer toutes les données'),
+            const Icon(Icons.warning, color: Colors.red),
+            const SizedBox(width: 8),
+            Text(TranslationService.t('delete_all_data')),
           ],
         ),
         content: const Column(
@@ -475,7 +482,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+            child: Text(TranslationService.t('cancel')),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
@@ -492,30 +499,27 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Future<void> _deleteAllData() async {
-    // Afficher un indicateur de progression
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
+      builder: (context) => AlertDialog(
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Suppression en cours...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text('${TranslationService.t('loading')}'),
           ],
         ),
       ),
     );
 
     try {
-      // Supprimer toutes les données - CORRECTION: utiliser deleteAllUserData()
       await _dataService.deleteAllUserData();
       
       if (!mounted) return;
-      Navigator.pop(context); // Fermer le dialog de chargement
+      Navigator.pop(context);
       
-      // Message de confirmation
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✅ Toutes les données ont été supprimées'),
@@ -524,7 +528,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         ),
       );
 
-      // Retourner au premier onglet
       _pageController.animateToPage(
         0,
         duration: const Duration(milliseconds: 300),
@@ -533,7 +536,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // Fermer le dialog de chargement
+      Navigator.pop(context);
       
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -555,14 +558,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Widget build(BuildContext context) {
     final user = _firebaseService.currentUser;
     
-    // Titres des onglets
+    // Titres des onglets traduits
     final List<String> tabTitles = [
-      'Dashboard', 
-      'Mes Dépenses',
-      'Revenus', 
-      'Charges', 
-      'Analyse',
-      'Catégories',
+      TranslationService.t('dashboard'), 
+      TranslationService.t('my_expenses'),
+      TranslationService.t('revenues'), 
+      TranslationService.t('charges'), 
+      TranslationService.t('analysis'),
+      TranslationService.t('categories'),
     ];
 
     return Scaffold(
@@ -581,9 +584,14 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             ),
           ),
           onPressed: _showTabSelectionMenu,
-          tooltip: 'Navigation',
+          tooltip: TranslationService.t('navigation'),
         ),
         actions: [
+          // Sélecteur de langue
+          LanguageSelector(
+            onLanguageChanged: _onLanguageChanged,
+          ),
+          // Profil utilisateur
           if (user != null)
             IconButton(
               icon: CircleAvatar(
@@ -599,7 +607,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 ),
               ),
               onPressed: _showProfileMenu,
-              tooltip: 'Profil',
+              tooltip: TranslationService.t('profile'),
             ),
         ],
       ),
