@@ -202,8 +202,8 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 
                 // Utiliser les noms des mois en français sans dépendance d'intl
                 final monthNames = [
-                  'JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUN',
-                  'JUL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'
+                  'JANVIER', 'FÉVRIER', 'MARS', 'AVRIL', 'MAI', 'JUIN',
+                  'JUILLET', 'AOÛT', 'SEPTEMBRE', 'OCTOBRE', 'NOVEMBRE', 'DÉCEMBRE'
                 ];
                 
                 final hasData = monthData['revenus']! > 0 || monthData['charges']! > 0 || monthData['depenses']! > 0;
@@ -214,18 +214,18 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                     padding: const EdgeInsets.all(8), // Padding optimisé
                     decoration: BoxDecoration(
                       color: isCurrentMonth 
-                          ? Colors.orange.withValues(alpha: 0.15)
+                          ? const Color.fromARGB(255, 245, 243, 241).withValues(alpha: 0.15)
                           : (hasData ? Colors.blue.withValues(alpha: 0.05) : Colors.grey.shade50),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isCurrentMonth 
-                            ? Colors.orange
+                            ? const Color.fromARGB(255, 232, 230, 228)
                             : (hasData ? Colors.blue.shade300 : Colors.grey.shade300),
                         width: isCurrentMonth ? 2 : 1,
                       ),
                       boxShadow: isCurrentMonth ? [
                         BoxShadow(
-                          color: Colors.orange.withValues(alpha: 0.3),
+                          color: const Color.fromARGB(255, 231, 229, 226).withValues(alpha: 0.3),
                           blurRadius: 6,
                           offset: const Offset(0, 2),
                         ),
@@ -245,7 +245,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                                   fontSize: 16, // Plus grand
                                   fontWeight: FontWeight.bold,
                                   color: isCurrentMonth 
-                                      ? Colors.orange.shade800 
+                                      ? const Color.fromARGB(255, 228, 226, 224) 
                                       : (hasData ? Colors.blue.shade700 : Colors.black87),
                                 ),
                               ),
@@ -254,7 +254,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                                 Container(
                                   padding: const EdgeInsets.all(2),
                                   decoration: BoxDecoration(
-                                    color: Colors.orange,
+                                    color: const Color.fromARGB(255, 239, 237, 234),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: const Icon(
