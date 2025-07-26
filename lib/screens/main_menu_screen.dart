@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_analytics/firebase_analytics.dart'; // AJOUT
+import 'package:firebase_analytics/firebase_analytics.dart';
 import '../services/firebase_service.dart';
 import '../services/encrypted_budget_service.dart' as encrypted;
 import 'home_tab.dart';
@@ -22,18 +22,28 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final PageController _pageController = PageController();
   final FirebaseService _firebaseService = FirebaseService();
   final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService();
-  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance; // AJOUT
+  final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
-  final List<Widget> _tabs = const [
+  // Tous les onglets disponibles
+  final List<Widget> _allTabs = const [
     HomeTab(),
-    PlaisirsTab(), // Renommé en "Dépenses" dans l'interface
+    PlaisirsTab(),
     EntreesTab(),
     SortiesTab(),
     AnalyseTab(),
-    TagsManagementTab(), // NOUVEAU: onglet de gestion des tags
+    TagsManagementTab(),
   ];
 
-  final List<NavigationDestination> _destinations = const [
+  // Onglets principaux (affichés dans la navigation du bas)
+  final List<Widget> _mainTabs = const [
+    HomeTab(),
+    PlaisirsTab(),
+    EntreesTab(),
+    SortiesTab(),
+  ];
+
+  // Navigation du bas (simplifiée)
+  final List<NavigationDestination> _mainDestinations = const [
     NavigationDestination(
       icon: Icon(Icons.dashboard_outlined),
       selectedIcon: Icon(Icons.dashboard),
@@ -42,7 +52,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     NavigationDestination(
       icon: Icon(Icons.shopping_cart_outlined),
       selectedIcon: Icon(Icons.shopping_cart),
-      label: 'Dépenses', // Changé de "Plaisirs" à "Dépenses"
+      label: 'Dépenses',
     ),
     NavigationDestination(
       icon: Icon(Icons.trending_up_outlined),
@@ -54,26 +64,55 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       selectedIcon: Icon(Icons.receipt_long),
       label: 'Charges',
     ),
-    NavigationDestination(
-      icon: Icon(Icons.analytics_outlined),
-      selectedIcon: Icon(Icons.analytics),
-      label: 'Analyse',
-    ),
-    NavigationDestination( // NOUVEAU: destination pour les tags
-      icon: Icon(Icons.tag_outlined),
-      selectedIcon: Icon(Icons.tag),
-      label: 'Catégories',
-    ),
+  ];
+
+  // Options du menu de sélection
+  final List<Map<String, dynamic>> _menuOptions = [
+    {
+      'title': 'Dashboard',
+      'icon': Icons.dashboard,
+      'color': Colors.blue,
+      'index': 0,
+    },
+    {
+      'title': 'Dépenses',
+      'icon': Icons.shopping_cart,
+      'color': Colors.purple,
+      'index': 1,
+    },
+    {
+      'title': 'Revenus',
+      'icon': Icons.trending_up,
+      'color': Colors.green,
+      'index': 2,
+    },
+    {
+      'title': 'Charges',
+      'icon': Icons.receipt_long,
+      'color': Colors.red,
+      'index': 3,
+    },
+    {
+      'title': 'Analyse',
+      'icon': Icons.analytics,
+      'color': Colors.orange,
+      'index': 4,
+    },
+    {
+      'title': 'Catégories',
+      'icon': Icons.tag,
+      'color': Colors.indigo,
+      'index': 5,
+    },
   ];
 
   @override
   void initState() {
     super.initState();
     _initializeServices();
-    _trackScreenView(); // AJOUT
+    _trackScreenView();
   }
 
-  // AJOUT: Tracker l'ouverture de l'écran principal
   Future<void> _trackScreenView() async {
     await _analytics.logScreenView(
       screenName: 'main_menu',
@@ -92,21 +131,35 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _onItemTapped(int index) {
+    // Si l'index correspond aux onglets principaux
+    if (index < _mainTabs.length) {
+      setState(() {
+        _selectedIndex = index;
+      });
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      _trackTabChange(index);
+    }
+  }
+
+  void _navigateToTab(int tabIndex) {
     setState(() {
-      _selectedIndex = index;
+      _selectedIndex = tabIndex;
     });
     _pageController.animateToPage(
-      index,
+      tabIndex,
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
-    
-    // AJOUT: Tracker la navigation entre onglets
-    _trackTabChange(index);
+    _trackTabChange(tabIndex);
+    Navigator.pop(context); // Fermer le menu
   }
 
   Future<void> _trackTabChange(int index) async {
-    final tabNames = ['home', 'entrees', 'sorties', 'plaisirs', 'analyse', 'tags'];
+    final tabNames = ['home', 'plaisirs', 'entrees', 'sorties', 'analyse', 'tags'];
     if (index < tabNames.length) {
       await _analytics.logEvent(
         name: 'tab_changed',
@@ -116,6 +169,118 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         },
       );
     }
+  }
+
+  void _showTabSelectionMenu() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            // Titre
+            Row(
+              children: [
+                Icon(Icons.menu, color: Colors.grey.shade600),
+                const SizedBox(width: 12),
+                Text(
+                  'Navigation',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            
+            // Grid des options
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                childAspectRatio: 2.5,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+              ),
+              itemCount: _menuOptions.length,
+              itemBuilder: (context, index) {
+                final option = _menuOptions[index];
+                final isSelected = _selectedIndex == option['index'];
+                
+                return Material(
+                  color: isSelected 
+                      ? option['color'].withValues(alpha: 0.1)
+                      : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => _navigateToTab(option['index']),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected 
+                              ? option['color']
+                              : Colors.grey.shade200,
+                          width: isSelected ? 2 : 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            option['icon'],
+                            color: isSelected 
+                                ? option['color']
+                                : Colors.grey.shade600,
+                            size: 24,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              option['title'],
+                              style: TextStyle(
+                                fontWeight: isSelected 
+                                    ? FontWeight.bold 
+                                    : FontWeight.normal,
+                                color: isSelected 
+                                    ? option['color']
+                                    : Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            Icon(
+                              Icons.check_circle,
+                              color: option['color'],
+                              size: 20,
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _showProfileMenu() async {
@@ -137,117 +302,71 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Colors.grey.shade300,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
             const SizedBox(height: 20),
             
-            // Profil utilisateur
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundImage: user.photoURL != null 
-                    ? NetworkImage(user.photoURL!) 
-                    : null,
-                  child: user.photoURL == null 
-                    ? Text(
-                        user.displayName?.substring(0, 1).toUpperCase() ?? 'U',
-                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      )
-                    : null,
+            // Photo de profil et infos
+            CircleAvatar(
+              radius: 30,
+              backgroundColor: Colors.blue.shade100,
+              child: Text(
+                user.email?.substring(0, 1).toUpperCase() ?? '?',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade700,
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.displayName ?? 'Utilisateur',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        user.email ?? '',
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 14,
-                        ),
-                      ),
-                      // NOUVEAU: Indicateur de sécurité
-                      Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.green.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.green.shade300),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.security, size: 12, color: Colors.green.shade700),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Données chiffrées',
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Colors.green.shade700,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              user.email ?? 'Utilisateur',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.green.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '🔐 Données chiffrées',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.green.shade700,
+                  fontWeight: FontWeight.w500,
                 ),
-              ],
+              ),
             ),
             const SizedBox(height: 30),
             
-            // Options du menu
-            ListTile(
-              leading: const Icon(Icons.sync, color: Colors.blue),
-              title: const Text('Synchroniser les données'),
+            // Options
+            _buildMenuOption(
+              icon: Icons.delete_forever,
+              title: 'Supprimer toutes les données',
+              subtitle: 'Action irréversible',
+              color: Colors.red,
+              onTap: _confirmDeleteAllData,
+            ),
+            const SizedBox(height: 16),
+            _buildMenuOption(
+              icon: Icons.logout,
+              title: 'Se déconnecter',
+              subtitle: 'Retour à l\'écran de connexion',
+              color: Colors.orange,
               onTap: () async {
                 Navigator.pop(context);
-                // Forcer une synchronisation
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Données synchronisées avec succès'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.help_outline, color: Colors.orange),
-              title: const Text('Aide & Support'),
-              onTap: () {
-                Navigator.pop(context);
-                _showHelpDialog();
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.delete_forever, color: Colors.red),
-              title: const Text('Supprimer toutes les données'),
-              subtitle: const Text('Action irréversible'),
-              onTap: () {
-                Navigator.pop(context);
-                _confirmDeleteAllData();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Se déconnecter'),
-              onTap: () async {
-                Navigator.pop(context);
-                await _confirmSignOut();
+                await _firebaseService.signOut();
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
               },
             ),
             const SizedBox(height: 20),
@@ -257,93 +376,66 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Déconnexion'),
-        content: const Text('Êtes-vous sûr de vouloir vous déconnecter ?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler'),
+  Widget _buildMenuOption({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: color.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: color,
+                      ),
+                    ),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: color.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: color),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Se déconnecter'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await _firebaseService.signOut();
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Déconnexion réussie'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la déconnexion: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  void _showHelpDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.help_outline, color: Colors.blue),
-            SizedBox(width: 8),
-            Text('Aide & Support'),
-          ],
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Gestion Budget Pro',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 8),
-            Text('Version 2.1.0 - Edition Sécurisée'),
-            SizedBox(height: 16),
-            Text('Fonctionnalités :'),
-            Text('• Synchronisation cloud avec Google'),
-            Text('• Suivi des revenus, charges et dépenses'),
-            Text('• Analyses détaillées avec graphiques'),
-            Text('• Accès multi-appareils'),
-            Text('• 🔐 Chiffrement des données financières'),
-            SizedBox(height: 16),
-            Text('🛡️ Sécurité : Vos montants sont chiffrés et même le développeur ne peut pas les voir dans la base de données.'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Fermer'),
-          ),
-        ],
       ),
     );
   }
 
   Future<void> _confirmDeleteAllData() async {
-    // PREMIÈRE ÉTAPE : Confirmation initiale
-    final firstConfirm = await showDialog<bool>(
+    Navigator.pop(context); // Fermer le menu profil
+    
+    final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
@@ -387,150 +479,52 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
-            child: const Text('Continuer'),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Supprimer définitivement'),
           ),
         ],
       ),
     );
 
-    if (firstConfirm != true) return;
+    if (confirmed == true) {
+      await _deleteAllData();
+    }
+  }
 
-    // DEUXIÈME ÉTAPE : Confirmation finale avec saisie
-    final secondConfirm = await showDialog<bool>(
+  Future<void> _deleteAllData() async {
+    // Afficher un indicateur de progression
+    showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) {
-        final confirmController = TextEditingController();
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Row(
-                children: [
-                  Icon(Icons.delete_forever, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Confirmation finale'),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.red.shade200),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.warning, color: Colors.red, size: 16),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'DERNIÈRE CHANCE ! Cette action ne peut pas être annulée.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Pour confirmer, tapez exactement le mot :',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'SUPPRIMER',
-                      style: TextStyle(
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: confirmController,
-                    decoration: const InputDecoration(
-                      labelText: 'Tapez SUPPRIMER ici',
-                      border: OutlineInputBorder(),
-                    ),
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (value) {
-                      setDialogState(() {}); // Mettre à jour l'état du bouton
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  child: const Text('Annuler'),
-                ),
-                FilledButton(
-                  onPressed: confirmController.text == 'SUPPRIMER'
-                      ? () => Navigator.pop(context, true)
-                      : null,
-                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
-                  child: const Text('SUPPRIMER DÉFINITIVEMENT'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Suppression en cours...'),
+          ],
+        ),
+      ),
     );
 
-    if (secondConfirm != true) return;
-
-    // Exécuter la suppression
     try {
-      // Afficher un indicateur de chargement
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('Suppression en cours...'),
-            ],
-          ),
-        ),
-      );
-
+      // Supprimer toutes les données - CORRECTION: utiliser deleteAllUserData()
       await _dataService.deleteAllUserData();
-
+      
       if (!mounted) return;
       Navigator.pop(context); // Fermer le dialog de chargement
-
+      
+      // Message de confirmation
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('✅ Toutes vos données ont été supprimées'),
+          content: Text('✅ Toutes les données ont été supprimées'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 3),
         ),
       );
 
-      // Recharger la page d'accueil pour refléter les changements
-      setState(() {
-        _selectedIndex = 0;
-      });
+      // Retourner au premier onglet
       _pageController.animateToPage(
         0,
         duration: const Duration(milliseconds: 300),
@@ -561,81 +555,52 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   Widget build(BuildContext context) {
     final user = _firebaseService.currentUser;
     
-    // Titres des onglets mis à jour
+    // Titres des onglets
     final List<String> tabTitles = [
       'Dashboard', 
-      'Mes Dépenses', // Changé de "Mes Plaisirs" à "Mes Dépenses"
+      'Mes Dépenses',
       'Revenus', 
       'Charges', 
       'Analyse',
-      'Catégories', // NOUVEAU: titre pour l'onglet tags
+      'Catégories',
     ];
-    
+
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          children: [
-            Text(tabTitles[_selectedIndex]),
-            const SizedBox(width: 8),
-            // NOUVEAU: Indicateur de sécurité dans l'AppBar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.green.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade300, width: 0.5),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lock, size: 12, color: Colors.green.shade700),
-                  const SizedBox(width: 2),
-                  Text(
-                    'Sécurisé',
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: Colors.green.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
+        title: Text(tabTitles[_selectedIndex]),
+        leading: IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
             ),
-          ],
-        ),
-        centerTitle: false,
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          // Bouton profil utilisateur
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: _showProfileMenu,
-              child: Container(
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundImage: user?.photoURL != null 
-                        ? NetworkImage(user!.photoURL!) 
-                        : null,
-                      child: user?.photoURL == null 
-                        ? Text(
-                            user?.displayName?.substring(0, 1).toUpperCase() ?? 'U',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                          )
-                        : null,
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.arrow_drop_down),
-                  ],
-                ),
-              ),
+            child: Icon(
+              Icons.menu,
+              color: Theme.of(context).primaryColor,
             ),
           ),
+          onPressed: _showTabSelectionMenu,
+          tooltip: 'Navigation',
+        ),
+        actions: [
+          if (user != null)
+            IconButton(
+              icon: CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.blue.shade100,
+                child: Text(
+                  user.email?.substring(0, 1).toUpperCase() ?? '?',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ),
+              onPressed: _showProfileMenu,
+              tooltip: 'Profil',
+            ),
         ],
       ),
       body: PageView(
@@ -645,14 +610,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             _selectedIndex = index;
           });
         },
-        children: _tabs,
+        children: _allTabs,
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
+        selectedIndex: _selectedIndex < _mainTabs.length ? _selectedIndex : 0,
+        destinations: _mainDestinations,
         onDestinationSelected: _onItemTapped,
-        destinations: _destinations,
-        elevation: 8,
-        backgroundColor: Theme.of(context).colorScheme.surface,
       ),
     );
   }
