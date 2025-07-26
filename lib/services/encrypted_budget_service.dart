@@ -127,32 +127,59 @@ Future<void> togglePlaisirPointing(int index) async {
     }
   }
 
-  /// Calcule le solde disponible (solde compte - dépenses pointées)
+  /// Calcule le solde débité (revenus - charges pointées - dépenses pointées)
   Future<double> getSoldeDisponible() async {
-  try {
-    final soldeCompte = await getBankBalance();
-    final plaisirs = await getPlaisirs();
-    final totalSortiesPointe = await getTotalSortiesTotaux();
-    
-    double totalDepensesPointe = 0.0;
-    double totalCreditsPointes = 0.0;
-    
-    for (var plaisir in plaisirs) {
-      if (plaisir['isPointed'] == true) {
-        final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
-        if (plaisir['isCredit'] == true) {
-          totalCreditsPointes += amount; // Les crédits s'ajoutent
-        } else {
-          totalDepensesPointe += amount; // Les dépenses se soustraient
+    try {
+      final entrees = await getEntrees();
+      final sorties = await getSorties();
+      final plaisirs = await getPlaisirs();
+      
+      // Calcul du total des revenus
+      double totalRevenus = 0.0;
+      for (var entree in entrees) {
+        totalRevenus += (entree['amount'] as num?)?.toDouble() ?? 0.0;
+      }
+      
+      // Calcul du total des charges pointées
+      double totalChargesPointees = 0.0;
+      for (var sortie in sorties) {
+        if (sortie['isPointed'] == true) {
+          totalChargesPointees += (sortie['amount'] as num?)?.toDouble() ?? 0.0;
         }
       }
+      
+      // Calcul du total des dépenses pointées
+      double totalDepensesPointees = 0.0;
+      for (var plaisir in plaisirs) {
+        if (plaisir['isPointed'] == true) {
+          final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+          if (plaisir['isCredit'] == true) {
+            totalDepensesPointees -= amount; // Les crédits s'ajoutent (donc on soustrait la soustraction)
+          } else {
+            totalDepensesPointees += amount; // Les dépenses se soustraient
+          }
+        }
+      }
+      
+      // Formule : Revenus - Charges pointées - Dépenses pointées
+      final result = totalRevenus - totalChargesPointees - totalDepensesPointees;
+      
+      if (kDebugMode) {
+        print('🔍 CALCUL SOLDE DÉBITÉ:');
+        print('  - Total revenus: $totalRevenus €');
+        print('  - Charges pointées: $totalChargesPointees €');
+        print('  - Dépenses pointées: $totalDepensesPointees €');
+        print('  - FORMULE: $totalRevenus - $totalChargesPointees - $totalDepensesPointees = $result €');
+      }
+      
+      return result;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul solde débité: $e');
+      }
+      return 0.0;
     }
-    
-    return soldeCompte + totalCreditsPointes - totalDepensesPointe - totalSortiesPointe;
-  } catch (e) {
-    return 0.0;
   }
-}
 
   /// GESTION DES ENTRÉES (REVENUS) CHIFFRÉES
 

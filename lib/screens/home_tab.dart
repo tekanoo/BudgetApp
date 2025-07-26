@@ -234,7 +234,7 @@ class _HomeTabState extends State<HomeTab> {
                         child: Column(
                           children: [
                             const Text(
-                              'Solde disponible',
+                              'Solde débité', // Changement de nom
                               style: TextStyle(color: Colors.white70, fontSize: 12),
                             ),
                             const SizedBox(height: 4),
@@ -428,7 +428,7 @@ class _HomeTabState extends State<HomeTab> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Après avoir ajouté une dépense, vous pouvez la "pointer" dans l\'onglet Dépenses en appuyant dessus. Les dépenses pointées sont déduites de votre solde disponible.',
+                    'Après avoir ajouté une dépense, vous pouvez la "pointer" dans l\'onglet Dépenses en appuyant dessus. Les dépenses pointées sont déduites de votre solde débité (revenus - charges pointées - dépenses pointées).',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.blue.shade700,
