@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../services/encryption_service.dart';
 
@@ -12,14 +13,19 @@ class EntreesTab extends StatefulWidget {
 class _EntreesTabState extends State<EntreesTab> {
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> entrees = [];
-  List<Map<String, dynamic>> filteredEntrees = []; // Nouvelle liste filtrée
+  List<Map<String, dynamic>> filteredEntrees = [];
   double totalEntrees = 0.0;
   double soldeDisponible = 0.0;
   bool isLoading = false;
 
   // Variables de filtrage
   DateTime? _selectedFilterDate;
-  String _currentFilter = 'Tous'; // 'Tous', 'Mois', 'Année'
+  String _currentFilter = 'Tous';
+
+  // Variables pour sélection multiple
+  bool _isSelectionMode = false;
+  Set<int> _selectedIndices = {};
+  bool _isProcessingBatch = false; // Ajouter cette ligne
 
   @override
   void initState() {
@@ -452,6 +458,111 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIndices.clear();
+      }
+    });
+  }
+
+  void _toggleSelection(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        _selectedIndices.add(index);
+      }
+    });
+  }
+
+  Future<void> _batchDeleteEntrees() async {
+    if (_selectedIndices.isEmpty) return;
+
+    // Confirmation
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirmer la suppression'),
+        content: Text('Voulez-vous vraiment supprimer ${_selectedIndices.length} revenu(s) ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isProcessingBatch = true;
+    });
+
+    try {
+      // Convertir les index d'affichage en index réels
+      final originalEntrees = await _dataService.getEntrees();
+      List<int> realIndices = [];
+      
+      for (int displayIndex in _selectedIndices) {
+        final entree = filteredEntrees[displayIndex];
+        final entreeId = entree['id'] ?? '';
+        final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+        
+        if (realIndex != -1) {
+          realIndices.add(realIndex);
+        }
+      }
+      
+      // Traiter dans l'ordre inverse pour éviter les décalages d'index
+      realIndices.sort((a, b) => b.compareTo(a));
+      
+      for (int realIndex in realIndices) {
+        await _dataService.deleteEntree(realIndex);
+      }
+
+      // Recharger les données
+      await _loadEntrees();
+
+      if (!mounted) return;
+
+      // Sortir du mode sélection
+      setState(() {
+        _isSelectionMode = false;
+        _selectedIndices.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${realIndices.length} revenu(s) supprimé(s)'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingBatch = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -470,208 +581,303 @@ class _EntreesTabState extends State<EntreesTab> {
     }
 
     return Scaffold(
-      body: filteredEntrees.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.trending_up,
-                    size: 100,
-                    color: Colors.grey.shade400,
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    _currentFilter == 'Tous' 
-                        ? 'Aucun revenu enregistré'
-                        : 'Aucun revenu pour cette période',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Ajoutez vos revenus (salaire, primes...)',
-                    style: TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 30),
-                  ElevatedButton.icon(
-                    onPressed: _addEntree,
-                    icon: const Icon(Icons.add),
-                    label: const Text('Ajouter un revenu'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : Column(
-              children: [
-                // En-tête avec totaux et filtres
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.green.shade400, Colors.green.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.green.withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ],
-                  ),
+      body: Stack(
+        children: [
+          // Contenu principal
+          filteredEntrees.isEmpty
+              ? Center(
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Ligne des actions (filtre + ajout)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Bouton filtre
-                          InkWell(
-                            onTap: _showFilterDialog,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.filter_list, color: Colors.white, size: 18),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    _currentFilter == 'Tous' 
-                                        ? 'Tous'
-                                        : _currentFilter == 'Mois'
-                                            ? '${_getMonthName(_selectedFilterDate!.month).substring(0, 3)} ${_selectedFilterDate!.year}'
-                                            : '${_selectedFilterDate!.year}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          
-                          // Bouton ajout - CORRECTION: Déplacer child à la fin
-                          InkWell(
-                            onTap: _addEntree,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                              child: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.account_balance_wallet,
+                        size: 100,
+                        color: Colors.grey.shade400,
                       ),
-                      
-                      const SizedBox(height: 15),
-                      
-                      // Informations totaux
-                      Column(
-                        children: [
-                          const Text(
-                            'Total Revenus',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            '${AmountParser.formatAmount(totalEntrees)} €',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            // CORRECTION: Utiliser interpolation au lieu de concaténation
-                            '${filteredEntrees.length} revenu${filteredEntrees.length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                      const SizedBox(height: 20),
+                      Text(
+                        _currentFilter == 'Tous' 
+                            ? 'Aucun revenu enregistré'
+                            : 'Aucun revenu pour cette période',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Ajoutez vos revenus (salaire, primes...)',
+                        style: TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 30),
+                      ElevatedButton.icon(
+                        onPressed: _addEntree,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Ajouter un revenu'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   ),
+                )
+              : Column(
+                  children: [
+                    // En-tête avec totaux et filtres
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.green.shade400, Colors.green.shade600],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Total Revenus',
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                Text(
+                                  '${AmountParser.formatAmount(totalEntrees)} €',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 5),
+                                Text(
+                                  '${filteredEntrees.length} revenu${filteredEntrees.length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
+                                  style: const TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            children: [
+                              // Bouton de sélection multiple
+                              if (!_isSelectionMode)
+                                IconButton(
+                                  onPressed: _toggleSelectionMode,
+                                  icon: const Icon(Icons.checklist, color: Colors.white),
+                                  tooltip: 'Sélection multiple',
+                                ),
+                              IconButton(
+                                onPressed: _showFilterDialog,
+                                icon: const Icon(Icons.filter_list, color: Colors.white),
+                                tooltip: 'Filtrer',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredEntrees.length,
+                        itemBuilder: (context, index) {
+                          final entree = filteredEntrees[index];
+                          final amount = (entree['amount'] as num?)?.toDouble() ?? 0;
+                          final description = entree['description'] as String? ?? 'Sans description';
+                          final date = DateTime.tryParse(entree['date'] ?? '') ?? DateTime.now();
+                          final isSelected = _selectedIndices.contains(index);
+
+                          return Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            elevation: isSelected ? 8 : 2,
+                            color: isSelected ? Colors.green.shade50 : null,
+                            child: ListTile(
+                              // Mode sélection
+                              leading: _isSelectionMode
+                                  ? Checkbox(
+                                      value: isSelected,
+                                      onChanged: (_) => _toggleSelection(index),
+                                      activeColor: Colors.green,
+                                    )
+                                  : CircleAvatar(
+                                      backgroundColor: Colors.green.shade100,
+                                      child: const Icon(
+                                        Icons.account_balance_wallet,
+                                        color: Colors.green,
+                                        size: 20,
+                                      ),
+                                    ),
+                              title: Text(
+                                description,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                DateFormat('dd/MM/yyyy').format(date),
+                                style: TextStyle(
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                              trailing: _isSelectionMode
+                                  ? null
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          '+ ${AmountParser.formatAmount(amount)} €',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                            color: Colors.green.shade700,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        PopupMenuButton<String>(
+                                          onSelected: (value) {
+                                            switch (value) {
+                                              case 'edit':
+                                                _editEntree(index);
+                                                break;
+                                              case 'delete':
+                                                _deleteEntree(index);
+                                                break;
+                                            }
+                                          },
+                                          itemBuilder: (context) => [
+                                            const PopupMenuItem(
+                                              value: 'edit',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.edit, color: Colors.blue),
+                                                  SizedBox(width: 8),
+                                                  Text('Modifier'),
+                                                ],
+                                              ),
+                                            ),
+                                            const PopupMenuItem(
+                                              value: 'delete',
+                                              child: Row(
+                                                children: [
+                                                  Icon(Icons.delete, color: Colors.red),
+                                                  SizedBox(width: 8),
+                                                  Text('Supprimer'),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                              onTap: _isSelectionMode
+                                  ? () => _toggleSelection(index)
+                                  : null,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
 
-                // Liste des revenus filtrés
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: filteredEntrees.length,
-                    itemBuilder: (context, index) {
-                      final entree = filteredEntrees[index];
-                      final amount = (entree['amount'] as num?)?.toDouble() ?? 0;
-                      final description = entree['description'] as String? ?? '';
-                      final dateStr = entree['date'] as String? ?? '';
-                      final date = DateTime.tryParse(dateStr);
-                      
-                      return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: ListTile(
-                          leading: CircleAvatar(
-                            backgroundColor: Colors.green.shade100,
-                            child: Icon(
-                              Icons.trending_up,
-                              color: Colors.green.shade600,
-                            ),
-                          ),
-                          title: Text(
-                            description,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: date != null
-                              ? Text('${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}')
-                              : null,
-                          trailing: Text(
-                            '+${AmountParser.formatAmount(amount)} €',
-                            style: TextStyle(
-                              color: Colors.green.shade600,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          onTap: () => _editEntree(index),
-                          onLongPress: () => _deleteEntree(index),
+          // Barre d'actions en mode sélection
+          if (_isSelectionMode)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.green.shade600,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 10,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(16),
+                child: SafeArea(
+                  child: Row(
+                    children: [
+                      Text(
+                        '${_selectedIndices.length} sélectionné(s)',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
-                      );
-                    },
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => setState(() {
+                          _isSelectionMode = false;
+                          _selectedIndices.clear();
+                        }),
+                        child: const Text(
+                          'Annuler',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      ElevatedButton.icon(
+                        onPressed: _selectedIndices.isEmpty || _isProcessingBatch
+                            ? null
+                            : _batchDeleteEntrees,
+                        icon: _isProcessingBatch
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                                ),
+                              )
+                            : const Icon(Icons.delete),
+                        label: Text(_isProcessingBatch ? 'Suppression...' : 'Supprimer'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
+            ),
+        ],
+      ),
+      floatingActionButton: _isSelectionMode
+          ? null
+          : FloatingActionButton(
+              onPressed: _addEntree,
+              backgroundColor: Colors.green,
+              child: const Icon(Icons.add),
             ),
     );
   }
 
-  // ...rest of existing methods...
+  // ...existing code pour les autres méthodes...
 }
