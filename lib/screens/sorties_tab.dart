@@ -738,39 +738,30 @@ class _SortiesTabState extends State<SortiesTab> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // Bouton filtre
-                              InkWell(
-                                onTap: _showFilterDialog,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(Icons.filter_list, color: Colors.white, size: 18),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        _currentFilter == 'Tous' 
-                                            ? 'Tous'
-                                            : _currentFilter == 'Mois'
-                                                ? '${_getMonthName(_selectedFilterDate!.month).substring(0, 3)} ${_selectedFilterDate!.year}'
-                                                : '${_selectedFilterDate!.year}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-
-                              // Actions
+                              // Bouton filtre - SUPPRIMER CE BLOC
+                              // InkWell(
+                              //   onTap: _showFilterDialog,
+                              //   child: Container(
+                              //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              //     decoration: BoxDecoration(
+                              //       color: Colors.white.withValues(alpha: 0.2),
+                              //       borderRadius: BorderRadius.circular(20),
+                              //       border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                              //     ),
+                              //     child: Row(
+                              //       mainAxisSize: MainAxisSize.min,
+                              //       children: [
+                              //         const Icon(Icons.filter_list, color: Colors.white, size: 18),
+                              //         const SizedBox(width: 6),
+                              //         Text(
+                              //           // Code du filtre...
+                              //         ),
+                              //       ],
+                              //     ),
+                              //   ),
+                              // ),
+                              
+                              // Autres contrôles
                               Row(
                                 children: [
                                   // Bouton sélection multiple
@@ -792,8 +783,8 @@ class _SortiesTabState extends State<SortiesTab> {
                                     ),
                                   
                                   const SizedBox(width: 8),
-                                  
-                                  // Bouton filtre
+
+                                  // Bouton filtre (conserver uniquement celui-ci)
                                   InkWell(
                                     onTap: _showFilterDialog,
                                     child: Container(
