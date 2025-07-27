@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 import 'screens/auth_wrapper.dart';
 import 'services/theme_service.dart';
@@ -13,16 +12,7 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Initialiser le service de thème
-  final themeService = ThemeService();
-  await themeService.initialize();
-  
-  runApp(
-    ChangeNotifierProvider.value(
-      value: themeService,
-      child: const BudgetApp(),
-    ),
-  );
+  runApp(const BudgetApp());
 }
 
 class BudgetApp extends StatelessWidget {
@@ -30,30 +20,24 @@ class BudgetApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ThemeService>(
-      builder: (context, themeService, child) {
-        return MaterialApp(
-          title: 'Gestion Budget Pro',
-          debugShowCheckedModeBanner: false,
-          
-          // Configuration du thème
-          theme: ThemeService.lightTheme,
-          darkTheme: ThemeService.darkTheme,
-          themeMode: themeService.themeMode,
-          
-          // Interface adaptée au mode sombre
-          builder: (context, child) {
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: const TextScaler.linear(1.0),
-              ),
-              child: child!,
-            );
-          },
-          
-          home: const AuthWrapper(),
+    return MaterialApp(
+      title: 'Gestion Budget Pro',
+      debugShowCheckedModeBanner: false,
+      
+      // Thème unique - mode clair seulement
+      theme: ThemeService.lightTheme,
+      
+      // Interface adaptée
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: const TextScaler.linear(1.0),
+          ),
+          child: child!,
         );
       },
+      
+      home: const AuthWrapper(),
     );
   }
 }
