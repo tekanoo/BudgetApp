@@ -32,91 +32,31 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
   }
 
   Future<void> _loadAllData() async {
+    if (!mounted) return;
+    
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final entrees = await _dataService.getEntrees();
-      final sorties = await _dataService.getSorties();
-      final plaisirs = await _dataService.getPlaisirs();
-
-      Map<String, Map<String, double>> monthlyData = {};
-
-      if (kDebugMode) {
-        print('DEBUG: Chargement des données...');
-        print('Entrées: ${entrees.length}');
-        print('Sorties: ${sorties.length}');
-        print('Plaisirs: ${plaisirs.length}');
-      }
-
-      // Analyser les revenus par mois
-      for (var entree in entrees) {
-        final dateStr = entree['date'] as String? ?? '';
-        final date = DateTime.tryParse(dateStr);
-        if (date != null) {
-          final monthKey = _getMonthKey(date);
-          final amount = (entree['amount'] as num?)?.toDouble() ?? 0.0;
-          
-          monthlyData[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
-          monthlyData[monthKey]!['revenus'] = monthlyData[monthKey]!['revenus']! + amount;
-          
-          if (kDebugMode) {
-            print('Revenus $monthKey: +$amount = ${monthlyData[monthKey]!['revenus']}');
-          }
-        }
-      }
-
-      // Analyser les charges par mois
-      for (var sortie in sorties) {
-        final dateStr = sortie['date'] as String? ?? '';
-        final date = DateTime.tryParse(dateStr);
-        if (date != null) {
-          final monthKey = _getMonthKey(date);
-          final amount = (sortie['amount'] as num?)?.toDouble() ?? 0.0;
-          
-          monthlyData[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
-          monthlyData[monthKey]!['charges'] = monthlyData[monthKey]!['charges']! + amount;
-          
-          if (kDebugMode) {
-            print('Charges $monthKey: +$amount = ${monthlyData[monthKey]!['charges']}');
-          }
-        }
-      }
-
-      // Analyser les dépenses par mois
-      for (var plaisir in plaisirs) {
-        final dateStr = plaisir['date'] as String? ?? '';
-        final date = DateTime.tryParse(dateStr);
-        if (date != null) {
-          final monthKey = _getMonthKey(date);
-          final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
-          final isCredit = plaisir['isCredit'] == true;
-          
-          monthlyData[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
-          if (isCredit) {
-            monthlyData[monthKey]!['depenses'] = monthlyData[monthKey]!['depenses']! - amount;
-          } else {
-            monthlyData[monthKey]!['depenses'] = monthlyData[monthKey]!['depenses']! + amount;
-          }
-          
-          if (kDebugMode) {
-            print('Dépenses $monthKey: ${isCredit ? '-' : '+'}$amount = ${monthlyData[monthKey]!['depenses']}');
-          }
-        }
-      }
+      // Utiliser la nouvelle méthode avec périodicité
+      final projections = await _dataService.getProjectionsWithPeriodicity(
+        yearStart: 2020,
+        yearEnd: 2030,
+      );
 
       if (kDebugMode) {
-        print('Données mensuelles finales: $monthlyData');
+        print('DEBUG: Projections avec périodicité chargées');
+        print('Nombre de mois: ${projections.length}');
       }
 
       setState(() {
-        _monthlyData = monthlyData;
+        _monthlyData = projections;
         _isLoading = false;
       });
     } catch (e) {
       if (kDebugMode) {
-        print('Erreur chargement: $e');
+        print('Erreur chargement projections: $e');
       }
       setState(() {
         _isLoading = false;

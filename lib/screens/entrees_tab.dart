@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../services/encryption_service.dart';
+import '../widgets/periodicity_selector.dart';
 
 class EntreesTab extends StatefulWidget {
   const EntreesTab({super.key});
@@ -26,6 +27,7 @@ class _EntreesTabState extends State<EntreesTab> {
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false; // Ajouter cette ligne
+  String? _selectedPeriodicity = 'ponctuel';
 
   @override
   void initState() {
@@ -218,30 +220,32 @@ class _EntreesTabState extends State<EntreesTab> {
 
   // Ajout de la méthode _addEntree manquante
   Future<void> _addEntree() async {
-    final result = await _showEntreeDialog();
-    if (result != null) {
-      try {
-        // Données automatiquement chiffrées avant sauvegarde
-        await _dataService.addEntree(
-          amountStr: result['amountStr'],
-          description: result['description'],
-          date: result['date'], // Ajouter la date
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _AddEntreeDialog(
+        onAdd: (amount, description, date, periodicity) async {
+          try {
+            await _dataService.addEntree(
+              amountStr: amount,
+              description: description,
+              date: date,
+              periodicity: periodicity,
+            );
+            return true;
+          } catch (e) {
+            return false;
+          }
+        },
+      ),
+    );
+
+    if (result != null && result['success'] == true) {
+      _loadEntrees();
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🔐 Revenu ajouté et chiffré avec succès'),
+            content: Text('Revenu ajouté avec succès'),
             backgroundColor: Colors.green,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de l\'ajout: $e'),
-            backgroundColor: Colors.red,
           ),
         );
       }
@@ -878,6 +882,174 @@ class _EntreesTabState extends State<EntreesTab> {
             ),
     );
   }
+}
 
-  // ...existing code pour les autres méthodes...
+class _AddEntreeDialog extends StatefulWidget {
+  final Future<bool> Function(String amount, String description, DateTime date, String periodicity) onAdd;
+
+  const _AddEntreeDialog({required this.onAdd});
+
+  @override
+  State<_AddEntreeDialog> createState() => _AddEntreeDialogState();
+}
+
+class _AddEntreeDialogState extends State<_AddEntreeDialog> {
+  final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+  String _selectedPeriodicity = 'ponctuel';
+  bool _isLoading = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Ajouter un revenu'),
+      content: SingleChildScrollView(
+        child: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.9,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Champ montant
+              TextField(
+                controller: _amountController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Montant *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.euro),
+                  suffixText: '€',
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Champ description
+              TextField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description *',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Sélecteur de date
+              InkWell(
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _selectedDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (date != null) {
+                    setState(() {
+                      _selectedDate = date;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Date: ${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                        style: const TextStyle(fontSize: 16),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Sélecteur de périodicité
+              PeriodicitySelector(
+                selectedPeriodicity: _selectedPeriodicity,
+                onChanged: (value) {
+                  setState(() {
+                    _selectedPeriodicity = value ?? 'ponctuel';
+                  });
+                },
+                enabled: !_isLoading,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+          child: const Text('Annuler'),
+        ),
+        ElevatedButton(
+          onPressed: _isLoading ? null : _handleAdd,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Ajouter'),
+        ),
+      ],
+    );
+  }
+
+  void _handleAdd() async {
+    if (_amountController.text.trim().isEmpty || _descriptionController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Veuillez remplir tous les champs requis'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final success = await widget.onAdd(
+        _amountController.text,
+        _descriptionController.text,
+        _selectedDate,
+        _selectedPeriodicity,
+      );
+
+      if (success && mounted) {
+        Navigator.of(context).pop({'success': true});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
 }

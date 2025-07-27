@@ -206,7 +206,8 @@ Future<void> togglePlaisirPointing(int index) async {
   Future<void> addEntree({
     required String amountStr,
     required String description,
-    DateTime? date, // Nouveau paramètre optionnel
+    DateTime? date,
+    String? periodicity, // Nouveau : 'ponctuel', 'mensuel', 'hebdomadaire', 'annuel'
   }) async {
     _ensureInitialized();
     try {
@@ -216,9 +217,10 @@ Future<void> togglePlaisirPointing(int index) async {
       final newEntree = {
         'amount': amount,
         'description': description,
-        'date': (date ?? DateTime.now()).toIso8601String(), // Utilise la date fournie ou la date actuelle
+        'date': (date ?? DateTime.now()).toIso8601String(),
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
+        'periodicity': periodicity ?? 'ponctuel', // Par défaut ponctuel
       };
       
       // Chiffre avant d'ajouter
@@ -228,7 +230,7 @@ Future<void> togglePlaisirPointing(int index) async {
       await _firebaseService.saveEntrees(entrees);
       
       if (kDebugMode) {
-        print('✅ Entrée chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
+        print('✅ Entrée chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description (${periodicity ?? 'ponctuel'})');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -320,7 +322,8 @@ Future<void> togglePlaisirPointing(int index) async {
   Future<void> addSortie({
     required String amountStr,
     required String description,
-    DateTime? date, // Nouveau paramètre optionnel
+    DateTime? date,
+    String? periodicity, // Nouveau
   }) async {
     _ensureInitialized();
     try {
@@ -330,10 +333,11 @@ Future<void> togglePlaisirPointing(int index) async {
       final newSortie = {
         'amount': amount,
         'description': description,
-        'date': (date ?? DateTime.now()).toIso8601String(), // Utilise la date fournie ou la date actuelle
+        'date': (date ?? DateTime.now()).toIso8601String(),
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'isPointed': false, // Ajout du statut de pointage
+        'isPointed': false,
+        'periodicity': periodicity ?? 'ponctuel', // Par défaut ponctuel
       };
       
       // Chiffre avant d'ajouter
@@ -343,7 +347,7 @@ Future<void> togglePlaisirPointing(int index) async {
       await _firebaseService.saveSorties(sorties);
       
       if (kDebugMode) {
-        print('✅ Sortie chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
+        print('✅ Sortie chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description (${periodicity ?? 'ponctuel'})');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -875,4 +879,134 @@ Future<void> togglePlaisirPointing(int index) async {
       rethrow;
     }
   }
-}
+
+  /// Génère les projections avec périodicité
+  Future<Map<String, Map<String, double>>> getProjectionsWithPeriodicity({
+    int yearStart = 2024,
+    int yearEnd = 2030,
+  }) async {
+    try {
+      final entrees = await getEntrees();
+      final sorties = await getSorties();
+      final plaisirs = await getPlaisirs();
+      
+      Map<String, Map<String, double>> projections = {};
+      
+      // Initialiser toutes les périodes
+      for (int year = yearStart; year <= yearEnd; year++) {
+        for (int month = 1; month <= 12; month++) {
+          final monthKey = '${year.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
+          projections[monthKey] = {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
+        }
+      }
+      
+      // Traiter les revenus avec périodicité
+      for (var entree in entrees) {
+        final periodicity = entree['periodicity'] as String? ?? 'ponctuel';
+        final amount = (entree['amount'] as num).toDouble();
+        final dateStr = entree['date'] as String? ?? '';
+        final startDate = DateTime.tryParse(dateStr) ?? DateTime.now();
+        
+        _applyPeriodicity(projections, startDate, amount, 'revenus', periodicity, yearStart, yearEnd);
+      }
+      
+      // Traiter les charges avec périodicité
+      for (var sortie in sorties) {
+        final periodicity = sortie['periodicity'] as String? ?? 'ponctuel';
+        final amount = (sortie['amount'] as num).toDouble();
+        final dateStr = sortie['date'] as String? ?? '';
+        final startDate = DateTime.tryParse(dateStr) ?? DateTime.now();
+        
+        _applyPeriodicity(projections, startDate, amount, 'charges', periodicity, yearStart, yearEnd);
+      }
+      
+      // Traiter les dépenses (toujours ponctuelles pour l'instant)
+      for (var plaisir in plaisirs) {
+        final dateStr = plaisir['date'] as String? ?? '';
+        final date = DateTime.tryParse(dateStr);
+        if (date != null) {
+          final monthKey = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}';
+          if (projections.containsKey(monthKey)) {
+            final amount = (plaisir['amount'] as num).toDouble();
+            final isCredit = plaisir['isCredit'] == true;
+            
+            if (isCredit) {
+              projections[monthKey]!['depenses'] = projections[monthKey]!['depenses']! - amount;
+            } else {
+              projections[monthKey]!['depenses'] = projections[monthKey]!['depenses']! + amount;
+            }
+          }
+        }
+      }
+      
+      return projections;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur génération projections: $e');
+      }
+      return {};
+    }
+  }
+  
+  void _applyPeriodicity(
+    Map<String, Map<String, double>> projections,
+    DateTime startDate,
+    double amount,
+    String category,
+    String periodicity,
+    int yearStart,
+    int yearEnd,
+  ) {
+    switch (periodicity) {
+      case 'ponctuel':
+        final monthKey = '${startDate.year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}';
+        if (projections.containsKey(monthKey)) {
+          projections[monthKey]![category] = projections[monthKey]![category]! + amount;
+        }
+        break;
+        
+      case 'mensuel':
+        // Appliquer à tous les mois à partir de la date de début
+        DateTime currentDate = DateTime(startDate.year, startDate.month);
+        final endDate = DateTime(yearEnd, 12);
+        
+        while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
+          if (currentDate.isAfter(startDate) || currentDate.isAtSameMomentAs(DateTime(startDate.year, startDate.month))) {
+            final monthKey = '${currentDate.year.toString().padLeft(4, '0')}-${currentDate.month.toString().padLeft(2, '0')}';
+            if (projections.containsKey(monthKey)) {
+              projections[monthKey]![category] = projections[monthKey]![category]! + amount;
+            }
+          }
+          currentDate = DateTime(currentDate.year, currentDate.month + 1);
+        }
+        break;
+        
+      case 'hebdomadaire':
+        // Appliquer ~4.33 fois par mois (52 semaines / 12 mois)
+        DateTime currentDate = DateTime(startDate.year, startDate.month);
+        final endDate = DateTime(yearEnd, 12);
+        
+        while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
+          if (currentDate.isAfter(startDate) || currentDate.isAtSameMomentAs(DateTime(startDate.year, startDate.month))) {
+            final monthKey = '${currentDate.year.toString().padLeft(4, '0')}-${currentDate.month.toString().padLeft(2, '0')}';
+            if (projections.containsKey(monthKey)) {
+              projections[monthKey]![category] = projections[monthKey]![category]! + (amount * 4.33);
+            }
+          }
+          currentDate = DateTime(currentDate.year, currentDate.month + 1);
+        }
+        break;
+        
+      case 'annuel':
+        // Appliquer uniquement au mois de début de chaque année
+        for (int year = startDate.year; year <= yearEnd; year++) {
+          if (year >= yearStart) {
+            final monthKey = '${year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}';
+            if (projections.containsKey(monthKey)) {
+              projections[monthKey]![category] = projections[monthKey]![category]! + amount;
+            }
+          }
+        }
+        break;
+    }
+  }
