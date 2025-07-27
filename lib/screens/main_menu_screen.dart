@@ -37,31 +37,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     const SortiesTab(),
   ];
 
-  // Options du menu de sélection (sans les options de thème)
+  // Options du menu de sélection (sans Dépenses, Revenus et Charges)
   List<Map<String, dynamic>> get _menuOptions => [
     {
       'title': 'Dashboard',
       'icon': Icons.dashboard,
       'color': Colors.blue,
       'index': 0,
-    },
-    {
-      'title': 'Dépenses',
-      'icon': Icons.shopping_cart,
-      'color': Colors.purple,
-      'index': 1,
-    },
-    {
-      'title': 'Revenus',
-      'icon': Icons.trending_up,
-      'color': Colors.green,
-      'index': 2,
-    },
-    {
-      'title': 'Charges',
-      'icon': Icons.receipt_long,
-      'color': Colors.red,
-      'index': 3,
     },
     {
       'title': 'Analyse',
@@ -599,6 +581,70 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         destinations: _mainDestinations,
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
+      ),
+    );
+  }
+
+  void _onMenuTap(int index) {
+    // Correspondance des index du menu avec les onglets réels
+    int tabIndex;
+    Widget targetScreen;
+    String title;
+    
+    switch (index) {
+      case 0: // Dashboard
+        tabIndex = 0;
+        targetScreen = const HomeTab();
+        title = 'Dashboard';
+        break;
+      case 4: // Analyse (index 4 dans la liste complète)
+        targetScreen = const AnalyseTab();
+        title = 'Analyse';
+        break;
+      case 5: // Catégories (index 5 dans la liste complète)
+        targetScreen = const TagsManagementTab();
+        title = 'Gestion des Catégories';
+        break;
+      case 6: // Projections (index 6 dans la liste complète)
+        targetScreen = const ProjectionsTab();
+        title = 'Projections';
+        break;
+      default:
+        targetScreen = const HomeTab();
+        title = 'Dashboard';
+    }
+    
+    // Si c'est le Dashboard, utiliser la navigation par onglets
+    if (index == 0) {
+      setState(() {
+        _selectedIndex = 0;
+      });
+      _pageController.animateToPage(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      _trackTabChange(0);
+      Navigator.pop(context);
+      return;
+    }
+    
+    // Pour les autres écrans, utiliser la navigation push
+    Navigator.pop(context);
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          appBar: AppBar(
+            title: Text(title),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.pop(context),
+            ),
+          ),
+          body: targetScreen,
+        ),
       ),
     );
   }
