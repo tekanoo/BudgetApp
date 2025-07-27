@@ -1010,3 +1010,4 @@ Future<void> togglePlaisirPointing(int index) async {
         break;
     }
   }
+}

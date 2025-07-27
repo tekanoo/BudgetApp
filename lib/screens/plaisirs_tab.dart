@@ -174,7 +174,9 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                       _selectedFilterDate = date;
                     });
                     _applyFilter();
-                    Navigator.pop(context);
+                    if (mounted) {
+                      Navigator.pop(context);
+                    }
                   }
                 },
               ),
@@ -198,16 +200,18 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                   if (date != null && mounted) {
                     setState(() {
                       _currentFilter = value!;
-                      _selectedFilterDate = date;
+                      _selectedFilterDate = DateTime(date.year);
                     });
                     _applyFilter();
-                    Navigator.pop(context);
+                    if (mounted) {
+                      Navigator.pop(context);
+                    }
                   }
                 },
               ),
               title: const Text('Par année'),
               subtitle: _currentFilter == 'Année' && _selectedFilterDate != null
-                  ? Text('Année ${_selectedFilterDate!.year}')
+                  ? Text(_selectedFilterDate!.year.toString())
                   : const Text('Sélectionner une année'),
             ),
             

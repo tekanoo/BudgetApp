@@ -29,13 +29,13 @@ class PeriodicitySelector extends StatelessWidget {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w500,
-            color: Colors.grey.shade700,
+            color: Colors.grey[700],
           ),
         ),
         const SizedBox(height: 12),
         Container(
           decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey.shade300),
+            border: Border.all(color: Colors.grey[300]!),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -47,10 +47,10 @@ class PeriodicitySelector extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue.shade50 : Colors.transparent,
+                    color: isSelected ? Colors.blue[50] : Colors.transparent,
                     border: Border(
                       bottom: BorderSide(
-                        color: Colors.grey.shade200,
+                        color: Colors.grey[200]!,
                         width: periodicity != periodicities.last ? 1 : 0,
                       ),
                     ),
@@ -66,7 +66,7 @@ class PeriodicitySelector extends StatelessWidget {
                       const SizedBox(width: 12),
                       Icon(
                         periodicity['icon'] as IconData,
-                        color: isSelected ? Colors.blue : Colors.grey.shade600,
+                        color: isSelected ? Colors.blue : Colors.grey[600],
                         size: 20,
                       ),
                       const SizedBox(width: 12),
@@ -76,12 +76,12 @@ class PeriodicitySelector extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                            color: isSelected ? Colors.blue.shade700 : Colors.grey.shade700,
+                            color: isSelected ? Colors.blue[700] : Colors.grey[700],
                           ),
                         ),
                       ),
                       if (isSelected)
-                        Icon(
+                        const Icon(
                           Icons.check_circle,
                           color: Colors.blue,
                           size: 20,
@@ -134,9 +134,9 @@ class PeriodicitySelector extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: helperColor.withOpacity(0.1),
+        color: helperColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: helperColor.withOpacity(0.3)),
+        border: Border.all(color: helperColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -147,12 +147,21 @@ class PeriodicitySelector extends StatelessWidget {
               helperText,
               style: TextStyle(
                 fontSize: 12,
-                color: helperColor.shade700,
+                color: _getTextColor(helperColor), // Correction ici
               ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  // Nouvelle méthode pour obtenir une couleur de texte appropriée
+  Color _getTextColor(Color baseColor) {
+    if (baseColor == Colors.blue) return Colors.blue.shade700;
+    if (baseColor == Colors.green) return Colors.green.shade700;
+    if (baseColor == Colors.orange) return Colors.orange.shade700;
+    if (baseColor == Colors.purple) return Colors.purple.shade700;
+    return baseColor; // Fallback
   }
 }

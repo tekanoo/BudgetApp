@@ -26,8 +26,7 @@ class _EntreesTabState extends State<EntreesTab> {
   // Variables pour sélection multiple
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
-  bool _isProcessingBatch = false; // Ajouter cette ligne
-  String? _selectedPeriodicity = 'ponctuel';
+  bool _isProcessingBatch = false;
 
   @override
   void initState() {

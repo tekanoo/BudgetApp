@@ -169,7 +169,9 @@ class _SortiesTabState extends State<SortiesTab> {
                       _selectedFilterDate = date;
                     });
                     _applyFilter();
-                    Navigator.pop(context);
+                    if (mounted) {
+                      Navigator.pop(context);
+                    }
                   }
                 },
               ),
@@ -193,16 +195,18 @@ class _SortiesTabState extends State<SortiesTab> {
                   if (date != null && mounted) {
                     setState(() {
                       _currentFilter = value!;
-                      _selectedFilterDate = date;
+                      _selectedFilterDate = DateTime(date.year);
                     });
                     _applyFilter();
-                    Navigator.pop(context);
+                    if (mounted) {
+                      Navigator.pop(context);
+                    }
                   }
                 },
               ),
               title: const Text('Par année'),
               subtitle: _currentFilter == 'Année' && _selectedFilterDate != null
-                  ? Text('Année ${_selectedFilterDate!.year}')
+                  ? Text(_selectedFilterDate!.year.toString())
                   : const Text('Sélectionner une année'),
             ),
             
@@ -335,8 +339,8 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
-  Future<void> _deleteSortie(int displayIndex) async {
-    final sortie = filteredSorties[displayIndex];
+  Future<void> _deleteSortie(int index) async {
+    final sortie = filteredSorties[index];
     final sortieId = sortie['id'] ?? '';
     
     final originalSorties = await _dataService.getSorties();
@@ -344,11 +348,13 @@ class _SortiesTabState extends State<SortiesTab> {
     
     if (realIndex == -1) return;
     
+    if (!mounted) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Supprimer'),
-        content: const Text('Voulez-vous vraiment supprimer cette charge ?'),
+        title: const Text('Supprimer la charge'),
+        content: Text('Voulez-vous vraiment supprimer "${sortie['description']}" ?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -363,26 +369,28 @@ class _SortiesTabState extends State<SortiesTab> {
       ),
     );
 
-    if (confirmed == true) {
+    if (confirmed == true && mounted) {
       try {
         await _dataService.deleteSortie(realIndex);
         await _loadSorties();
         
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Charge supprimée'),
-            backgroundColor: Colors.orange,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Charge supprimée'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la suppression: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur lors de la suppression: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
