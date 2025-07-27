@@ -116,6 +116,7 @@ class _SortiesTabState extends State<SortiesTab> {
         await _dataService.addSortie(
           amountStr: result['amountStr'],
           description: result['description'],
+          date: result['date'], // Ajouter la date
         );
         await _loadSorties();
         
@@ -151,7 +152,8 @@ class _SortiesTabState extends State<SortiesTab> {
     final result = await _showSortieDialog(
       isEdit: true,
       description: sortie['description'],
-      amount: sortie['amount'], // Utiliser amount au lieu de amountStr
+      amount: sortie['amount'],
+      date: DateTime.tryParse(sortie['date'] ?? ''), // Ajouter la date existante
     );
     
     if (result != null) {
@@ -160,10 +162,11 @@ class _SortiesTabState extends State<SortiesTab> {
           index: realIndex,
           amountStr: result['amountStr'],
           description: result['description'],
+          date: result['date'], // Ajouter la date
         );
         await _loadSorties();
         
-        if (!mounted) return; // Protection async
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('🔐 Charge modifiée et chiffrée avec succès'),
@@ -171,7 +174,7 @@ class _SortiesTabState extends State<SortiesTab> {
           ),
         );
       } catch (e) {
-        if (!mounted) return; // Protection async
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la modification: $e'),
@@ -238,14 +241,32 @@ class _SortiesTabState extends State<SortiesTab> {
   Future<void> _toggleSortieType(int index) async {
     try {
       final sortie = sorties[index];
+      final sortieId = sortie['id'] ?? '';
+      
+      // Trouver l'index réel dans la liste non triée
+      final originalSorties = await _dataService.getSorties();
+      final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
+      
+      if (realIndex == -1) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Charge non trouvée'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
       final currentType = sortie['type'] as String? ?? 'variable';
       final newType = currentType == 'fixe' ? 'variable' : 'fixe';
       
       await _dataService.updateSortie(
-        index: index,
+        index: realIndex,
         amountStr: sortie['amount'].toString(),
         description: sortie['description'],
-        type: newType,
+        date: DateTime.tryParse(sortie['date'] ?? ''), // Ajouter la date
+        // Retirer le paramètre 'type' car il n'existe pas dans la méthode
       );
       
       await _loadSorties();
@@ -365,127 +386,118 @@ class _SortiesTabState extends State<SortiesTab> {
   Future<Map<String, dynamic>?> _showSortieDialog({
     String? description,
     double? amount,
+    DateTime? date, // Nouveau paramètre
     bool isEdit = false,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
+    DateTime? selectedDate = date ?? DateTime.now(); // Date par défaut = aujourd'hui
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isEdit ? Icons.edit : Icons.add,
-              color: isEdit ? Colors.blue : Colors.red,
-            ),
-            const SizedBox(width: 8),
-            Text(isEdit ? 'Modifier la charge' : 'Ajouter une charge'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.description),
-                helperText: 'Loyer, Électricité, Internet...',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                isEdit ? Icons.edit : Icons.add,
+                color: isEdit ? Colors.blue : Colors.red,
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: montantController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Montant',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.euro),
-                suffixText: '€',
-                helperText: 'Utilisez , ou . pour les décimales',
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Indicateur de sécurité
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.security, color: Colors.red.shade700, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Ce montant sera automatiquement chiffré',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.red.shade700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (isEdit) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE3F2FD),
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                  border: Border.fromBorderSide(BorderSide(color: Color(0xFFBBDEFB))),
+              const SizedBox(width: 8),
+              Text(isEdit ? 'Modifier la charge' : 'Ajouter une charge'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description),
+                  helperText: 'Loyer, Électricité, Internet...',
                 ),
-                child: const Row(
-                  children: [
-                    Icon(
-                      Icons.info,
-                      color: Color(0xFF1976D2),
-                      size: 16
-                    ),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Le statut de pointage sera préservé lors de la modification',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF1976D2),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: montantController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Montant',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.euro),
+                  suffixText: '€',
+                  helperText: 'Utilisez , ou . pour les décimales',
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Sélecteur de date (comme dans plaisirs_tab.dart)
+              InkWell(
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      selectedDate = pickedDate;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          selectedDate != null 
+                            ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
+                            : 'Sélectionner une date',
+                          style: TextStyle(
+                            color: selectedDate != null ? Colors.black87 : Colors.grey,
+                            fontSize: 16,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final desc = descriptionController.text.trim();
+                final amountStr = montantController.text.trim();
+                final montant = AmountParser.parseAmount(amountStr);
+                if (desc.isNotEmpty && montant > 0 && selectedDate != null) {
+                  Navigator.pop(context, {
+                    'description': desc,
+                    'amountStr': amountStr,
+                    'date': selectedDate,
+                  });
+                }
+              },
+              child: Text(isEdit ? 'Modifier' : 'Ajouter'),
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final desc = descriptionController.text.trim();
-              final amountStr = montantController.text.trim();
-              final montant = AmountParser.parseAmount(amountStr);
-              if (desc.isNotEmpty && montant > 0) {
-                Navigator.pop(context, {
-                  'description': desc,
-                  'amountStr': amountStr,
-                });
-              }
-            },
-            child: Text(isEdit ? 'Modifier' : 'Ajouter'),
-          ),
-        ],
       ),
     );
   }

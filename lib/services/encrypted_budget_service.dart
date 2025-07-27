@@ -206,19 +206,17 @@ Future<void> togglePlaisirPointing(int index) async {
   Future<void> addEntree({
     required String amountStr,
     required String description,
+    DateTime? date, // Nouveau paramètre optionnel
   }) async {
     _ensureInitialized();
     try {
       final entrees = await _firebaseService.loadEntrees();
-      
-      // Parse le montant avec support des virgules
       final double amount = AmountParser.parseAmount(amountStr);
       
-      // Crée la nouvelle entrée
       final newEntree = {
         'amount': amount,
         'description': description,
-        'date': DateTime.now().toIso8601String(),
+        'date': (date ?? DateTime.now()).toIso8601String(), // Utilise la date fournie ou la date actuelle
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
       };
@@ -244,32 +242,34 @@ Future<void> togglePlaisirPointing(int index) async {
     required int index,
     required String amountStr,
     required String description,
+    DateTime? date, // Nouveau paramètre optionnel
   }) async {
     _ensureInitialized();
     try {
       final entrees = await _firebaseService.loadEntrees();
       if (index >= 0 && index < entrees.length) {
-        final double amount = AmountParser.parseAmount(amountStr);
+        // Récupérer l'ancienne entrée pour préserver certaines données
+        final oldEntree = _encryption.decryptTransaction(entrees[index]);
         
+        final double amount = AmountParser.parseAmount(amountStr);
         final updatedEntree = {
           'amount': amount,
           'description': description,
-          'date': DateTime.now().toIso8601String(),
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'id': entrees[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          'date': (date ?? DateTime.tryParse(oldEntree['date'] ?? '') ?? DateTime.now()).toIso8601String(),
+          'timestamp': oldEntree['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+          'id': oldEntree['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
         };
         
-        // Chiffre avant de remplacer
         entrees[index] = _encryption.encryptTransaction(updatedEntree);
         await _firebaseService.saveEntrees(entrees);
         
         if (kDebugMode) {
-          print('✅ Entrée chiffrée modifiée: [MONTANT_CHIFFRÉ] - $description');
+          print('✅ Entrée mise à jour');
         }
       }
     } catch (e) {
       if (kDebugMode) {
-        print('❌ Erreur modification entrée chiffrée: $e');
+        print('❌ Erreur mise à jour entrée: $e');
       }
       rethrow;
     }
@@ -320,6 +320,7 @@ Future<void> togglePlaisirPointing(int index) async {
   Future<void> addSortie({
     required String amountStr,
     required String description,
+    DateTime? date, // Nouveau paramètre optionnel
   }) async {
     _ensureInitialized();
     try {
@@ -329,7 +330,7 @@ Future<void> togglePlaisirPointing(int index) async {
       final newSortie = {
         'amount': amount,
         'description': description,
-        'date': DateTime.now().toIso8601String(),
+        'date': (date ?? DateTime.now()).toIso8601String(), // Utilise la date fournie ou la date actuelle
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'isPointed': false, // Ajout du statut de pointage
@@ -356,23 +357,30 @@ Future<void> togglePlaisirPointing(int index) async {
     required int index,
     required String amountStr,
     required String description,
-    String? type,
+    DateTime? date, // Nouveau paramètre optionnel
   }) async {
     _ensureInitialized();
     try {
       final sorties = await _firebaseService.loadSorties();
       if (index >= 0 && index < sorties.length) {
-        final double amount = AmountParser.parseAmount(amountStr);
+        // Récupérer l'ancienne sortie pour préserver certaines données
+        final oldSortie = _encryption.decryptTransaction(sorties[index]);
         
+        final double amount = AmountParser.parseAmount(amountStr);
         final updatedSortie = {
           'amount': amount,
           'description': description,
-          'date': DateTime.now().toIso8601String(),
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'id': sorties[index]['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          'date': (date ?? DateTime.tryParse(oldSortie['date'] ?? '') ?? DateTime.now()).toIso8601String(),
+          'timestamp': oldSortie['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
+          'id': oldSortie['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          'isPointed': oldSortie['isPointed'] ?? false,
         };
         
-        // Chiffre avant de remplacer
+        // Préserver pointedAt si présent
+        if (oldSortie['pointedAt'] != null) {
+          updatedSortie['pointedAt'] = oldSortie['pointedAt'];
+        }
+        
         sorties[index] = _encryption.encryptTransaction(updatedSortie);
         await _firebaseService.saveSorties(sorties);
         

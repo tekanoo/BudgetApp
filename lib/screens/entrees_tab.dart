@@ -63,16 +63,18 @@ class _EntreesTabState extends State<EntreesTab> {
     final result = await _showEntreeDialog();
     if (result != null) {
       try {
+        // Données automatiquement chiffrées avant sauvegarde
         await _dataService.addEntree(
           amountStr: result['amountStr'],
           description: result['description'],
+          date: result['date'], // Ajouter la date
         );
         await _loadEntrees();
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Revenu ajouté avec succès'),
+            content: Text('🔐 Revenu ajouté et chiffré avec succès'),
             backgroundColor: Colors.green,
           ),
         );
@@ -89,27 +91,37 @@ class _EntreesTabState extends State<EntreesTab> {
   }
 
   // Ajout de la méthode _editEntree manquante
-  Future<void> _editEntree(int index) async {
-    final entree = entrees[index];
+  Future<void> _editEntree(int displayIndex) async {
+    final entree = entrees[displayIndex];
+    final entreeId = entree['id'] ?? '';
+    
+    // Trouver l'index réel
+    final originalEntrees = await _dataService.getEntrees();
+    final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+    
+    if (realIndex == -1) return;
+    
     final result = await _showEntreeDialog(
       isEdit: true,
       description: entree['description'],
       amount: entree['amount'],
+      date: DateTime.tryParse(entree['date'] ?? ''), // Ajouter la date existante
     );
-
+    
     if (result != null) {
       try {
         await _dataService.updateEntree(
-          index: index,
+          index: realIndex,
           amountStr: result['amountStr'],
           description: result['description'],
+          date: result['date'], // Ajouter la date
         );
         await _loadEntrees();
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Revenu modifié avec succès'),
+            content: Text('🔐 Revenu modifié et chiffré avec succès'),
             backgroundColor: Colors.blue,
           ),
         );
@@ -128,97 +140,118 @@ class _EntreesTabState extends State<EntreesTab> {
   Future<Map<String, dynamic>?> _showEntreeDialog({
     String? description,
     double? amount,
+    DateTime? date, // Nouveau paramètre
     bool isEdit = false,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
+    DateTime? selectedDate = date ?? DateTime.now(); // Date par défaut = aujourd'hui
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(
-              isEdit ? Icons.edit : Icons.add,
-              color: isEdit ? Colors.blue : Colors.green,
-            ),
-            const SizedBox(width: 8),
-            Text(isEdit ? 'Modifier le revenu' : 'Ajouter un revenu'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.description),
-                helperText: 'Salaire, Freelance, Prime...',
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                isEdit ? Icons.edit : Icons.add,
+                color: isEdit ? Colors.blue : Colors.green,
               ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: montantController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Montant',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.euro),
-                suffixText: '€',
-                helperText: 'Utilisez , ou . pour les décimales',
+              const SizedBox(width: 8),
+              Text(isEdit ? 'Modifier le revenu' : 'Ajouter un revenu'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: descriptionController,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.description),
+                  helperText: 'Salaire, Prime, Freelance...',
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            // Indicateur de sécurité
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+              const SizedBox(height: 16),
+              TextField(
+                controller: montantController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Montant',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.euro),
+                  suffixText: '€',
+                  helperText: 'Utilisez , ou . pour les décimales',
+                ),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.security, color: Colors.green.shade700, size: 16),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Ce montant sera automatiquement chiffré',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.green.shade700,
-                      ),
-                    ),
+              const SizedBox(height: 16),
+              // Sélecteur de date
+              InkWell(
+                onTap: () async {
+                  final pickedDate = await showDatePicker(
+                    context: context,
+                    initialDate: selectedDate ?? DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (pickedDate != null) {
+                    setState(() {
+                      selectedDate = pickedDate;
+                    });
+                  }
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey),
+                    borderRadius: BorderRadius.circular(4),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.grey),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          selectedDate != null 
+                            ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
+                            : 'Sélectionner une date',
+                          style: TextStyle(
+                            color: selectedDate != null ? Colors.black87 : Colors.grey,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final desc = descriptionController.text.trim();
+                final amountStr = montantController.text.trim();
+                final montant = AmountParser.parseAmount(amountStr);
+                if (desc.isNotEmpty && montant > 0 && selectedDate != null) {
+                  Navigator.pop(context, {
+                    'description': desc,
+                    'amountStr': amountStr,
+                    'date': selectedDate,
+                  });
+                }
+              },
+              child: Text(isEdit ? 'Modifier' : 'Ajouter'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Annuler'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final desc = descriptionController.text.trim();
-              final amountStr = montantController.text.trim();
-              final montant = AmountParser.parseAmount(amountStr);
-              if (desc.isNotEmpty && montant > 0) {
-                Navigator.pop(context, {
-                  'description': desc,
-                  'amountStr': amountStr,
-                });
-              }
-            },
-            child: Text(isEdit ? 'Modifier' : 'Ajouter'),
-          ),
-        ],
       ),
     );
   }
