@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../services/encryption_service.dart';
 import '../services/pointing_service.dart';
@@ -27,6 +28,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   // Variables pour sélection multiple
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
+  bool _isProcessingBatch = false; // Ajout de cette variable manquante
 
   late PointingService _pointingService;
 
@@ -166,15 +168,13 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null) {
-                    if (mounted) {
-                      setState(() {
-                        _currentFilter = value!;
-                        _selectedFilterDate = date;
-                      });
-                      _applyFilter();
-                      Navigator.pop(context);
-                    }
+                  if (date != null && mounted) { // Vérification du mounted ici
+                    setState(() {
+                      _currentFilter = value!;
+                      _selectedFilterDate = date;
+                    });
+                    _applyFilter();
+                    Navigator.pop(context);
                   }
                 },
               ),
@@ -195,15 +195,13 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null) {
-                    if (mounted) {
-                      setState(() {
-                        _currentFilter = value!;
-                        _selectedFilterDate = date;
-                      });
-                      _applyFilter();
-                      Navigator.pop(context);
-                    }
+                  if (date != null && mounted) { // Vérification du mounted ici
+                    setState(() {
+                      _currentFilter = value!;
+                      _selectedFilterDate = date;
+                    });
+                    _applyFilter();
+                    Navigator.pop(context);
                   }
                 },
               ),
@@ -388,318 +386,385 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 ],
               ),
             )
-          : Column(
+          : Stack(  // Ajouter un Stack ici pour contenir le Positioned
               children: [
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.all(16),
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Colors.purple.shade400, Colors.purple.shade600],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.purple.withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
+                Column(
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.purple.shade400, Colors.purple.shade600],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.purple.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          InkWell(
-                            onTap: _showFilterDialog,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(Icons.filter_list, color: Colors.white, size: 18),
-                                  const SizedBox(width: 6),
                                   Text(
-                                    _currentFilter == 'Tous' 
-                                        ? 'Tous'
-                                        : _currentFilter == 'Mois'
-                                            ? '${_getMonthName(_selectedFilterDate!.month).substring(0, 3)} ${_selectedFilterDate!.year}'
-                                            : '${_selectedFilterDate!.year}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                    'Total Dépenses',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 16,
                                     ),
                                   ),
                                 ],
                               ),
-                            ),
-                          ),
-                          
-                          Row(
-                            children: [
-                              InkWell(
-                                onTap: _addPlaisir,
-                                child: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    borderRadius: BorderRadius.circular(25),
+                              Column(
+                                children: [
+                                  // Actions
+                                  Row(
+                                    children: [
+                                      // Bouton sélection multiple
+                                      if (filteredPlaisirs.isNotEmpty)
+                                        InkWell(
+                                          onTap: _toggleSelectionMode,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white.withValues(alpha: 0.2),
+                                              borderRadius: BorderRadius.circular(25),
+                                            ),
+                                            child: Icon(
+                                              _isSelectionMode ? Icons.close : Icons.checklist,
+                                              color: Colors.white,
+                                              size: 24,
+                                            ),
+                                          ),
+                                        ),
+                                      
+                                      const SizedBox(width: 8),
+
+                                      // Bouton filtre
+                                      InkWell(
+                                        onTap: _showFilterDialog,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(25),
+                                          ),
+                                          child: const Icon(
+                                            Icons.filter_alt,
+                                            color: Colors.white,
+                                            size: 24,
+                                          ),
+                                        ),
+                                      ),
+                                      
+                                      const SizedBox(width: 8),
+                                      
+                                      // Bouton ajout
+                                      InkWell(
+                                        onTap: _addPlaisir,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white.withValues(alpha: 0.2),
+                                            borderRadius: BorderRadius.circular(25),
+                                          ),
+                                          child: const Icon(
+                                            Icons.add,
+                                            color: Colors.white,
+                                            size: 28,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  child: const Icon(
-                                    Icons.add,
-                                    color: Colors.white,
-                                    size: 28,
-                                  ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      
-                      const SizedBox(height: 15),
-                      
-                      Column(
-                        children: [
-                          const Text(
-                            'Total Dépenses',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 16,
-                            ),
-                          ),
-                          Text(
-                            '${AmountParser.formatAmount(totalPlaisirs)} €',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 28,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            '${filteredPlaisirs.length} dépense${filteredPlaisirs.length > 1 ? 's' : ''} • ${filteredPlaisirs.where((p) => p['isPointed'] == true).length} pointée${filteredPlaisirs.where((p) => p['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                Expanded(
-                  child: ListView.builder(
-                    itemCount: filteredPlaisirs.length,
-                    itemBuilder: (context, index) {
-                      final plaisir = filteredPlaisirs[index];
-                      final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0;
-                      final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
-                      final dateStr = plaisir['date'] as String? ?? '';
-                      final date = DateTime.tryParse(dateStr);
-                      final isPointed = plaisir['isPointed'] == true;
-                      final isSelected = _selectedIndices.contains(index);
-                      final pointedAt = plaisir['pointedAt'] as String?;
-
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: isSelected 
-                              ? Colors.blue.shade50 
-                              : (isPointed ? Colors.green.shade50 : Colors.white),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected 
-                                ? Colors.blue.shade300
-                                : (isPointed ? Colors.green.shade300 : Colors.grey.shade200),
-                            width: isSelected ? 2 : 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.withValues(alpha: 0.1),
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
-                            ),
-                          ],
-                        ),
-                        child: ListTile(
-                          leading: _isSelectionMode
-                              ? Checkbox(
-                                  value: isSelected,
-                                  onChanged: (value) => _toggleSelection(index),
-                                  activeColor: Colors.blue,
-                                )
-                              : PointingButton(
-                                  isPointed: isPointed,
-                                  onTap: () => _togglePointing(index),
-                                  baseColor: Colors.purple,
-                                ),
-                          title: Row(
+                          
+                          const SizedBox(height: 15),
+                          
+                          Column(
                             children: [
-                              Expanded(
-                                child: Text(
-                                  tag,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: isPointed ? Colors.green.shade700 : Colors.black87,
-                                  ),
-                                ),
-                              ),
-                              Text(
-                                '${AmountParser.formatAmount(amount)} €',
+                              const Text(
+                                'Total Dépenses',
                                 style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: isPointed ? Colors.green.shade700 : Colors.purple.shade700,
+                                  color: Colors.white70,
                                   fontSize: 16,
                                 ),
                               ),
-                            ],
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              if (date != null)
-                                Text(
-                                  '${date.day}/${date.month}/${date.year}',
-                                  style: TextStyle(
-                                    color: Colors.grey.shade600,
-                                    fontSize: 12,
-                                  ),
+                              Text(
+                                '${AmountParser.formatAmount(totalPlaisirs)} €',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  PointingStatus(
-                                    isPointed: isPointed,
-                                    pointedAt: pointedAt,
-                                  ),
-                                ],
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                '${filteredPlaisirs.length} dépense${filteredPlaisirs.length > 1 ? 's' : ''} • ${filteredPlaisirs.where((p) => p['isPointed'] == true).length} pointée${filteredPlaisirs.where((p) => p['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
                               ),
                             ],
                           ),
-                          trailing: !_isSelectionMode
-                              ? PopupMenuButton(
-                                  icon: const Icon(Icons.more_vert),
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: 'toggle',
-                                      child: Row(
-                                        children: [
-                                          Icon(
-                                            isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
-                                            color: isPointed ? Colors.orange : Colors.green,
+                        ],
+                      ),
+                    ),
+
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredPlaisirs.length,
+                        itemBuilder: (context, index) {
+                          final plaisir = filteredPlaisirs[index];
+                          final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0;
+                          final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
+                          final isPointed = plaisir['isPointed'] == true;
+
+                          // Date formatée
+                          String formattedDate = 'Date inconnue';
+                          if (plaisir['date'] != null) {
+                            final date = DateTime.tryParse(plaisir['date']);
+                            if (date != null) {
+                              formattedDate = DateFormat('dd/MM/yyyy').format(date);
+                            }
+                          }
+
+                          return Card(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: _isSelectionMode && _selectedIndices.contains(index)
+                                  ? BorderSide(color: Colors.purple.shade400, width: 2)
+                                  : BorderSide.none,
+                            ),
+                            elevation: _isSelectionMode && _selectedIndices.contains(index) ? 3 : 1,
+                            child: InkWell(
+                              onTap: _isSelectionMode
+                                  ? () => _toggleSelection(index)
+                                  : () => _showPlaisirDetails(index),
+                              onLongPress: !_isSelectionMode
+                                  ? () {
+                                      _toggleSelectionMode();
+                                      _toggleSelection(index);
+                                    }
+                                  : null,
+                              child: Padding(
+                                padding: const EdgeInsets.all(16),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            tag,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              color: isPointed ? Colors.green.shade700 : Colors.black87,
+                                            ),
                                           ),
-                                          const SizedBox(width: 8),
-                                          Text(isPointed ? 'Dépointer' : 'Pointer'),
-                                        ],
-                                      ),
+                                        ),
+                                        Text(
+                                          '${AmountParser.formatAmount(amount)} €',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: isPointed ? Colors.green.shade700 : Colors.purple.shade700,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                      ],
                                     ),
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.edit, color: Colors.blue),
-                                          SizedBox(width: 8),
-                                          Text('Modifier'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete, color: Colors.red),
-                                          SizedBox(width: 8),
-                                          Text('Supprimer'),
-                                        ],
-                                      ),
+                                    const SizedBox(height: 8),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text(
+                                          formattedDate,
+                                          style: TextStyle(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        PointingStatus(
+                                          isPointed: isPointed,
+                                          pointedAt: plaisir['pointedAt'] as String?,
+                                        ),
+                                      ],
                                     ),
                                   ],
-                                  onSelected: (value) async {
-                                    switch (value) {
-                                      case 'toggle':
-                                        await _togglePointing(index);
-                                        break;
-                                      case 'edit':
-                                        await _editPlaisir(index);
-                                        break;
-                                      case 'delete':
-                                        await _deletePlaisir(index);
-                                        break;
-                                    }
-                                  },
-                                )
-                              : null,
-                          onTap: _isSelectionMode
-                              ? () => _toggleSelection(index)
-                              : () => _togglePointing(index),
-                        ),
-                      );
-                    },
-                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-      
-      // Suppression du bottomSheet de sélection multiple
-      // bottomSheet: _isSelectionMode && _selectedIndices.isNotEmpty
-      //     ? Container(
-      //         padding: const EdgeInsets.all(16),
-      //         decoration: BoxDecoration(
-      //           color: Colors.white,
-      //           boxShadow: [
-      //             BoxShadow(
-      //               color: Colors.grey.withValues(alpha: 0.3),
-      //               blurRadius: 10,
-      //               offset: const Offset(0, -2),
-      //             ),
-      //           ],
-      //         ),
-      //         child: Row(
-      //           children: [
-      //             Expanded(
-      //               child: Text(
-      //                 '${_selectedIndices.length} dépense${_selectedIndices.length > 1 ? 's' : ''} sélectionnée${_selectedIndices.length > 1 ? 's' : ''}',
-      //                 style: const TextStyle(fontWeight: FontWeight.bold),
-      //               ),
-      //             ),
-      //             const SizedBox(width: 16),
-      //             ElevatedButton.icon(
-      //               onPressed: _batchTogglePointing,
-      //               icon: const Icon(Icons.check_circle),
-      //               label: const Text('Pointer'),
-      //               style: ElevatedButton.styleFrom(
-      //                 backgroundColor: Colors.green,
-      //                 foregroundColor: Colors.white,
-      //               ),
-      //             ),
-      //             const SizedBox(width: 8),
-      //             ElevatedButton.icon(
-      //               onPressed: _selectAll,
-      //               icon: const Icon(Icons.select_all),
-      //               label: const Text('Tout'),
-      //               style: ElevatedButton.styleFrom(
-      //                 backgroundColor: Colors.blue,
-      //                 foregroundColor: Colors.white,
-      //               ),
-      //             ),
-      //           ],
-      //         ),
-      //       )
-      //     : null,
+                
+                // Overlay de sélection multiple
+                if (_isSelectionMode)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            spreadRadius: 1,
+                            blurRadius: 5,
+                            offset: const Offset(0, -3),
+                          ),
+                        ],
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_selectedIndices.length} sélectionnée${_selectedIndices.length > 1 ? 's' : ''}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _isProcessingBatch ? null : _batchTogglePointing,
+                                icon: _isProcessingBatch 
+                                    ? const SizedBox(
+                                        width: 18, 
+                                        height: 18, 
+                                        child: CircularProgressIndicator(strokeWidth: 2),
+                                      )
+                                    : const Icon(Icons.check_circle_outline),
+                                label: const Text('Pointer/Dépointer'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.purple,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                onPressed: _selectAll,
+                                icon: const Icon(Icons.select_all),
+                                label: const Text('Tout'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blue,
+                                  foregroundColor: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
     );
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedIndices.clear();
+      }
+    });
+  }
+
+  void _selectAll() {
+    setState(() {
+      if (_selectedIndices.length == filteredPlaisirs.length) {
+        _selectedIndices.clear();
+      } else {
+        _selectedIndices = Set.from(List.generate(filteredPlaisirs.length, (index) => index));
+      }
+    });
+  }
+
+  Future<void> _batchTogglePointing() async {
+    if (_selectedIndices.isEmpty) return;
+
+    setState(() {
+      _isProcessingBatch = true;
+    });
+
+    try {
+      // Convertir les index d'affichage en index réels
+      final originalPlaisirs = await _dataService.getPlaisirs();
+      List<int> realIndices = [];
+      
+      for (int displayIndex in _selectedIndices) {
+        final plaisir = filteredPlaisirs[displayIndex];
+        final plaisirId = plaisir['id'] ?? '';
+        final realIndex = originalPlaisirs.indexWhere((p) => p['id'] == plaisirId);
+        
+        if (realIndex != -1) {
+          realIndices.add(realIndex);
+        }
+      }
+      
+      // Traiter dans l'ordre inverse pour éviter les décalages d'index
+      realIndices.sort((a, b) => b.compareTo(a));
+      
+      for (int realIndex in realIndices) {
+        await _dataService.togglePlaisirPointing(realIndex);
+      }
+
+      // Recharger les données
+      await _loadPlaisirs();
+
+      if (!mounted) return;
+      
+      // Sortir du mode sélection
+      setState(() {
+        _isSelectionMode = false;
+        _selectedIndices.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${realIndices.length} dépense(s) mise(s) à jour'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du traitement: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingBatch = false;
+        });
+      }
+    }
   }
 
   Future<void> _togglePointing(int displayIndex) async {
@@ -926,6 +991,110 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 }
               },
               child: Text(isEdit ? 'Modifier' : 'Ajouter'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Ajouter cette méthode avant _toggleSelectionMode
+  Future<void> _showPlaisirDetails(int index) async {
+    final plaisir = filteredPlaisirs[index];
+    
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.purple.shade100,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.shopping_bag, color: Colors.purple),
+                ),
+                const SizedBox(width: 15),
+                Expanded(
+                  child: Text(
+                    plaisir['tag'] as String? ?? 'Sans catégorie',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Text(
+              '${AmountParser.formatAmount((plaisir['amount'] as num?)?.toDouble() ?? 0)} €',
+              style: const TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                const SizedBox(width: 8),
+                Text(
+                  plaisir['date'] != null 
+                      ? DateFormat('dd/MM/yyyy').format(DateTime.parse(plaisir['date']))
+                      : 'Date inconnue',
+                  style: const TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _togglePointing(index);
+                  },
+                  icon: Icon(
+                    plaisir['isPointed'] == true 
+                        ? Icons.radio_button_unchecked
+                        : Icons.check_circle_outline,
+                    color: plaisir['isPointed'] == true ? Colors.orange : Colors.green,
+                  ),
+                  label: Text(
+                    plaisir['isPointed'] == true ? 'Dépointer' : 'Pointer',
+                    style: TextStyle(
+                      color: plaisir['isPointed'] == true ? Colors.orange : Colors.green,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _editPlaisir(index);
+                  },
+                  icon: const Icon(Icons.edit, color: Colors.blue),
+                  label: const Text('Modifier', style: TextStyle(color: Colors.blue)),
+                ),
+                TextButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _deletePlaisir(index);
+                  },
+                  icon: const Icon(Icons.delete, color: Colors.red),
+                  label: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                ),
+              ],
             ),
           ],
         ),
