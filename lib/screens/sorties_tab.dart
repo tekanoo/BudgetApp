@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../services/encryption_service.dart';
+import '../widgets/periodicity_selector.dart'; // Ajouter cet import
 
 class SortiesTab extends StatefulWidget {
   const SortiesTab({super.key});
@@ -27,6 +28,7 @@ class _SortiesTabState extends State<SortiesTab> {
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
+  String? _selectedPeriodicity = 'ponctuel'; // Ajouter cette variable
 
   @override
   void initState() {
@@ -272,6 +274,7 @@ class _SortiesTabState extends State<SortiesTab> {
           amountStr: result['amountStr'],
           description: result['description'],
           date: result['date'],
+          periodicity: _selectedPeriodicity, // Passer la périodicité
         );
         await _loadSorties();
         
@@ -308,6 +311,7 @@ class _SortiesTabState extends State<SortiesTab> {
       description: sortie['description'],
       amount: sortie['amount'],
       date: DateTime.tryParse(sortie['date'] ?? ''),
+      periodicity: sortie['periodicity'], // Récupérer la périodicité existante
     );
     
     if (result != null) {
@@ -317,6 +321,7 @@ class _SortiesTabState extends State<SortiesTab> {
           amountStr: result['amountStr'],
           description: result['description'],
           date: result['date'],
+          periodicity: result['periodicity'], // Passer la périodicité
         );
         await _loadSorties();
         
@@ -542,12 +547,14 @@ class _SortiesTabState extends State<SortiesTab> {
     double? amount,
     DateTime? date,
     bool isEdit = false,
+    String? periodicity,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
     DateTime? selectedDate = date ?? DateTime.now(); // Date par défaut = aujourd'hui
+    String? selectedPeriodicity = periodicity ?? 'ponctuel'; // Périodicité par défaut
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -563,72 +570,84 @@ class _SortiesTabState extends State<SortiesTab> {
               Text(isEdit ? 'Modifier la charge' : 'Ajouter une charge'),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.description),
-                  helperText: 'Loyer, Électricité, Internet...',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: montantController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Montant',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.euro),
-                  suffixText: '€',
-                  helperText: 'Utilisez , ou . pour les décimales',
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Sélecteur de date (comme dans plaisirs_tab.dart)
-              InkWell(
-                onTap: () async {
-                  final pickedDate = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate ?? DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (pickedDate != null) {
-                    setState(() {
-                      selectedDate = pickedDate;
-                    });
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.description),
+                    helperText: 'Loyer, Électricité, Internet...',
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today, color: Colors.grey),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          selectedDate != null 
-                            ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
-                            : 'Sélectionner une date',
-                          style: TextStyle(
-                            color: selectedDate != null ? Colors.black87 : Colors.grey,
-                            fontSize: 16,
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: montantController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Montant',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.euro),
+                    suffixText: '€',
+                    helperText: 'Utilisez , ou . pour les décimales',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Sélecteur de date (comme dans plaisirs_tab.dart)
+                InkWell(
+                  onTap: () async {
+                    final pickedDate = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (pickedDate != null) {
+                      setState(() {
+                        selectedDate = pickedDate;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, color: Colors.grey),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            selectedDate != null 
+                              ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
+                              : 'Sélectionner une date',
+                            style: TextStyle(
+                              color: selectedDate != null ? Colors.black87 : Colors.grey,
+                              fontSize: 16,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                // Ajouter le sélecteur de périodicité
+                PeriodicitySelector(
+                  selectedPeriodicity: selectedPeriodicity,
+                  onChanged: (value) {
+                    setState(() {
+                      selectedPeriodicity = value;
+                    });
+                  },
+                ),
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -645,6 +664,7 @@ class _SortiesTabState extends State<SortiesTab> {
                     'description': desc,
                     'amountStr': amountStr,
                     'date': selectedDate,
+                    'periodicity': selectedPeriodicity, // Passer la périodicité
                   });
                 }
               },

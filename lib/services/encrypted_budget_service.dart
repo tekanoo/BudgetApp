@@ -361,7 +361,8 @@ Future<void> togglePlaisirPointing(int index) async {
     required int index,
     required String amountStr,
     required String description,
-    DateTime? date, // Nouveau paramètre optionnel
+    DateTime? date,
+    String? periodicity, // Ajouter ce paramètre
   }) async {
     _ensureInitialized();
     try {
@@ -378,18 +379,14 @@ Future<void> togglePlaisirPointing(int index) async {
           'timestamp': oldSortie['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
           'id': oldSortie['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
           'isPointed': oldSortie['isPointed'] ?? false,
+          'periodicity': periodicity ?? oldSortie['periodicity'] ?? 'ponctuel', // Ajouter la périodicité
         };
-        
-        // Préserver pointedAt si présent
-        if (oldSortie['pointedAt'] != null) {
-          updatedSortie['pointedAt'] = oldSortie['pointedAt'];
-        }
         
         sorties[index] = _encryption.encryptTransaction(updatedSortie);
         await _firebaseService.saveSorties(sorties);
         
         if (kDebugMode) {
-          print('✅ Charge mise à jour');
+          print('✅ Sortie mise à jour avec périodicité: ${periodicity ?? 'ponctuel'}');
         }
       }
     } catch (e) {
