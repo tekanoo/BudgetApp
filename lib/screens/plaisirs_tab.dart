@@ -28,7 +28,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   // Variables pour sélection multiple
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
-  bool _isProcessingBatch = false; // Ajout de cette variable manquante
+  bool _isProcessingBatch = false;
 
   late PointingService _pointingService;
 
@@ -168,7 +168,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null && mounted) { // Vérification du mounted ici
+                  if (date != null && mounted) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = date;
@@ -195,7 +195,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null && mounted) { // Vérification du mounted ici
+                  if (date != null && mounted) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = date;
@@ -226,7 +226,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     return months[month - 1];
   }
 
-  // Add missing _toggleSelection method
   void _toggleSelection(int index) {
     setState(() {
       if (_selectedIndices.contains(index)) {
@@ -237,7 +236,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     });
   }
 
-  // Add missing _deletePlaisir method
   Future<void> _deletePlaisir(int displayIndex) async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -298,7 +296,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     }
   }
 
-  // Add missing _updatePlaisir method
   Future<void> _updatePlaisir(int realIndex, Map<String, dynamic> result) async {
     try {
       await _dataService.updatePlaisir(
@@ -386,7 +383,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 ],
               ),
             )
-          : Stack(  // Ajouter un Stack ici pour contenir le Positioned
+          : Stack(
               children: [
                 Column(
                   children: [
@@ -429,10 +426,8 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                               ),
                               Column(
                                 children: [
-                                  // Actions
                                   Row(
                                     children: [
-                                      // Bouton sélection multiple
                                       if (filteredPlaisirs.isNotEmpty)
                                         InkWell(
                                           onTap: _toggleSelectionMode,
@@ -452,7 +447,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                       
                                       const SizedBox(width: 8),
 
-                                      // Bouton filtre
                                       InkWell(
                                         onTap: _showFilterDialog,
                                         child: Container(
@@ -471,7 +465,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                       
                                       const SizedBox(width: 8),
                                       
-                                      // Bouton ajout
                                       InkWell(
                                         onTap: _addPlaisir,
                                         child: Container(
@@ -536,7 +529,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                           final tag = plaisir['tag'] as String? ?? 'Sans catégorie';
                           final isPointed = plaisir['isPointed'] == true;
 
-                          // Date formatée
                           String formattedDate = 'Date inconnue';
                           if (plaisir['date'] != null) {
                             final date = DateTime.tryParse(plaisir['date']);
@@ -619,7 +611,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                   ],
                 ),
                 
-                // Overlay de sélection multiple
                 if (_isSelectionMode)
                   Positioned(
                     bottom: 0,
@@ -681,6 +672,8 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                       ),
                     ),
                   ),
+              ],
+            ),
     );
   }
 
@@ -711,7 +704,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     });
 
     try {
-      // Convertir les index d'affichage en index réels
       final originalPlaisirs = await _dataService.getPlaisirs();
       List<int> realIndices = [];
       
@@ -725,19 +717,16 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
         }
       }
       
-      // Traiter dans l'ordre inverse pour éviter les décalages d'index
       realIndices.sort((a, b) => b.compareTo(a));
       
       for (int realIndex in realIndices) {
         await _dataService.togglePlaisirPointing(realIndex);
       }
 
-      // Recharger les données
       await _loadPlaisirs();
 
       if (!mounted) return;
       
-      // Sortir du mode sélection
       setState(() {
         _isSelectionMode = false;
         _selectedIndices.clear();
@@ -998,7 +987,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     );
   }
 
-  // Ajouter cette méthode avant _toggleSelectionMode
   Future<void> _showPlaisirDetails(int index) async {
     final plaisir = filteredPlaisirs[index];
     
