@@ -447,25 +447,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                           
                           Row(
                             children: [
-                              if (filteredPlaisirs.isNotEmpty)
-                                InkWell(
-                                  onTap: _toggleSelectionMode,
-                                  child: Container(
-                                    padding: const EdgeInsets.all(8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(25),
-                                    ),
-                                    child: Icon(
-                                      _isSelectionMode ? Icons.close : Icons.checklist,
-                                      color: Colors.white,
-                                      size: 24,
-                                    ),
-                                  ),
-                                ),
-                              
-                              const SizedBox(width: 8),
-                              
                               InkWell(
                                 onTap: _addPlaisir,
                                 child: Container(
@@ -672,52 +653,52 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
               ],
             ),
       
-      // Add selection mode bottom bar
-      bottomSheet: _isSelectionMode && _selectedIndices.isNotEmpty
-          ? Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.withValues(alpha: 0.3),
-                    blurRadius: 10,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '${_selectedIndices.length} dépense${_selectedIndices.length > 1 ? 's' : ''} sélectionnée${_selectedIndices.length > 1 ? 's' : ''}',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  ElevatedButton.icon(
-                    onPressed: _batchTogglePointing,
-                    icon: const Icon(Icons.check_circle),
-                    label: const Text('Pointer'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: _selectAll,
-                    icon: const Icon(Icons.select_all),
-                    label: const Text('Tout'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : null,
+      // Suppression du bottomSheet de sélection multiple
+      // bottomSheet: _isSelectionMode && _selectedIndices.isNotEmpty
+      //     ? Container(
+      //         padding: const EdgeInsets.all(16),
+      //         decoration: BoxDecoration(
+      //           color: Colors.white,
+      //           boxShadow: [
+      //             BoxShadow(
+      //               color: Colors.grey.withValues(alpha: 0.3),
+      //               blurRadius: 10,
+      //               offset: const Offset(0, -2),
+      //             ),
+      //           ],
+      //         ),
+      //         child: Row(
+      //           children: [
+      //             Expanded(
+      //               child: Text(
+      //                 '${_selectedIndices.length} dépense${_selectedIndices.length > 1 ? 's' : ''} sélectionnée${_selectedIndices.length > 1 ? 's' : ''}',
+      //                 style: const TextStyle(fontWeight: FontWeight.bold),
+      //               ),
+      //             ),
+      //             const SizedBox(width: 16),
+      //             ElevatedButton.icon(
+      //               onPressed: _batchTogglePointing,
+      //               icon: const Icon(Icons.check_circle),
+      //               label: const Text('Pointer'),
+      //               style: ElevatedButton.styleFrom(
+      //                 backgroundColor: Colors.green,
+      //                 foregroundColor: Colors.white,
+      //               ),
+      //             ),
+      //             const SizedBox(width: 8),
+      //             ElevatedButton.icon(
+      //               onPressed: _selectAll,
+      //               icon: const Icon(Icons.select_all),
+      //               label: const Text('Tout'),
+      //               style: ElevatedButton.styleFrom(
+      //                 backgroundColor: Colors.blue,
+      //                 foregroundColor: Colors.white,
+      //               ),
+      //             ),
+      //           ],
+      //         ),
+      //       )
+      //     : null,
     );
   }
 
@@ -807,75 +788,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
           ),
         );
       }
-    }
-  }
-
-  void _toggleSelectionMode() {
-    setState(() {
-      _isSelectionMode = !_isSelectionMode;
-      if (!_isSelectionMode) {
-        _selectedIndices.clear();
-      }
-    });
-  }
-
-  void _selectAll() {
-    setState(() {
-      if (_selectedIndices.length == filteredPlaisirs.length) {
-        _selectedIndices.clear();
-      } else {
-        _selectedIndices = Set.from(List.generate(filteredPlaisirs.length, (index) => index));
-      }
-    });
-  }
-
-  Future<void> _batchTogglePointing() async {
-    if (_selectedIndices.isEmpty) return;
-
-    try {
-      final originalPlaisirs = await _dataService.getPlaisirs();
-      List<int> realIndices = [];
-      
-      for (int displayIndex in _selectedIndices) {
-        final plaisir = filteredPlaisirs[displayIndex];
-        final plaisirId = plaisir['id'] ?? '';
-        final realIndex = originalPlaisirs.indexWhere((p) => p['id'] == plaisirId);
-        
-        if (realIndex != -1) {
-          realIndices.add(realIndex);
-        }
-      }
-      
-      realIndices.sort((a, b) => b.compareTo(a));
-      
-      for (int realIndex in realIndices) {
-        await _pointingService.togglePlaisirPointing(realIndex);
-      }
-
-      await _loadPlaisirs();
-
-      if (!mounted) return;
-      
-      setState(() {
-        _isSelectionMode = false;
-        _selectedIndices.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ ${realIndices.length} dépense(s) mise(s) à jour'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors du traitement: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 
