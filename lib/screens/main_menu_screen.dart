@@ -526,7 +526,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   Widget build(BuildContext context) {
     final user = _firebaseService.currentUser;
-    final tabTitles = _menuOptions.map((option) => option['title'] as String).toList();
+    final tabTitles = ['Dashboard', 'Dépenses', 'Revenus', 'Charges']; // Simplification des titres
 
     return Scaffold(
       appBar: AppBar(
@@ -581,70 +581,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         destinations: _mainDestinations,
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
-      ),
-    );
-  }
-
-  void _onMenuTap(int index) {
-    // Correspondance des index du menu avec les onglets réels
-    int tabIndex;
-    Widget targetScreen;
-    String title;
-    
-    switch (index) {
-      case 0: // Dashboard
-        tabIndex = 0;
-        targetScreen = const HomeTab();
-        title = 'Dashboard';
-        break;
-      case 4: // Analyse (index 4 dans la liste complète)
-        targetScreen = const AnalyseTab();
-        title = 'Analyse';
-        break;
-      case 5: // Catégories (index 5 dans la liste complète)
-        targetScreen = const TagsManagementTab();
-        title = 'Gestion des Catégories';
-        break;
-      case 6: // Projections (index 6 dans la liste complète)
-        targetScreen = const ProjectionsTab();
-        title = 'Projections';
-        break;
-      default:
-        targetScreen = const HomeTab();
-        title = 'Dashboard';
-    }
-    
-    // Si c'est le Dashboard, utiliser la navigation par onglets
-    if (index == 0) {
-      setState(() {
-        _selectedIndex = 0;
-      });
-      _pageController.animateToPage(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-      );
-      _trackTabChange(0);
-      Navigator.pop(context);
-      return;
-    }
-    
-    // Pour les autres écrans, utiliser la navigation push
-    Navigator.pop(context);
-    
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          appBar: AppBar(
-            title: Text(title),
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ),
-          body: targetScreen,
-        ),
       ),
     );
   }
