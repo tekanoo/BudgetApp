@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../services/encrypted_budget_service.dart';
 
@@ -42,10 +43,12 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
 
       Map<String, Map<String, double>> monthlyData = {};
 
-      print('DEBUG: Chargement des données...');
-      print('Entrées: ${entrees.length}');
-      print('Sorties: ${sorties.length}');
-      print('Plaisirs: ${plaisirs.length}');
+      if (kDebugMode) {
+        print('DEBUG: Chargement des données...');
+        print('Entrées: ${entrees.length}');
+        print('Sorties: ${sorties.length}');
+        print('Plaisirs: ${plaisirs.length}');
+      }
 
       // Analyser les revenus par mois
       for (var entree in entrees) {
@@ -58,7 +61,9 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
           monthlyData[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
           monthlyData[monthKey]!['revenus'] = monthlyData[monthKey]!['revenus']! + amount;
           
-          print('Revenus $monthKey: +$amount = ${monthlyData[monthKey]!['revenus']}');
+          if (kDebugMode) {
+            print('Revenus $monthKey: +$amount = ${monthlyData[monthKey]!['revenus']}');
+          }
         }
       }
 
@@ -73,7 +78,9 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
           monthlyData[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
           monthlyData[monthKey]!['charges'] = monthlyData[monthKey]!['charges']! + amount;
           
-          print('Charges $monthKey: +$amount = ${monthlyData[monthKey]!['charges']}');
+          if (kDebugMode) {
+            print('Charges $monthKey: +$amount = ${monthlyData[monthKey]!['charges']}');
+          }
         }
       }
 
@@ -93,18 +100,24 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
             monthlyData[monthKey]!['depenses'] = monthlyData[monthKey]!['depenses']! + amount;
           }
           
-          print('Dépenses $monthKey: ${isCredit ? '-' : '+'}$amount = ${monthlyData[monthKey]!['depenses']}');
+          if (kDebugMode) {
+            print('Dépenses $monthKey: ${isCredit ? '-' : '+'}$amount = ${monthlyData[monthKey]!['depenses']}');
+          }
         }
       }
 
-      print('Données mensuelles finales: $monthlyData');
+      if (kDebugMode) {
+        print('Données mensuelles finales: $monthlyData');
+      }
 
       setState(() {
         _monthlyData = monthlyData;
         _isLoading = false;
       });
     } catch (e) {
-      print('Erreur chargement: $e');
+      if (kDebugMode) {
+        print('Erreur chargement: $e');
+      }
       setState(() {
         _isLoading = false;
       });
@@ -188,7 +201,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
               physics: const NeverScrollableScrollPhysics(),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 3,
-                childAspectRatio: 0.8, // Rapport hauteur/largeur pour plus de hauteur
+                childAspectRatio: 0.8,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
@@ -200,8 +213,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 final isCurrentMonth = DateTime.now().year == year && DateTime.now().month == monthDate.month;
                 final solde = monthData['revenus']! - monthData['charges']! - monthData['depenses']!;
                 
-                // Utiliser les noms des mois en français sans dépendance d'intl
-                final monthNames = [
+                const monthNames = [
                   'JANVIER', 'FÉVRIER', 'MARS', 'AVRIL', 'MAI', 'JUIN',
                   'JUILLET', 'AOÛT', 'SEPTEMBRE', 'OCTOBRE', 'NOVEMBRE', 'DÉCEMBRE'
                 ];
@@ -211,7 +223,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                 return GestureDetector(
                   onTap: () => _showMonthDetails(monthDate, monthData),
                   child: Container(
-                    padding: const EdgeInsets.all(8), // Padding optimisé
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: isCurrentMonth 
                           ? const Color.fromARGB(255, 245, 243, 241).withValues(alpha: 0.15)
@@ -234,7 +246,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                     child: Column(
                       children: [
                         // Nom du mois avec indicateur mois actuel
-                        Container(
+                        SizedBox(
                           width: double.infinity,
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -242,7 +254,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                               Text(
                                 monthNames[monthDate.month - 1],
                                 style: TextStyle(
-                                  fontSize: 16, // Plus grand
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: isCurrentMonth 
                                       ? const Color.fromARGB(255, 228, 226, 224) 
@@ -332,7 +344,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                                       Text(
                                         '${_formatAmount(solde)}€',
                                         style: TextStyle(
-                                          fontSize: 13, // Plus grand
+                                          fontSize: 13,
                                           fontWeight: FontWeight.bold,
                                           color: solde >= 0 ? Colors.green.shade800 : Colors.red.shade800,
                                         ),
@@ -359,16 +371,16 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
   Widget _buildCompactDataRow(String prefix, double amount, Color color) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: 2), // Marge verticale réduite
+      margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(vertical: 3, horizontal: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1), // Fond coloré léger
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
         children: [
           Container(
-            width: 10, // Plus grand point
+            width: 10,
             height: 10,
             decoration: BoxDecoration(
               color: color,
@@ -379,7 +391,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
           Text(
             '$prefix:',
             style: TextStyle(
-              fontSize: 12, // Plus grand
+              fontSize: 12,
               color: color,
               fontWeight: FontWeight.w600,
             ),
@@ -389,11 +401,11 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
             child: Text(
               '${_formatAmount(amount)}€',
               style: TextStyle(
-                fontSize: 12, // Plus grand
+                fontSize: 12,
                 color: color,
                 fontWeight: FontWeight.bold,
               ),
-              textAlign: TextAlign.right, // Aligné à droite
+              textAlign: TextAlign.right,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -404,7 +416,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
 
   void _showMonthDetails(DateTime monthDate, Map<String, double> monthData) {
     final solde = monthData['revenus']! - monthData['charges']! - monthData['depenses']!;
-    final monthNames = [
+    const monthNames = [
       'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
       'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
     ];
@@ -610,7 +622,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Projections par année (${currentYear} en premier). Les montants sont calculés à partir de vos données réelles.',
+                        'Projections par année ($currentYear en premier). Les montants sont calculés à partir de vos données réelles.',
                         style: TextStyle(
                           color: Colors.blue.shade700,
                           fontSize: 14,

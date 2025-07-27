@@ -13,12 +13,17 @@ class SortiesTab extends StatefulWidget {
 class _SortiesTabState extends State<SortiesTab> {
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   List<Map<String, dynamic>> sorties = [];
+  List<Map<String, dynamic>> filteredSorties = [];
   double totalSorties = 0.0;
   double totalPointe = 0.0;
   double soldeDisponible = 0.0;
   bool isLoading = false;
 
-  // Nouveaux états pour la sélection multiple (suppression des variables de tri)
+  // Variables de filtrage
+  DateTime? _selectedFilterDate;
+  String _currentFilter = 'Tous';
+
+  // Variables pour la sélection multiple
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
@@ -51,6 +56,9 @@ class _SortiesTabState extends State<SortiesTab> {
         totalPointe = totalSortiesPointe;
         soldeDisponible = solde;
         isLoading = false;
+        
+        // Appliquer le filtre après le chargement
+        _applyFilter();
       });
     } catch (e) {
       setState(() {
@@ -67,13 +75,157 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
+  void _applyFilter() {
+    if (_currentFilter == 'Tous' || _selectedFilterDate == null) {
+      filteredSorties = List.from(sorties);
+    } else {
+      filteredSorties = sorties.where((sortie) {
+        final sortieDate = DateTime.tryParse(sortie['date'] ?? '');
+        if (sortieDate == null) return false;
+        
+        if (_currentFilter == 'Mois') {
+          return sortieDate.year == _selectedFilterDate!.year &&
+                 sortieDate.month == _selectedFilterDate!.month;
+        } else if (_currentFilter == 'Année') {
+          return sortieDate.year == _selectedFilterDate!.year;
+        }
+        return true;
+      }).toList();
+    }
+    
+    // Recalculer les totaux des charges filtrées
+    final filteredTotal = filteredSorties.fold(0.0, 
+      (sum, sortie) => sum + ((sortie['amount'] as num?)?.toDouble() ?? 0.0));
+    final filteredPointe = filteredSorties
+        .where((s) => s['isPointed'] == true)
+        .fold(0.0, (sum, sortie) => sum + ((sortie['amount'] as num?)?.toDouble() ?? 0.0));
+    
+    setState(() {
+      totalSorties = filteredTotal;
+      totalPointe = filteredPointe;
+    });
+  }
+
+  void _showFilterDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            
+            const Text(
+              'Filtrer les charges',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            
+            // Options de filtre
+            ListTile(
+              leading: Radio<String>(
+                value: 'Tous',
+                groupValue: _currentFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _currentFilter = value!;
+                    _selectedFilterDate = null;
+                  });
+                  _applyFilter();
+                  Navigator.pop(context);
+                },
+              ),
+              title: const Text('Toutes les charges'),
+              subtitle: Text('${sorties.length} charges'),
+            ),
+            
+            ListTile(
+              leading: Radio<String>(
+                value: 'Mois',
+                groupValue: _currentFilter,
+                onChanged: (value) async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (date != null && mounted) {
+                    setState(() {
+                      _currentFilter = value!;
+                      _selectedFilterDate = date;
+                    });
+                    _applyFilter();
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+              title: const Text('Par mois'),
+              subtitle: _currentFilter == 'Mois' && _selectedFilterDate != null
+                  ? Text('${_getMonthName(_selectedFilterDate!.month)} ${_selectedFilterDate!.year}')
+                  : const Text('Sélectionner un mois'),
+            ),
+            
+            ListTile(
+              leading: Radio<String>(
+                value: 'Année',
+                groupValue: _currentFilter,
+                onChanged: (value) async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: DateTime.now(),
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime(2030),
+                  );
+                  if (date != null && mounted) {
+                    setState(() {
+                      _currentFilter = value!;
+                      _selectedFilterDate = date;
+                    });
+                    _applyFilter();
+                    Navigator.pop(context);
+                  }
+                },
+              ),
+              title: const Text('Par année'),
+              subtitle: _currentFilter == 'Année' && _selectedFilterDate != null
+                  ? Text('Année ${_selectedFilterDate!.year}')
+                  : const Text('Sélectionner une année'),
+            ),
+            
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getMonthName(int month) {
+    const months = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    return months[month - 1];
+  }
+
   Future<void> _togglePointing(int displayIndex) async {
     try {
-      // Trouver l'index réel dans la liste non triée
-      final sortieToToggle = sorties[displayIndex];
+      final sortieToToggle = filteredSorties[displayIndex];
       final sortieId = sortieToToggle['id'] ?? '';
       
-      // Charger la liste originale pour trouver le vrai index
       final originalSorties = await _dataService.getSorties();
       final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
       
@@ -82,7 +234,7 @@ class _SortiesTabState extends State<SortiesTab> {
       }
       
       await _dataService.toggleSortiePointing(realIndex);
-      await _loadSorties(); // Recharger pour mettre à jour les totaux
+      await _loadSorties();
       
       if (!mounted) return;
       final isPointed = sortieToToggle['isPointed'] == true;
@@ -112,11 +264,10 @@ class _SortiesTabState extends State<SortiesTab> {
     final result = await _showSortieDialog();
     if (result != null) {
       try {
-        // Données automatiquement chiffrées avant sauvegarde
         await _dataService.addSortie(
           amountStr: result['amountStr'],
           description: result['description'],
-          date: result['date'], // Ajouter la date
+          date: result['date'],
         );
         await _loadSorties();
         
@@ -140,10 +291,9 @@ class _SortiesTabState extends State<SortiesTab> {
   }
 
   Future<void> _editSortie(int displayIndex) async {
-    final sortie = sorties[displayIndex];
+    final sortie = filteredSorties[displayIndex];
     final sortieId = sortie['id'] ?? '';
     
-    // Trouver l'index réel
     final originalSorties = await _dataService.getSorties();
     final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
     
@@ -153,7 +303,7 @@ class _SortiesTabState extends State<SortiesTab> {
       isEdit: true,
       description: sortie['description'],
       amount: sortie['amount'],
-      date: DateTime.tryParse(sortie['date'] ?? ''), // Ajouter la date existante
+      date: DateTime.tryParse(sortie['date'] ?? ''),
     );
     
     if (result != null) {
@@ -162,7 +312,7 @@ class _SortiesTabState extends State<SortiesTab> {
           index: realIndex,
           amountStr: result['amountStr'],
           description: result['description'],
-          date: result['date'], // Ajouter la date
+          date: result['date'],
         );
         await _loadSorties();
         
@@ -186,10 +336,9 @@ class _SortiesTabState extends State<SortiesTab> {
   }
 
   Future<void> _deleteSortie(int displayIndex) async {
-    final sortie = sorties[displayIndex];
+    final sortie = filteredSorties[displayIndex];
     final sortieId = sortie['id'] ?? '';
     
-    // Trouver l'index réel
     final originalSorties = await _dataService.getSorties();
     final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
     
@@ -219,7 +368,7 @@ class _SortiesTabState extends State<SortiesTab> {
         await _dataService.deleteSortie(realIndex);
         await _loadSorties();
         
-        if (!mounted) return; // Protection async
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Charge supprimée'),
@@ -227,7 +376,7 @@ class _SortiesTabState extends State<SortiesTab> {
           ),
         );
       } catch (e) {
-        if (!mounted) return; // Protection async
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Erreur lors de la suppression: $e'),
@@ -240,10 +389,9 @@ class _SortiesTabState extends State<SortiesTab> {
 
   Future<void> _toggleSortieType(int index) async {
     try {
-      final sortie = sorties[index];
+      final sortie = filteredSorties[index];
       final sortieId = sortie['id'] ?? '';
       
-      // Trouver l'index réel dans la liste non triée
       final originalSorties = await _dataService.getSorties();
       final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
       
@@ -265,8 +413,7 @@ class _SortiesTabState extends State<SortiesTab> {
         index: realIndex,
         amountStr: sortie['amount'].toString(),
         description: sortie['description'],
-        date: DateTime.tryParse(sortie['date'] ?? ''), // Ajouter la date
-        // Retirer le paramètre 'type' car il n'existe pas dans la méthode
+        date: DateTime.tryParse(sortie['date'] ?? ''),
       );
       
       await _loadSorties();
@@ -289,7 +436,6 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
-  // Nouvelles méthodes pour la sélection multiple (identiques à plaisirs_tab.dart)
   void _toggleSelectionMode() {
     setState(() {
       _isSelectionMode = !_isSelectionMode;
@@ -311,10 +457,10 @@ class _SortiesTabState extends State<SortiesTab> {
 
   void _selectAll() {
     setState(() {
-      if (_selectedIndices.length == sorties.length) {
+      if (_selectedIndices.length == filteredSorties.length) {
         _selectedIndices.clear();
       } else {
-        _selectedIndices = Set.from(List.generate(sorties.length, (index) => index));
+        _selectedIndices = Set.from(List.generate(filteredSorties.length, (index) => index));
       }
     });
   }
@@ -332,7 +478,7 @@ class _SortiesTabState extends State<SortiesTab> {
       List<int> realIndices = [];
       
       for (int displayIndex in _selectedIndices) {
-        final sortie = sorties[displayIndex];
+        final sortie = filteredSorties[displayIndex];
         final sortieId = sortie['id'] ?? '';
         final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
         
@@ -386,7 +532,7 @@ class _SortiesTabState extends State<SortiesTab> {
   Future<Map<String, dynamic>?> _showSortieDialog({
     String? description,
     double? amount,
-    DateTime? date, // Nouveau paramètre
+    DateTime? date,
     bool isEdit = false,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
@@ -520,606 +666,457 @@ class _SortiesTabState extends State<SortiesTab> {
     }
 
     return Scaffold(
-      body: RefreshIndicator(
-        onRefresh: _loadSorties,
-        child: sorties.isEmpty
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.receipt_long,
-                      size: 80,
-                      color: Colors.red.shade300,
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Aucune charge enregistrée',
-                      style: TextStyle(fontSize: 18, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Ajoutez vos charges fixes et variables',
-                      style: TextStyle(color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-                    ElevatedButton.icon(
-                      onPressed: _addSortie,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Ajouter une charge'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            : Column(
-                children: [
-                  // En-tête avec totaux et solde
-                  Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.all(16),
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.red.shade400, Colors.red.shade600],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(15),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.red.withValues(alpha: 0.3),
-                          blurRadius: 10,
-                          offset: const Offset(0, 5),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.receipt_long,
-                              color: Colors.white,
-                              size: 40,
-                            ),
-                            const SizedBox(width: 12),
-                            // Indicateur de chiffrement
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(Icons.lock, color: Colors.white, size: 14),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    'Chiffré',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              onPressed: _addSortie,
-                              icon: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                              tooltip: 'Ajouter une charge',
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 15),
-                        
-                        // Ligne des totaux
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Total Charges',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${AmountParser.formatAmount(totalSorties)} €',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: Colors.white.withValues(alpha: 0.3),
-                            ),
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        'Pointées',
-                                        style: TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      SizedBox(width: 4),
-                                      Icon(
-                                        Icons.check_circle,
-                                        color: Colors.white70,
-                                        size: 12,
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    '${AmountParser.formatAmount(totalPointe)} €',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: Colors.white.withValues(alpha: 0.3),
-                            ),
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Solde Débité',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  Text(
-                                    '${AmountParser.formatAmount(soldeDisponible)} €',
-                                    style: TextStyle(
-                                      color: soldeDisponible >= 0 ? Colors.greenAccent : Colors.redAccent,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Container(
-                              width: 1,
-                              height: 40,
-                              color: Colors.white.withValues(alpha: 0.3),
-                            ),
-                            Expanded(
-                              child: Column(
-                                children: [
-                                  const Text(
-                                    'Solde Prévisionnel',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                  FutureBuilder<double>(
-                                    future: _dataService.getTotals().then((totals) => totals['solde'] ?? 0.0),
-                                    builder: (context, snapshot) {
-                                      final soldePrevi = snapshot.data ?? 0.0;
-                                      return Text(
-                                        '${AmountParser.formatAmount(soldePrevi)} €',
-                                        style: TextStyle(
-                                          color: soldePrevi >= 0 ? Colors.greenAccent : Colors.redAccent,
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                        
-                        const SizedBox(height: 10),
-                        Text(
-                          '${sorties.length} charge${sorties.length > 1 ? 's' : ''} • ${sorties.where((s) => s['isPointed'] == true).length} pointée${sorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}',
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Mode sélection
-                  Row(
+      body: Stack(
+        children: [
+          // Contenu principal
+          filteredSorties.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Mode sélection
-                      Row(
-                        children: [
-                          IconButton(
-                            onPressed: _toggleSelectionMode,
-                            icon: Icon(
-                              _isSelectionMode ? Icons.close : Icons.checklist,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                            tooltip: _isSelectionMode ? 'Annuler sélection' : 'Sélection multiple',
-                          ),
-                          if (_isSelectionMode) ...[
-                            IconButton(
-                              onPressed: _selectAll,
-                              icon: Icon(
-                                _selectedIndices.length == sorties.length 
-                                    ? Icons.deselect 
-                                    : Icons.select_all,
-                                color: Colors.white,
-                                size: 24,
-                              ),
-                              tooltip: _selectedIndices.length == sorties.length 
-                                  ? 'Tout désélectionner' 
-                                  : 'Tout sélectionner',
-                            ),
-                          ],
-                        ],
+                      Icon(
+                        Icons.receipt_long,
+                        size: 100,
+                        color: Colors.grey.shade400,
                       ),
-                      
-                      // Tri et autres actions (suppression du bouton de tri)
-                      Row(
-                        children: [
-                          if (!_isSelectionMode)
-                            IconButton(
-                              onPressed: _addSortie,
-                              icon: const Icon(
-                                Icons.add,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                              tooltip: 'Ajouter une charge',
-                            ),
-                        ],
+                      const SizedBox(height: 20),
+                      Text(
+                        _currentFilter == 'Tous' 
+                            ? 'Aucune charge enregistrée'
+                            : 'Aucune charge pour cette période',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      const Text(
+                        'Ajoutez vos charges fixes et variables',
+                        style: TextStyle(color: Colors.grey),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 30),
+                      ElevatedButton.icon(
+                        onPressed: _addSortie,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Ajouter une charge'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red,
+                          foregroundColor: Colors.white,
+                        ),
                       ),
                     ],
                   ),
-
-                  // Bouton d'action pour la sélection multiple
-                  if (_isSelectionMode && _selectedIndices.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: _isProcessingBatch ? null : _batchTogglePointing,
-                        icon: _isProcessingBatch
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                ),
-                              )
-                            : const Icon(Icons.check_circle),
-                        label: Text(
-                          _isProcessingBatch
-                              ? 'Traitement en cours...'
-                              : 'Pointer ${_selectedIndices.length} charge(s)',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                      ),
-                    ),
-                  ],
-                  
-                  // Texte d'information pour la sélection
-                  if (_isSelectionMode)
+                )
+              : Column(
+                  children: [
+                    // En-tête avec totaux et filtres
                     Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      padding: const EdgeInsets.all(12),
+                      width: double.infinity,
+                      margin: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade200),
+                        gradient: LinearGradient(
+                          colors: [Colors.red.shade400, Colors.red.shade600],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(15),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.red.withValues(alpha: 0.3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
                       ),
-                      child: Row(
+                      child: Column(
                         children: [
-                          Icon(Icons.info, color: Colors.blue.shade600, size: 16),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '${_selectedIndices.length} charge(s) sélectionnée(s). Appuyez sur les cases pour sélectionner/désélectionner.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.blue.shade700,
+                          // Ligne des actions (filtre + ajout)
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Bouton filtre
+                              InkWell(
+                                onTap: _showFilterDialog,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.filter_list, color: Colors.white, size: 18),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _currentFilter == 'Tous' 
+                                            ? 'Tous'
+                                            : _currentFilter == 'Mois'
+                                                ? '${_getMonthName(_selectedFilterDate!.month).substring(0, 3)} ${_selectedFilterDate!.year}'
+                                                : '${_selectedFilterDate!.year}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
-                            ),
+
+                              // Actions
+                              Row(
+                                children: [
+                                  // Bouton sélection multiple
+                                  if (filteredSorties.isNotEmpty)
+                                    InkWell(
+                                      onTap: _toggleSelectionMode,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(25),
+                                        ),
+                                        child: Icon(
+                                          _isSelectionMode ? Icons.close : Icons.checklist,
+                                          color: Colors.white,
+                                          size: 24,
+                                        ),
+                                      ),
+                                    ),
+                                  
+                                  const SizedBox(width: 8),
+                                  
+                                  // Bouton ajout
+                                  InkWell(
+                                    onTap: _addSortie,
+                                    child: Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.2),
+                                        borderRadius: BorderRadius.circular(25),
+                                      ),
+                                      child: const Icon(
+                                        Icons.add,
+                                        color: Colors.white,
+                                        size: 28,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 15),
+                          
+                          // Informations totaux
+                          Column(
+                            children: [
+                              const Text(
+                                'Total Charges',
+                                style: TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                '${AmountParser.formatAmount(totalSorties)} €',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 5),
+                              Text(
+                                // CORRECTION: Utiliser interpolation
+                                '${filteredSorties.length} charge${filteredSorties.length > 1 ? 's' : ''} • ${filteredSorties.where((s) => s['isPointed'] == true).length} pointée${filteredSorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
 
-                  const SizedBox(height: 10),
-
-                  // Liste des charges
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: sorties.length,
-                      itemBuilder: (context, index) {
-                        final sortie = sorties[index];
-                        final amount = (sortie['amount'] as num?)?.toDouble() ?? 0;
-                        final description = sortie['description'] as String? ?? '';
-                        final dateStr = sortie['date'] as String? ?? '';
-                        final date = DateTime.tryParse(dateStr);
-                        final isPointed = sortie['isPointed'] == true;
-                        final isSelected = _selectedIndices.contains(index);
-                        final pointedAt = sortie['pointedAt'] != null 
-                            ? DateTime.tryParse(sortie['pointedAt']) 
-                            : null;
-                        
-                        return Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: isSelected 
-                                ? Colors.blue.shade50 
-                                : (isPointed ? Colors.green.shade50 : Colors.white),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
+                    // Liste des charges filtrées
+                    Expanded(
+                      child: ListView.builder(
+                        itemCount: filteredSorties.length,
+                        itemBuilder: (context, index) {
+                          final sortie = filteredSorties[index];
+                          final amount = (sortie['amount'] as num?)?.toDouble() ?? 0;
+                          final description = sortie['description'] as String? ?? '';
+                          final dateStr = sortie['date'] as String? ?? '';
+                          final date = DateTime.tryParse(dateStr);
+                          final isPointed = sortie['isPointed'] == true;
+                          final isSelected = _selectedIndices.contains(index);
+                          final pointedAt = sortie['pointedAt'] != null 
+                              ? DateTime.tryParse(sortie['pointedAt']) 
+                              : null;
+                          
+                          return Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            decoration: BoxDecoration(
                               color: isSelected 
-                                  ? Colors.blue.shade300
-                                  : (isPointed ? Colors.green.shade300 : Colors.grey.shade200),
-                              width: isSelected ? 2 : 1,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.grey.withValues(alpha: 0.1),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
+                                  ? Colors.blue.shade50 
+                                  : (isPointed ? Colors.green.shade50 : Colors.white),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected 
+                                    ? Colors.blue.shade300
+                                    : (isPointed ? Colors.green.shade300 : Colors.grey.shade200),
+                                width: isSelected ? 2 : 1,
                               ),
-                            ],
-                          ),
-                          child: ListTile(
-                            // Case à cocher en mode sélection
-                            leading: _isSelectionMode
-                                ? Checkbox(
-                                    value: isSelected,
-                                    onChanged: (value) => _toggleSelection(index),
-                                    activeColor: Colors.blue,
-                                  )
-                                : GestureDetector(
-                                    onTap: () => _togglePointing(index),
-                                    child: Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: isPointed ? Colors.green.shade100 : 
-                                               (sortie['type'] == 'fixe' ? Colors.red.shade100 : Colors.orange.shade100),
-                                        borderRadius: BorderRadius.circular(20),
-                                        border: Border.all(
-                                          color: isPointed ? Colors.green.shade300 : 
-                                                 (sortie['type'] == 'fixe' ? Colors.red.shade300 : Colors.orange.shade300),
-                                          width: 2,
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        isPointed ? Icons.check_circle : Icons.radio_button_unchecked,
-                                        color: isPointed ? Colors.green.shade700 : 
-                                               (sortie['type'] == 'fixe' ? Colors.red.shade700 : Colors.orange.shade700),
-                                        size: 24,
-                                      ),
-                                    ),
-                                  ),
-                            title: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    description,
-                                    style: TextStyle(
-                                      fontWeight: sortie['type'] == 'fixe' ? FontWeight.bold : FontWeight.normal,
-                                      color: isPointed ? Colors.green.shade700 : null,
-                                    ),
-                                  ),
-                                ),
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '${AmountParser.formatAmount(amount)} €',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: isPointed ? Colors.green.shade700 : 
-                                               (sortie['type'] == 'fixe' ? Colors.red : Colors.orange),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.lock_open,
-                                      size: 12,
-                                      color: isPointed ? Colors.green.shade400 : 
-                                             (sortie['type'] == 'fixe' ? Colors.red.shade400 : Colors.orange.shade400),
-                                    ),
-                                  ],
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.withValues(alpha: 0.1),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(
-                                      sortie['type'] == 'fixe' 
-                                          ? Icons.repeat 
-                                          : Icons.show_chart,
-                                      size: 16,
-                                      color: isPointed ? Colors.green.shade600 : Colors.grey,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      sortie['type'] == 'fixe' 
-                                          ? 'Charge fixe mensuelle'
-                                          : 'Charge variable',
-                                      style: TextStyle(
-                                        color: isPointed ? Colors.green.shade600 : Colors.grey,
+                            child: ListTile(
+                              // Case à cocher en mode sélection
+                              leading: _isSelectionMode
+                                  ? Checkbox(
+                                      value: isSelected,
+                                      onChanged: (value) => _toggleSelection(index),
+                                      activeColor: Colors.blue,
+                                    )
+                                  : GestureDetector(
+                                      onTap: () => _togglePointing(index),
+                                      child: Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: isPointed ? Colors.green.shade100 : 
+                                                 (sortie['type'] == 'fixe' ? Colors.red.shade100 : Colors.orange.shade100),
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: isPointed ? Colors.green.shade300 : 
+                                                   (sortie['type'] == 'fixe' ? Colors.red.shade300 : Colors.orange.shade300),
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          isPointed ? Icons.check_circle : Icons.radio_button_unchecked,
+                                          color: isPointed ? Colors.green.shade700 : 
+                                                 (sortie['type'] == 'fixe' ? Colors.red.shade700 : Colors.orange.shade700),
+                                          size: 24,
+                                        ),
                                       ),
                                     ),
-                                    if (date != null) ...[
-                                      const Text(' • '),
+                              title: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      description,
+                                      style: TextStyle(
+                                        fontWeight: sortie['type'] == 'fixe' ? FontWeight.bold : FontWeight.normal,
+                                        color: isPointed ? Colors.green.shade700 : null,
+                                      ),
+                                    ),
+                                  ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
                                       Text(
-                                        DateFormat('dd/MM/yyyy').format(date),
+                                        '${AmountParser.formatAmount(amount)} €',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: isPointed ? Colors.green.shade700 : 
+                                                 (sortie['type'] == 'fixe' ? Colors.red : Colors.orange),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Icon(
+                                        Icons.lock_open,
+                                        size: 12,
+                                        color: isPointed ? Colors.green.shade400 : 
+                                               (sortie['type'] == 'fixe' ? Colors.red.shade400 : Colors.orange.shade400),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        sortie['type'] == 'fixe' 
+                                            ? Icons.repeat 
+                                            : Icons.show_chart,
+                                        size: 16,
+                                        color: isPointed ? Colors.green.shade600 : Colors.grey,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        sortie['type'] == 'fixe' 
+                                            ? 'Charge fixe mensuelle'
+                                            : 'Charge variable',
                                         style: TextStyle(
                                           color: isPointed ? Colors.green.shade600 : Colors.grey,
                                         ),
                                       ),
-                                    ],
-                                  ],
-                                ),
-                                if (isPointed && pointedAt != null)
-                                  Text(
-                                    'Pointée le ${pointedAt.day}/${pointedAt.month} à ${pointedAt.hour}:${pointedAt.minute.toString().padLeft(2, '0')}',
-                                    style: TextStyle(
-                                      color: Colors.green.shade600,
-                                      fontSize: 10,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            trailing: !_isSelectionMode
-                                ? Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      if (isPointed)
-                                        Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: Colors.green.shade100,
-                                            borderRadius: BorderRadius.circular(8),
-                                            border: Border.all(color: Colors.green.shade300),
+                                      if (date != null) ...[
+                                        const Text(' • '),
+                                        Text(
+                                          DateFormat('dd/MM/yyyy').format(date),
+                                          style: TextStyle(
+                                            color: isPointed ? Colors.green.shade600 : Colors.grey,
                                           ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  if (isPointed && pointedAt != null)
+                                    Text(
+                                      'Pointée le ${pointedAt.day}/${pointedAt.month} à ${pointedAt.hour}:${pointedAt.minute.toString().padLeft(2, '0')}',
+                                      style: TextStyle(
+                                        color: Colors.green.shade600,
+                                        fontSize: 10,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: !_isSelectionMode
+                                  ? PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        switch (value) {
+                                          case 'toggle':
+                                            _togglePointing(index);
+                                            break;
+                                          case 'type':
+                                            _toggleSortieType(index);
+                                            break;
+                                          case 'edit':
+                                            _editSortie(index);
+                                            break;
+                                          case 'delete':
+                                            _deleteSortie(index);
+                                            break;
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: 'toggle',
                                           child: Row(
-                                            mainAxisSize: MainAxisSize.min,
                                             children: [
-                                              Icon(Icons.check, size: 12, color: Colors.green.shade700),
-                                              const SizedBox(width: 2),
-                                              Text(
-                                                'Pointé',
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  color: Colors.green.shade700,
-                                                  fontWeight: FontWeight.w500,
-                                                ),
+                                              Icon(
+                                                isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
+                                                color: isPointed ? Colors.orange : Colors.green,
                                               ),
+                                              const SizedBox(width: 8),
+                                              Text(isPointed ? 'Dépointer' : 'Pointer'),
                                             ],
                                           ),
                                         ),
-                                      const SizedBox(width: 8),
-                                      PopupMenuButton<String>(
-                                        onSelected: (value) {
-                                          switch (value) {
-                                            case 'toggle':
-                                              _togglePointing(index);
-                                              break;
-                                            case 'type':
-                                              _toggleSortieType(index);
-                                              break;
-                                            case 'edit':
-                                              _editSortie(index);
-                                              break;
-                                            case 'delete':
-                                              _deleteSortie(index);
-                                              break;
-                                          }
-                                        },
-                                        itemBuilder: (context) => [
-                                          PopupMenuItem(
-                                            value: 'toggle',
-                                            child: Row(
-                                              children: [
-                                                Icon(
-                                                  isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
-                                                  color: isPointed ? Colors.orange : Colors.green,
-                                                ),
-                                                const SizedBox(width: 8),
-                                                Text(isPointed ? 'Dépointer' : 'Pointer'),
-                                              ],
-                                            ),
+                                        const PopupMenuItem(
+                                          value: 'type',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.swap_horiz, color: Colors.blue),
+                                              SizedBox(width: 8),
+                                              Text('Changer type'),
+                                            ],
                                           ),
-                                          const PopupMenuItem(
-                                            value: 'type',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.swap_horiz, color: Colors.blue),
-                                                SizedBox(width: 8),
-                                                Text('Changer type'),
-                                              ],
-                                            ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit, color: Colors.blue),
+                                              SizedBox(width: 8),
+                                              Text('Modifier'),
+                                            ],
                                           ),
-                                          const PopupMenuItem(
-                                            value: 'edit',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.edit, color: Colors.blue),
-                                                SizedBox(width: 8),
-                                                Text('Modifier'),
-                                              ],
-                                            ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete, color: Colors.red),
+                                              SizedBox(width: 8),
+                                              Text('Supprimer'),
+                                            ],
                                           ),
-                                          const PopupMenuItem(
-                                            value: 'delete',
-                                            child: Row(
-                                              children: [
-                                                Icon(Icons.delete, color: Colors.red),
-                                                SizedBox(width: 8),
-                                                Text('Supprimer'),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ],
-                                  )
-                                : null,
-                            onTap: _isSelectionMode
-                                ? () => _toggleSelection(index)
-                                : () => _togglePointing(index),
-                          ),
-                        );
-                      },
+                                        ),
+                                      ],
+                                    )
+                                  : null,
+                              onTap: _isSelectionMode
+                                  ? () => _toggleSelection(index)
+                                  : () => _togglePointing(index),
+                            ),
+                          );
+                        },
+                      ),
                     ),
+                  ],
+                ),
+
+          // CORRECTION: Créer un widget simple au lieu d'utiliser PointingWidget
+          if (_isSelectionMode && _selectedIndices.isNotEmpty)
+            Positioned(
+              bottom: 80,
+              left: 16,
+              right: 16,
+              child: Card(
+                elevation: 8,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${_selectedIndices.length} charge${_selectedIndices.length > 1 ? 's' : ''} sélectionnée${_selectedIndices.length > 1 ? 's' : ''}',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      if (_isProcessingBatch)
+                        const CircularProgressIndicator(strokeWidth: 2)
+                      else ...[
+                        ElevatedButton.icon(
+                          onPressed: _batchTogglePointing,
+                          icon: const Icon(Icons.check_circle),
+                          label: const Text('Pointer'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: _selectAll,
+                          icon: const Icon(Icons.select_all),
+                          label: const Text('Tout'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
+                ),
               ),
+            ),
+        ],
       ),
     );
   }
