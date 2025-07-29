@@ -6,7 +6,12 @@ import '../services/pointing_service.dart';
 import '../widgets/pointing_widget.dart';
 
 class PlaisirsTab extends StatefulWidget {
-  const PlaisirsTab({super.key});
+  final DateTime? selectedMonth; // Ajouter ce paramètre optionnel
+  
+  const PlaisirsTab({
+    super.key,
+    this.selectedMonth,
+  });
 
   @override
   State<PlaisirsTab> createState() => _PlaisirsTabState();
@@ -35,7 +40,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   @override
   void initState() {
     super.initState();
-    _pointingService = PointingService(_dataService);
     _loadPlaisirs();
   }
 
@@ -46,25 +50,19 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
     try {
       final data = await _dataService.getPlaisirs();
-      final totals = await _dataService.getTotals();
-      final solde = await _dataService.getSoldeDisponible();
-      
-      final totalPlaisirsPointe = data
-          .where((p) => p['isPointed'] == true)
-          .fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
       
       setState(() {
-        plaisirs = data..sort((a, b) {
-          final aDate = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
-          final bDate = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
-          return bDate.compareTo(aDate);
-        });
-        totalPlaisirs = totals['plaisirs'] ?? 0.0;
-        totalPointe = totalPlaisirsPointe;
-        soldeDisponible = solde;
+        plaisirs = data;
+        // Si un mois spécifique est sélectionné, filtrer automatiquement
+        if (widget.selectedMonth != null) {
+          _currentFilter = 'Mois';
+          _selectedFilterDate = widget.selectedMonth;
+          _applyFilter();
+        } else {
+          filteredPlaisirs = List.from(plaisirs);
+          _calculateTotals();
+        }
         isLoading = false;
-        
-        _applyFilter();
       });
     } catch (e) {
       setState(() {
@@ -79,6 +77,19 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
         );
       }
     }
+  }
+  
+  void _calculateTotals() {
+    final total = plaisirs.fold(0.0, 
+      (sum, plaisir) => sum + ((plaisir['amount'] as num?)?.toDouble() ?? 0.0));
+    final pointe = plaisirs
+        .where((p) => p['isPointed'] == true)
+        .fold(0.0, (sum, plaisir) => sum + ((plaisir['amount'] as num?)?.toDouble() ?? 0.0));
+    
+    setState(() {
+      totalPlaisirs = total;
+      totalPointe = pointe;
+    });
   }
 
   void _applyFilter() {

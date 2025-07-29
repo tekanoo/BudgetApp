@@ -5,7 +5,12 @@ import '../services/encryption_service.dart';
 import '../widgets/periodicity_selector.dart';
 
 class EntreesTab extends StatefulWidget {
-  const EntreesTab({super.key});
+  final DateTime? selectedMonth; // Ajouter ce paramètre optionnel
+  
+  const EntreesTab({
+    super.key,
+    this.selectedMonth,
+  });
 
   @override
   State<EntreesTab> createState() => _EntreesTabState();
@@ -25,7 +30,7 @@ class _EntreesTabState extends State<EntreesTab> {
 
   // Variables pour sélection multiple
   bool _isSelectionMode = false;
-  Set<int> _selectedIndices = {};
+  final Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
 
   @override
@@ -41,22 +46,19 @@ class _EntreesTabState extends State<EntreesTab> {
 
     try {
       final data = await _dataService.getEntrees();
-      final totals = await _dataService.getTotals();
-      final solde = await _dataService.getSoldeDisponible();
       
       setState(() {
-        // Tri par défaut : plus récent en haut (par date de création)
-        entrees = data..sort((a, b) {
-          final aDate = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
-          final bDate = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
-          return bDate.compareTo(aDate); // Plus récent en premier
-        });
-        totalEntrees = totals['entrees'] ?? 0.0;
-        soldeDisponible = solde;
+        entrees = data;
+        // Si un mois spécifique est sélectionné, filtrer automatiquement
+        if (widget.selectedMonth != null) {
+          _currentFilter = 'Mois';
+          _selectedFilterDate = widget.selectedMonth;
+          _applyFilter();
+        } else {
+          filteredEntrees = List.from(entrees);
+          _calculateTotals();
+        }
         isLoading = false;
-        
-        // Appliquer le filtre après le chargement
-        _applyFilter();
       });
     } catch (e) {
       setState(() {
@@ -563,6 +565,21 @@ class _EntreesTabState extends State<EntreesTab> {
           _isProcessingBatch = false;
         });
       }
+    }
+  }
+
+  void _calculateTotals() {
+    // Calculer le total des entrées
+    totalEntrees = entrees.fold(0.0, (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
+    
+    // Si un filtre est appliqué, recalculer le total des entrées filtrées
+    if (_currentFilter != 'Tous' && _selectedFilterDate != null) {
+      final filteredTotal = filteredEntrees.fold(0.0, 
+        (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
+      
+      setState(() {
+        totalEntrees = filteredTotal;
+      });
     }
   }
 

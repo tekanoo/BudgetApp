@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firebase_service.dart';
 import 'login_screen.dart';
-import 'main_menu_screen.dart';
+import 'month_selector_screen.dart'; // Ajouter cet import
 
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
@@ -77,13 +77,9 @@ class AuthWrapper extends StatelessWidget {
 
         // Utilisateur connecté ou non
         final user = snapshot.data;
-        if (user != null) {
-          // Utilisateur connecté → Interface principale
-          return const MainMenuScreen();
-        } else {
-          // Utilisateur non connecté → Écran de connexion
-          return const LoginScreen();
-        }
+        return user != null
+            ? const MonthSelectorScreen() // Changement ici
+            : const LoginScreen();
       },
     );
   }

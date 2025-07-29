@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
-import '../services/encryption_service.dart';
+import '../utils/amount_parser.dart';
 
 class HomeTab extends StatefulWidget {
-  const HomeTab({super.key});
+  final DateTime? selectedMonth; // Ajouter ce paramètre optionnel
+  
+  const HomeTab({
+    super.key,
+    this.selectedMonth, // Paramètre optionnel pour garder la compatibilité
+  });
 
   @override
   State<HomeTab> createState() => _HomeTabState();
@@ -14,66 +19,322 @@ class _HomeTabState extends State<HomeTab> {
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _tagController = TextEditingController();
+  
   DateTime? _selectedDate;
-  List<String> _availableTags = [];
-  List<String> _filteredTags = [];
   bool _isLoading = false;
   
-  // Variables manquantes ajoutées
-  bool isLoading = false;
-  double totalEntrees = 0.0;
-  double totalSorties = 0.0;
-  double totalPlaisirs = 0.0;
-  double soldeDisponible = 0.0;
-
+  // Données du mois
+  double _monthlyEntrees = 0.0;
+  double _monthlySorties = 0.0;
+  double _monthlyPlaisirs = 0.0;
+  List<String> _availableTags = [];
+  
   @override
   void initState() {
     super.initState();
-    _selectedDate = DateTime.now();
+    // Si selectedMonth est fourni, l'utiliser comme date sélectionnée
+    if (widget.selectedMonth != null) {
+      _selectedDate = widget.selectedMonth;
+    }
+    _loadMonthlyData();
     _loadAvailableTags();
-    _tagController.addListener(_onTagTextChanged);
   }
-
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _tagController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadAvailableTags() async {
+  
+  // Modifier la méthode _loadMonthlyData pour filtrer par mois si nécessaire
+  Future<void> _loadMonthlyData() async {
     try {
-      final tags = await _dataService.getTags();
-      setState(() {
-        _availableTags = tags;
-        _filteredTags = tags;
-      });
+      final entrees = await _dataService.getEntrees();
+      final sorties = await _dataService.getSorties();
+      final plaisirs = await _dataService.getPlaisirs();
+      
+      // Si un mois spécifique est sélectionné, filtrer les données
+      if (widget.selectedMonth != null) {
+        final monthlyEntrees = entrees.where((e) {
+          final date = DateTime.tryParse(e['date'] ?? '');
+          return date != null && 
+                 date.year == widget.selectedMonth!.year &&
+                 date.month == widget.selectedMonth!.month;
+        }).toList();
+        
+        final monthlySorties = sorties.where((s) {
+          final date = DateTime.tryParse(s['date'] ?? '');
+          return date != null && 
+                 date.year == widget.selectedMonth!.year &&
+                 date.month == widget.selectedMonth!.month;
+        }).toList();
+        
+        final monthlyPlaisirs = plaisirs.where((p) {
+          final date = DateTime.tryParse(p['date'] ?? '');
+          return date != null && 
+                 date.year == widget.selectedMonth!.year &&
+                 date.month == widget.selectedMonth!.month;
+        }).toList();
+        
+        setState(() {
+          _monthlyEntrees = monthlyEntrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          _monthlySorties = monthlySorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+          _monthlyPlaisirs = monthlyPlaisirs.fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+        });
+      } else {
+        // Comportement normal (toutes les données)
+        final totals = await _dataService.getTotals();
+        setState(() {
+          _monthlyEntrees = totals['entrees'] ?? 0.0;
+          _monthlySorties = totals['sorties'] ?? 0.0;
+          _monthlyPlaisirs = totals['plaisirs'] ?? 0.0;
+        });
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Erreur de chargement des tags'),
+          SnackBar(
+            content: Text('Erreur de chargement: $e'),
             backgroundColor: Colors.red,
           ),
         );
       }
     }
   }
-
-  void _onTagTextChanged() {
-    final query = _tagController.text.toLowerCase();
-    setState(() {
-      if (query.isEmpty) {
-        _filteredTags = _availableTags;
-      } else {
-        _filteredTags = _availableTags
-            .where((tag) => tag.toLowerCase().contains(query))
-            .toList();
-      }
-    });
+  
+  Future<void> _loadAvailableTags() async {
+    try {
+      final plaisirs = await _dataService.getPlaisirs();
+      final tags = plaisirs
+          .map((p) => p['tag'] as String? ?? '')
+          .where((tag) => tag.isNotEmpty)
+          .toSet()
+          .toList();
+      
+      setState(() {
+        _availableTags = tags;
+      });
+    } catch (e) {
+      // Gestion d'erreur silencieuse
+    }
   }
+  
+  @override
+  Widget build(BuildContext context) {
+    final monthName = widget.selectedMonth != null 
+        ? DateFormat('MMMM yyyy', 'fr_FR').format(widget.selectedMonth!)
+        : 'Budget Global';
+    final solde = _monthlyEntrees - _monthlySorties - _monthlyPlaisirs;
+    
+    return Scaffold(
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Carte de résumé mensuel
+            Card(
+              elevation: 8,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withOpacity(0.8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      'Budget $monthName',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildSummaryItem('Revenus', _monthlyEntrees, Colors.green),
+                        _buildSummaryItem('Charges', _monthlySorties, Colors.red),
+                        _buildSummaryItem('Dépenses', _monthlyPlaisirs, Colors.purple),
+                      ],
+                    ),
+                    const Divider(color: Colors.white54, height: 30),
+                    _buildSummaryItem(
+                      'Solde',
+                      solde,
+                      solde >= 0 ? Colors.green : Colors.red,
+                      isLarge: true,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 30),
+            
+            // Formulaire d'ajout de dépense (comme votre HomeTab actuel)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Text(
+                      'Ajouter une dépense',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 30),
 
-  // CORRECTION: Renommer _saveTransaction en _addExpense
+                    // Champ montant
+                    TextField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      decoration: const InputDecoration(
+                        labelText: 'Montant *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.euro),
+                        suffixText: '€',
+                        helperText: 'Utilisez , ou . pour les décimales',
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Champ catégorie avec suggestions
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        TextField(
+                          controller: _tagController,
+                          decoration: const InputDecoration(
+                            labelText: 'Catégorie',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.tag),
+                            helperText: 'Restaurant, Shopping, Loisirs...',
+                          ),
+                        ),
+                        if (_availableTags.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 4,
+                            children: _availableTags.take(6).map((tag) => 
+                              ActionChip(
+                                label: Text(tag),
+                                onPressed: () {
+                                  _tagController.text = tag;
+                                },
+                              ),
+                            ).toList(),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Sélecteur de date (pré-rempli avec le mois sélectionné)
+                    InkWell(
+                      onTap: _pickDate,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: Colors.grey.shade400),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.calendar_today),
+                            const SizedBox(width: 12),
+                            Text(
+                              _selectedDate == null
+                                  ? 'Sélectionner une date'
+                                  : 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: _selectedDate == null ? Colors.grey.shade600 : null,
+                              ),
+                            ),
+                            const Spacer(),
+                            Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 30),
+
+                    // Bouton d'ajout
+                    SizedBox(
+                      height: 56,
+                      child: FilledButton.icon(
+                        onPressed: _isLoading ? null : _addExpense,
+                        icon: _isLoading 
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.add),
+                        label: Text(
+                          _isLoading 
+                            ? 'Enregistrement...'
+                            : 'Ajouter une dépense',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildSummaryItem(String label, double amount, Color color, {bool isLarge = false}) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.white70,
+            fontSize: isLarge ? 16 : 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '${amount.toStringAsFixed(2).replaceAll('.', ',')}€',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: isLarge ? 24 : 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate ?? widget.selectedMonth ?? DateTime.now(),
+      firstDate: widget.selectedMonth != null 
+          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month, 1)
+          : DateTime(2020),
+      lastDate: widget.selectedMonth != null 
+          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month + 1, 0)
+          : DateTime(2030),
+    );
+    
+    if (picked != null) {
+      setState(() {
+        _selectedDate = picked;
+      });
+    }
+  }
+  
   Future<void> _addExpense() async {
     if (_amountController.text.trim().isEmpty || _selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -85,7 +346,6 @@ class _HomeTabState extends State<HomeTab> {
       return;
     }
 
-    // Parse le montant avec support des virgules
     final amount = AmountParser.parseAmount(_amountController.text);
     if (amount <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -106,22 +366,19 @@ class _HomeTabState extends State<HomeTab> {
           ? 'Sans catégorie' 
           : _tagController.text.trim();
 
-      // Les données sont automatiquement chiffrées !
       await _dataService.addPlaisir(
         amountStr: _amountController.text,
         tag: tag,
         date: _selectedDate,
       );
 
+      // Recharger les données du mois
+      await _loadMonthlyData();
+      await _loadAvailableTags();
+
       // Réinitialiser le formulaire
       _amountController.clear();
       _tagController.clear();
-      setState(() {
-        _selectedDate = DateTime.now();
-      });
-
-      // Recharger les tags disponibles
-      await _loadAvailableTags();
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,264 +402,5 @@ class _HomeTabState extends State<HomeTab> {
         });
       }
     }
-  }
-
-  Future<void> _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate ?? now,
-      firstDate: DateTime(now.year - 5),
-      lastDate: DateTime(now.year + 1),
-    );
-    if (picked != null) {
-      setState(() {
-        _selectedDate = picked;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Section des soldes
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: Theme.of(context).brightness == Brightness.dark
-                      ? [Colors.blue.shade800, Colors.blue.shade900]
-                      : [Colors.blue.shade600, Colors.blue.shade800],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Solde prévisionnel',
-                              style: TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
-                            const SizedBox(height: 4),
-                            FutureBuilder<double>(
-                              future: _dataService.getTotals().then((totals) => totals['solde'] ?? 0.0),
-                              builder: (context, snapshot) {
-                                if (snapshot.hasData) {
-                                  return Text(
-                                    '${AmountParser.formatAmount(snapshot.data!)} €',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  );
-                                }
-                                return const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 1,
-                        height: 40,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                      Expanded(
-                        child: Column(
-                          children: [
-                            const Text(
-                              'Solde débité',
-                              style: TextStyle(color: Colors.white70, fontSize: 12),
-                            ),
-                            const SizedBox(height: 4),
-                            FutureBuilder<double>(
-                              future: _dataService.getSoldeDisponible(),
-                              builder: (context, snapshot) {
-                                if (snapshot.hasData) {
-                                  return Text(
-                                    '${AmountParser.formatAmount(snapshot.data!)} €',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  );
-                                }
-                                return const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                  ),
-                                );
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Icône et titre
-            Icon(
-              Icons.shopping_cart_outlined,
-              size: 80,
-              color: Theme.of(context).primaryColor,
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Ajouter une dépense',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 30),
-
-            // Champ montant avec support virgules
-            TextField(
-              controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'Montant *',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.euro),
-                suffixText: '€',
-                helperText: 'Utilisez , ou . pour les décimales (ex: 15,50 ou 15.50)',
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // Champ tag avec autocomplétion
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: _tagController,
-                  decoration: const InputDecoration(
-                    labelText: 'Catégorie',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.tag),
-                    helperText: 'Restaurant, Shopping, Loisirs...',
-                  ),
-                ),
-                if (_filteredTags.isNotEmpty && _tagController.text.isNotEmpty)
-                  Container(
-                    margin: const EdgeInsets.only(top: 5),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey.shade300),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: _filteredTags.take(5).length,
-                      itemBuilder: (context, index) {
-                        final tag = _filteredTags[index];
-                        return ListTile(
-                          dense: true,
-                          leading: const Icon(Icons.tag, size: 16),
-                          title: Text(tag),
-                          onTap: () {
-                            _tagController.text = tag;
-                            setState(() {
-                              _filteredTags = [];
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-
-            // Sélecteur de date
-            InkWell(
-              onTap: _pickDate,
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade400),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.calendar_today),
-                    const SizedBox(width: 12),
-                    Text(
-                      _selectedDate == null
-                          ? 'Sélectionner une date'
-                          : 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: _selectedDate == null ? Colors.grey.shade600 : null,
-                      ),
-                    ),
-                    const Spacer(),
-                    Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 30),
-
-            // Bouton de validation
-            SizedBox(
-              height: 56,
-              child: FilledButton.icon(
-                onPressed: _isLoading ? null : _addExpense,
-                icon: _isLoading 
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.add),
-                label: Text(
-                  _isLoading 
-                    ? 'Enregistrement...'
-                    : 'Ajouter une dépense',
-                  style: const TextStyle(fontSize: 16),
-                ),
-              ),
-            ),
-            
-            const SizedBox(height: 20),
-            Text(
-              '* Champs obligatoires',
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey.shade600,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

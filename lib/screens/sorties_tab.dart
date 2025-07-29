@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
-import '../services/encryption_service.dart';
-import '../widgets/periodicity_selector.dart'; // Ajouter cet import
+import '../utils/amount_parser.dart'; // GARDER SEULEMENT CELUI-CI
+import '../widgets/periodicity_selector.dart';
 
 class SortiesTab extends StatefulWidget {
-  const SortiesTab({super.key});
+  final DateTime? selectedMonth;
+  
+  const SortiesTab({
+    super.key,
+    this.selectedMonth,
+  });
 
   @override
   State<SortiesTab> createState() => _SortiesTabState();
@@ -28,7 +33,6 @@ class _SortiesTabState extends State<SortiesTab> {
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
-  String? _selectedPeriodicity = 'ponctuel'; // Ajouter cette variable
 
   @override
   void initState() {
@@ -43,24 +47,19 @@ class _SortiesTabState extends State<SortiesTab> {
 
     try {
       final data = await _dataService.getSorties();
-      final totals = await _dataService.getTotals();
-      final solde = await _dataService.getSoldeDisponible();
-      final totalSortiesPointe = await _dataService.getTotalSortiesTotaux();
       
       setState(() {
-        // Tri par défaut : plus récent en haut (par date de création)
-        sorties = data..sort((a, b) {
-          final aDate = DateTime.tryParse(a['date'] ?? '') ?? DateTime(1970);
-          final bDate = DateTime.tryParse(b['date'] ?? '') ?? DateTime(1970);
-          return bDate.compareTo(aDate); // Plus récent en premier
-        });
-        totalSorties = totals['sorties'] ?? 0.0;
-        totalPointe = totalSortiesPointe;
-        soldeDisponible = solde;
+        sorties = data;
+        // Si un mois spécifique est sélectionné, filtrer automatiquement
+        if (widget.selectedMonth != null) {
+          _currentFilter = 'Mois';
+          _selectedFilterDate = widget.selectedMonth;
+          _applyFilter();
+        } else {
+          filteredSorties = List.from(sorties);
+          _calculateTotals();
+        }
         isLoading = false;
-        
-        // Appliquer le filtre après le chargement
-        _applyFilter();
       });
     } catch (e) {
       setState(() {
@@ -95,17 +94,18 @@ class _SortiesTabState extends State<SortiesTab> {
       }).toList();
     }
     
-    // Recalculer les totaux des charges filtrées
-    final filteredTotal = filteredSorties.fold(0.0, 
+    _calculateTotals();
+  }
+
+  void _calculateTotals() {
+    totalSorties = filteredSorties.fold(0.0, 
       (sum, sortie) => sum + ((sortie['amount'] as num?)?.toDouble() ?? 0.0));
-    final filteredPointe = filteredSorties
+    
+    totalPointe = filteredSorties
         .where((s) => s['isPointed'] == true)
         .fold(0.0, (sum, sortie) => sum + ((sortie['amount'] as num?)?.toDouble() ?? 0.0));
     
-    setState(() {
-      totalSorties = filteredTotal;
-      totalPointe = filteredPointe;
-    });
+    setState(() {});
   }
 
   void _showFilterDialog() {
@@ -274,7 +274,7 @@ class _SortiesTabState extends State<SortiesTab> {
           amountStr: result['amountStr'],
           description: result['description'],
           date: result['date'],
-          periodicity: _selectedPeriodicity, // Passer la périodicité
+          periodicity: result['periodicity'],
         );
         await _loadSorties();
         
@@ -311,7 +311,7 @@ class _SortiesTabState extends State<SortiesTab> {
       description: sortie['description'],
       amount: sortie['amount'],
       date: DateTime.tryParse(sortie['date'] ?? ''),
-      periodicity: sortie['periodicity'], // Récupérer la périodicité existante
+      periodicity: sortie['periodicity'],
     );
     
     if (result != null) {
@@ -321,7 +321,7 @@ class _SortiesTabState extends State<SortiesTab> {
           amountStr: result['amountStr'],
           description: result['description'],
           date: result['date'],
-          periodicity: result['periodicity'], // Passer la périodicité
+          periodicity: result['periodicity'],
         );
         await _loadSorties();
         
@@ -400,55 +400,6 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
-  Future<void> _toggleSortieType(int index) async {
-    try {
-      final sortie = filteredSorties[index];
-      final sortieId = sortie['id'] ?? '';
-      
-      final originalSorties = await _dataService.getSorties();
-      final realIndex = originalSorties.indexWhere((s) => s['id'] == sortieId);
-      
-      if (realIndex == -1) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Charge non trouvée'),
-            backgroundColor: Colors.red,
-          ),
-        );
-        return;
-      }
-      
-      final currentType = sortie['type'] as String? ?? 'variable';
-      final newType = currentType == 'fixe' ? 'variable' : 'fixe';
-      
-      await _dataService.updateSortie(
-        index: realIndex,
-        amountStr: sortie['amount'].toString(),
-        description: sortie['description'],
-        date: DateTime.tryParse(sortie['date'] ?? ''),
-      );
-      
-      await _loadSorties();
-      
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Charge passée en ${newType == 'fixe' ? 'fixe' : 'variable'}'),
-          backgroundColor: newType == 'fixe' ? Colors.red : Colors.orange,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors du changement de type: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
   void _toggleSelectionMode() {
     setState(() {
       _isSelectionMode = !_isSelectionMode;
@@ -486,7 +437,6 @@ class _SortiesTabState extends State<SortiesTab> {
     });
 
     try {
-      // Convertir les index d'affichage en index réels
       final originalSorties = await _dataService.getSorties();
       List<int> realIndices = [];
       
@@ -500,19 +450,16 @@ class _SortiesTabState extends State<SortiesTab> {
         }
       }
       
-      // Traiter dans l'ordre inverse pour éviter les décalages d'index
       realIndices.sort((a, b) => b.compareTo(a));
       
       for (int realIndex in realIndices) {
         await _dataService.toggleSortiePointing(realIndex);
       }
 
-      // Recharger les données
       await _loadSorties();
 
       if (!mounted) return;
       
-      // Sortir du mode sélection
       setState(() {
         _isSelectionMode = false;
         _selectedIndices.clear();
@@ -553,8 +500,8 @@ class _SortiesTabState extends State<SortiesTab> {
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
-    DateTime? selectedDate = date ?? DateTime.now(); // Date par défaut = aujourd'hui
-    String? selectedPeriodicity = periodicity ?? 'ponctuel'; // Périodicité par défaut
+    DateTime? selectedDate = date ?? (widget.selectedMonth ?? DateTime.now());
+    String? selectedPeriodicity = periodicity ?? 'ponctuel';
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -596,14 +543,17 @@ class _SortiesTabState extends State<SortiesTab> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Sélecteur de date (comme dans plaisirs_tab.dart)
                 InkWell(
                   onTap: () async {
                     final pickedDate = await showDatePicker(
                       context: context,
                       initialDate: selectedDate ?? DateTime.now(),
-                      firstDate: DateTime(2020),
-                      lastDate: DateTime(2030),
+                      firstDate: widget.selectedMonth != null 
+                          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month, 1)
+                          : DateTime(2020),
+                      lastDate: widget.selectedMonth != null 
+                          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month + 1, 0)
+                          : DateTime(2030),
                     );
                     if (pickedDate != null) {
                       setState(() {
@@ -637,7 +587,6 @@ class _SortiesTabState extends State<SortiesTab> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                // Ajouter le sélecteur de périodicité
                 PeriodicitySelector(
                   selectedPeriodicity: selectedPeriodicity,
                   onChanged: (value) {
@@ -664,7 +613,7 @@ class _SortiesTabState extends State<SortiesTab> {
                     'description': desc,
                     'amountStr': amountStr,
                     'date': selectedDate,
-                    'periodicity': selectedPeriodicity, // Passer la périodicité
+                    'periodicity': selectedPeriodicity,
                   });
                 }
               },
@@ -696,7 +645,6 @@ class _SortiesTabState extends State<SortiesTab> {
     return Scaffold(
       body: Stack(
         children: [
-          // Contenu principal
           filteredSorties.isEmpty
               ? Center(
                   child: Column(
@@ -766,30 +714,7 @@ class _SortiesTabState extends State<SortiesTab> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              // Bouton filtre - SUPPRIMER CE BLOC
-                              // InkWell(
-                              //   onTap: _showFilterDialog,
-                              //   child: Container(
-                              //     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              //     decoration: BoxDecoration(
-                              //       color: Colors.white.withValues(alpha: 0.2),
-                              //       borderRadius: BorderRadius.circular(20),
-                              //       border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                              //     ),
-                              //     child: Row(
-                              //       mainAxisSize: MainAxisSize.min,
-                              //       children: [
-                              //         const Icon(Icons.filter_list, color: Colors.white, size: 18),
-                              //         const SizedBox(width: 6),
-                              //         Text(
-                              //           // Code du filtre...
-                              //         ),
-                              //       ],
-                              //     ),
-                              //   ),
-                              // ),
-                              
-                              // Autres contrôles
+                              const SizedBox(width: 8), // Placeholder pour équilibrer
                               Row(
                                 children: [
                                   // Bouton sélection multiple
@@ -1038,9 +963,6 @@ class _SortiesTabState extends State<SortiesTab> {
                                           case 'toggle':
                                             _togglePointing(index);
                                             break;
-                                          case 'type':
-                                            _toggleSortieType(index);
-                                            break;
                                           case 'edit':
                                             _editSortie(index);
                                             break;
@@ -1060,16 +982,6 @@ class _SortiesTabState extends State<SortiesTab> {
                                               ),
                                               const SizedBox(width: 8),
                                               Text(isPointed ? 'Dépointer' : 'Pointer'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'type',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.swap_horiz, color: Colors.blue),
-                                              SizedBox(width: 8),
-                                              Text('Changer type'),
                                             ],
                                           ),
                                         ),
