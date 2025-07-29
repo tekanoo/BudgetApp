@@ -93,8 +93,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void initState() {
     super.initState();
     _initializeServices();
-    // CORRECTION: Utiliser _analytics au lieu de _firebaseService.logEvent
     _logScreenView();
+    
+    // AJOUT: Vérifier l'état de la connexion périodiquement
+    _checkAuthState();
   }
 
   Future<void> _initializeServices() async {
@@ -119,6 +121,22 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         print('❌ Erreur Analytics: $e');
       }
     }
+  }
+
+  // NOUVELLE MÉTHODE: Vérifier l'état de l'authentification
+  void _checkAuthState() {
+    // Écouter les changements d'état d'authentification
+    _firebaseService.authStateChanges.listen((user) {
+      if (mounted) {
+        setState(() {
+          // Forcer la reconstruction pour mettre à jour l'icône
+        });
+        
+        if (kDebugMode) {
+          print('🔄 État auth changé: ${user?.email}');
+        }
+      }
+    });
   }
 
   void _onItemTapped(int index) {
@@ -325,125 +343,152 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _showUserMenu() {
+    final user = _firebaseService.currentUser;
+    
+    // Si pas d'utilisateur, ne pas afficher le menu
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Erreur: Utilisateur non connecté'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            // En-tête
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.blue.shade100,
-                  child: Icon(Icons.person, color: Colors.blue.shade700),
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _firebaseService.currentUser?.displayName ?? 'Utilisateur',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        _firebaseService.currentUser?.email ?? '',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            
-            const SizedBox(height: 24),
-            
-            // Informations de sécurité
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.shade200),
               ),
-              child: Column(
+              const SizedBox(height: 20),
+              
+              // En-tête utilisateur avec icône visible
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.security, color: Colors.green.shade600),
-                      const SizedBox(width: 8),
-                      const Expanded(
-                        child: Text(
-                          'Données chiffrées',
-                          style: TextStyle(
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Colors.blue.shade100,
+                    child: Text(
+                      user.email?.substring(0, 1).toUpperCase() ?? '?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.displayName ?? 'Utilisateur',
+                          style: const TextStyle(
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            fontSize: 16,
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Vos données financières sont automatiquement chiffrées avant d\'être envoyées dans le cloud. Même le développeur ne peut pas voir vos montants !',
-                    style: TextStyle(fontSize: 12),
+                        Text(
+                          user.email ?? '',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-            ),
-            
-            const SizedBox(height: 16),
-            
-            // Actions
-            Column(
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.orange),
-                  title: const Text('Se déconnecter'),
-                  onTap: () async {
-                    try {
-                      await _firebaseService.signOut();
-                      if (context.mounted) Navigator.of(context).pop();
-                    } catch (e) {
-                      if (kDebugMode) print('❌ Erreur déconnexion: $e');
-                    }
-                  },
+              
+              const SizedBox(height: 24),
+              
+              // Informations de sécurité
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade50,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.green.shade200),
                 ),
-                ListTile(
-                  leading: const Icon(Icons.delete_forever, color: Colors.red),
-                  title: const Text('Supprimer toutes les données'),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    _showDeleteAllDataDialog();
-                  },
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.security, color: Colors.green.shade600),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Données chiffrées',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Vos données financières sont automatiquement chiffrées avant d\'être envoyées dans le cloud. Même le développeur ne peut pas voir vos montants !',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            
-            const SizedBox(height: 20),
-          ],
+              ),
+              
+              const SizedBox(height: 16),
+              
+              // Actions
+              Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.logout, color: Colors.orange),
+                    title: const Text('Se déconnecter'),
+                    onTap: () async {
+                      try {
+                        await _firebaseService.signOut();
+                        if (context.mounted) Navigator.of(context).pop();
+                      } catch (e) {
+                        if (kDebugMode) print('❌ Erreur déconnexion: $e');
+                      }
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.delete_forever, color: Colors.red),
+                    title: const Text('Supprimer toutes les données'),
+                    onTap: () async {
+                      Navigator.of(context).pop();
+                      _showDeleteAllDataDialog();
+                    },
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 20),
+            ],
+          ),
         ),
       ),
     );
@@ -526,7 +571,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   @override
   Widget build(BuildContext context) {
     final user = _firebaseService.currentUser;
-    final tabTitles = ['Dashboard', 'Dépenses', 'Revenus', 'Charges']; // Simplification des titres
+    final tabTitles = ['Dashboard', 'Dépenses', 'Revenus', 'Charges'];
+
+    // DEBUG: Ajouter un print pour vérifier l'état de l'utilisateur
+    if (kDebugMode) {
+      print('🔍 Utilisateur connecté: ${user != null}');
+      print('🔍 Email utilisateur: ${user?.email}');
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -547,24 +598,30 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           tooltip: 'Navigation',
         ),
         actions: [
-          // Profil utilisateur
-          if (user != null)
-            IconButton(
-              icon: CircleAvatar(
-                radius: 16,
-                backgroundColor: Colors.blue.shade100,
-                child: Text(
-                  user.email?.substring(0, 1).toUpperCase() ?? '?',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.blue.shade700,
-                  ),
+          // CORRECTION: Forcer l'affichage de l'icône même si user est null temporairement
+          IconButton(
+            icon: CircleAvatar(
+              radius: 16,
+              backgroundColor: Colors.blue.shade100,
+              child: Text(
+                user?.email?.substring(0, 1).toUpperCase() ?? '?',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade700,
                 ),
               ),
-              onPressed: _showUserMenu,
-              tooltip: 'Profil',
             ),
+            onPressed: () {
+              if (user != null) {
+                _showUserMenu();
+              } else {
+                // Si pas d'utilisateur, naviguer vers la connexion
+                Navigator.pushReplacementNamed(context, '/login');
+              }
+            },
+            tooltip: 'Profil',
+          ),
         ],
       ),
       body: PageView(
