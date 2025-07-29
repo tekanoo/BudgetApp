@@ -9,7 +9,6 @@ dependencies:
   flutter:
     sdk: flutter
   
-  
   # UI & Charts
   shared_preferences: ^2.2.0
   fl_chart: ^0.63.0
@@ -32,4 +31,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  generate: true

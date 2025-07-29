@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:intl/date_symbol_data_local.dart'; // Ajouter cet import
 import 'firebase_options.dart';
 import 'screens/auth_wrapper.dart';
 import 'services/theme_service.dart';
@@ -13,9 +12,6 @@ void main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Initialiser la localisation française
-  await initializeDateFormatting('fr_FR', null);
-  
   runApp(const BudgetApp());
 }
 
@@ -27,9 +23,6 @@ class BudgetApp extends StatelessWidget {
     return MaterialApp(
       title: 'Gestion Budget Pro',
       debugShowCheckedModeBanner: false,
-      
-      // Localisation
-      locale: const Locale('fr', 'FR'),
       
       // Thème unique - mode clair seulement
       theme: ThemeService.lightTheme,

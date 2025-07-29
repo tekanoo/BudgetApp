@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+
 import 'monthly_budget_screen.dart';
 import '../services/encrypted_budget_service.dart';
 
@@ -15,17 +15,46 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
   final EncryptedBudgetDataService _dataService = EncryptedBudgetDataService();
   Map<String, Map<String, double>> _monthlyData = {};
   bool _isLoading = true;
+  bool _isInitialized = false;
   
   @override
   void initState() {
     super.initState();
-    _loadMonthlyData();
+    _initializeAndLoadData();
   }
   
-  Future<void> _loadMonthlyData() async {
+  Future<void> _initializeAndLoadData() async {
     setState(() {
       _isLoading = true;
     });
+    
+    try {
+      // Initialiser le service de données chiffrées
+      await _dataService.initialize();
+      setState(() {
+        _isInitialized = true;
+      });
+      
+      // Charger les données mensuelles
+      await _loadMonthlyData();
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _isInitialized = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur d\'initialisation: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+  
+  Future<void> _loadMonthlyData() async {
+    if (!_isInitialized) return;
     
     try {
       // Charger toutes les données
@@ -115,7 +144,19 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
                 ],
               ),
             )
-          : Column(
+          : !_isInitialized
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      SizedBox(height: 16),
+                      Text('Erreur d\'initialisation'),
+                      Text('Veuillez redémarrer l\'application'),
+                    ],
+                  ),
+                )
+              : Column(
         children: [
           // Sélecteur d'année
           Container(
@@ -189,7 +230,12 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
     final depenses = monthData?['depenses'] ?? 0.0;
     final solde = revenus - charges - depenses;
     
-    final monthName = DateFormat('MMMM', 'fr_FR').format(monthDate);
+    // Utiliser les noms de mois français directement
+    const monthNames = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    final monthName = monthNames[monthDate.month - 1];
     
     return Card(
       elevation: isCurrentMonth ? 8 : (hasData ? 6 : 4),
