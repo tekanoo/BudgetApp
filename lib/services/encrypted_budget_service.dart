@@ -963,18 +963,25 @@ Future<void> togglePlaisirPointing(int index) async {
         break;
         
       case 'mensuel':
-        // Appliquer à tous les mois à partir de la date de début
+        // CORRECTION: Appliquer à tous les mois à partir de la date de début
         DateTime currentDate = DateTime(startDate.year, startDate.month);
-        final endDate = DateTime(yearEnd, 12);
+        final endDate = DateTime(yearEnd, 12, 31);
         
         while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
-          if (currentDate.isAfter(startDate) || currentDate.isAtSameMomentAs(DateTime(startDate.year, startDate.month))) {
+          // CORRECTION: Vérifier que la date actuelle est >= à la date de début
+          if (currentDate.isAfter(DateTime(startDate.year, startDate.month - 1)) || 
+              currentDate.isAtSameMomentAs(DateTime(startDate.year, startDate.month))) {
             final monthKey = '${currentDate.year.toString().padLeft(4, '0')}-${currentDate.month.toString().padLeft(2, '0')}';
             if (projections.containsKey(monthKey)) {
               projections[monthKey]![category] = projections[monthKey]![category]! + amount;
             }
           }
-          currentDate = DateTime(currentDate.year, currentDate.month + 1);
+          // Passer au mois suivant
+          if (currentDate.month == 12) {
+            currentDate = DateTime(currentDate.year + 1, 1);
+          } else {
+            currentDate = DateTime(currentDate.year, currentDate.month + 1);
+          }
         }
         break;
         

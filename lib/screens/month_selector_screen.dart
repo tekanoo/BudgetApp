@@ -57,48 +57,14 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
     if (!_isInitialized) return;
     
     try {
-      // Charger toutes les données
-      final entrees = await _dataService.getEntrees();
-      final sorties = await _dataService.getSorties();
-      final plaisirs = await _dataService.getPlaisirs();
-      
-      Map<String, Map<String, double>> monthlyTotals = {};
-      
-      // Traiter les revenus
-      for (var entree in entrees) {
-        final date = DateTime.tryParse(entree['date'] ?? '');
-        if (date != null) {
-          final monthKey = '${date.year}-${date.month.toString().padLeft(2, '0')}';
-          monthlyTotals[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
-          monthlyTotals[monthKey]!['revenus'] = 
-              (monthlyTotals[monthKey]!['revenus'] ?? 0.0) + ((entree['amount'] as num?)?.toDouble() ?? 0.0);
-        }
-      }
-      
-      // Traiter les charges
-      for (var sortie in sorties) {
-        final date = DateTime.tryParse(sortie['date'] ?? '');
-        if (date != null) {
-          final monthKey = '${date.year}-${date.month.toString().padLeft(2, '0')}';
-          monthlyTotals[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
-          monthlyTotals[monthKey]!['charges'] = 
-              (monthlyTotals[monthKey]!['charges'] ?? 0.0) + ((sortie['amount'] as num?)?.toDouble() ?? 0.0);
-        }
-      }
-      
-      // Traiter les dépenses
-      for (var plaisir in plaisirs) {
-        final date = DateTime.tryParse(plaisir['date'] ?? '');
-        if (date != null) {
-          final monthKey = '${date.year}-${date.month.toString().padLeft(2, '0')}';
-          monthlyTotals[monthKey] ??= {'revenus': 0.0, 'charges': 0.0, 'depenses': 0.0};
-          monthlyTotals[monthKey]!['depenses'] = 
-              (monthlyTotals[monthKey]!['depenses'] ?? 0.0) + ((plaisir['amount'] as num?)?.toDouble() ?? 0.0);
-        }
-      }
+      // CORRECTION: Utiliser les projections avec périodicité au lieu du calcul simple
+      final projections = await _dataService.getProjectionsWithPeriodicity(
+        yearStart: _currentYear - 1,
+        yearEnd: _currentYear + 1,
+      );
       
       setState(() {
-        _monthlyData = monthlyTotals;
+        _monthlyData = projections;
         _isLoading = false;
       });
     } catch (e) {

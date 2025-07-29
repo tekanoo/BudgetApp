@@ -303,14 +303,16 @@ class _EntreesTabState extends State<EntreesTab> {
   Future<Map<String, dynamic>?> _showEntreeDialog({
     String? description,
     double? amount,
-    DateTime? date, // Nouveau paramètre
+    DateTime? date,
     bool isEdit = false,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
-    DateTime? selectedDate = date ?? DateTime.now(); // Date par défaut = aujourd'hui
+    // CORRECTION: Utiliser le mois sélectionné par défaut
+    DateTime? selectedDate = date ?? widget.selectedMonth ?? DateTime.now();
+    String? selectedPeriodicity = 'ponctuel';
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -407,7 +409,8 @@ class _EntreesTabState extends State<EntreesTab> {
                   Navigator.pop(context, {
                     'description': desc,
                     'amountStr': amountStr,
-                    'date': selectedDate,
+                    'date': selectedDate, // S'assurer que la date est bien passée
+                    'periodicity': selectedPeriodicity,
                   });
                 }
               },
