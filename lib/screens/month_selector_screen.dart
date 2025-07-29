@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-
-import 'monthly_budget_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // AJOUT
 import '../services/encrypted_budget_service.dart';
+import 'monthly_budget_screen.dart';
+import 'analyse_tab.dart'; // AJOUT
 
 class MonthSelectorScreen extends StatefulWidget {
   const MonthSelectorScreen({super.key});
@@ -94,7 +96,85 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
           IconButton(
             icon: const Icon(Icons.analytics),
             onPressed: () {
-              // Navigation vers analyse globale - peut être ajoutée plus tard
+              // CORRECTION: Navigation vers l'analyse globale
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Scaffold(
+                    appBar: AppBar(
+                      title: const Text('Analyse globale'),
+                      backgroundColor: Theme.of(context).primaryColor,
+                      foregroundColor: Colors.white,
+                    ),
+                    body: const AnalyseTab(),
+                  ),
+                ),
+              );
+            },
+          ),
+          // AJOUT: Icône de profil utilisateur
+          StreamBuilder<User?>(
+            stream: FirebaseAuth.instance.authStateChanges(),
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+              
+              if (user != null) {
+                return PopupMenuButton<String>(
+                  icon: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.white.withOpacity(0.2),
+                    child: Text(
+                      user.email?.substring(0, 1).toUpperCase() ?? '?',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  onSelected: (value) async {
+                    if (value == 'logout') {
+                      await FirebaseAuth.instance.signOut();
+                    } else if (value == 'delete') {
+                      _showDeleteAllDataDialog();
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'profile',
+                      child: Row(
+                        children: [
+                          const Icon(Icons.person),
+                          const SizedBox(width: 8),
+                          Text(user.email ?? 'Utilisateur'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'logout',
+                      child: Row(
+                        children: [
+                          Icon(Icons.logout, color: Colors.orange),
+                          SizedBox(width: 8),
+                          Text('Se déconnecter'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_forever, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Supprimer toutes les données'),
+                        ],
+                      ),
+                    ),
+                  ],
+                );
+              }
+              
+              return const SizedBox.shrink();
             },
           ),
         ],
@@ -360,5 +440,60 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
       return '${(amount / 1000).toStringAsFixed(1)}k';
     }
     return amount.toStringAsFixed(0);
+  }
+  
+  // AJOUT: Méthode pour supprimer les données
+  void _showDeleteAllDataDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Attention !'),
+          ],
+        ),
+        content: const Text(
+          'Cette action supprimera définitivement toutes vos données.\n\nCette action est IRRÉVERSIBLE !',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              
+              try {
+                final dataService = EncryptedBudgetDataService();
+                await dataService.deleteAllData();
+                
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('🗑️ Toutes les données ont été supprimées'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erreur: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
   }
 }
