@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firebase_service.dart';
 import '../services/encrypted_budget_service.dart' as encrypted;
 
-// AJOUTER ces imports manquants
-import 'home_tab.dart';
+// CORRECTION: Importer home_tab.dart aussi pour éviter l'erreur
+import 'month_selector_screen.dart';
+import 'home_tab.dart'; // AJOUT pour éviter l'erreur HomeTab
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
 import 'sorties_tab.dart';
@@ -27,23 +29,47 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService();
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
-  // SUPPRESSION: Champ non utilisé _allTabs supprimé
-
-  // CORRECTION: Retirer const
+  // Onglets principaux avec MonthSelectorScreen en premier
   final List<Widget> _mainTabs = [
-    const HomeTab(),
+    const MonthSelectorScreen(), // Premier onglet = Sélection des mois
     const PlaisirsTab(),
     const EntreesTab(),
     const SortiesTab(),
   ];
 
-  // Options du menu de sélection (sans Dépenses, Revenus et Charges)
+  // Titres des onglets
+  final List<String> _tabTitles = [
+    'Sélection Mois',
+    'Dépenses',
+    'Revenus', 
+    'Charges'
+  ];
+
+  // Options du menu de navigation
   List<Map<String, dynamic>> get _menuOptions => [
     {
-      'title': 'Dashboard',
-      'icon': Icons.dashboard,
+      'title': 'Sélection Mois',
+      'icon': Icons.calendar_month,
       'color': Colors.blue,
       'index': 0,
+    },
+    {
+      'title': 'Dépenses',
+      'icon': Icons.shopping_cart,
+      'color': Colors.purple,
+      'index': 1,
+    },
+    {
+      'title': 'Revenus',
+      'icon': Icons.trending_up,
+      'color': Colors.green,
+      'index': 2,
+    },
+    {
+      'title': 'Charges',
+      'icon': Icons.receipt_long,
+      'color': Colors.red,
+      'index': 3,
     },
     {
       'title': 'Analyse',
@@ -65,12 +91,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     },
   ];
 
-  // CORRECTION: Retirer const
   List<NavigationDestination> get _mainDestinations => [
     const NavigationDestination(
-      icon: Icon(Icons.dashboard_outlined),
-      selectedIcon: Icon(Icons.dashboard),
-      label: 'Dashboard',
+      icon: Icon(Icons.calendar_month_outlined),
+      selectedIcon: Icon(Icons.calendar_month),
+      label: 'Mois',
     ),
     const NavigationDestination(
       icon: Icon(Icons.shopping_cart_outlined),
@@ -94,8 +119,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     super.initState();
     _initializeServices();
     _logScreenView();
-    
-    // AJOUT: Vérifier l'état de la connexion périodiquement
     _checkAuthState();
   }
 
@@ -109,7 +132,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
   }
 
-  // NOUVELLE MÉTHODE: Log des événements Firebase Analytics
   Future<void> _logScreenView() async {
     try {
       await _analytics.logScreenView(
@@ -123,9 +145,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
   }
 
-  // NOUVELLE MÉTHODE: Vérifier l'état de l'authentification
   void _checkAuthState() {
-    // Écouter les changements d'état d'authentification
     _firebaseService.authStateChanges.listen((user) {
       if (mounted) {
         setState(() {
@@ -154,9 +174,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _navigateToTab(int tabIndex) {
-    // CORRECTION: Gérer la navigation vers les onglets non-principaux
     if (tabIndex < 4) {
-      // Onglets principaux (accessibles via PageView)
+      // Onglets principaux
       setState(() {
         _selectedIndex = tabIndex;
       });
@@ -165,8 +184,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
+      _trackTabChange(tabIndex);
+      Navigator.pop(context); // Fermer le menu
     } else {
-      // Onglets supplémentaires (navigation directe)
+      // Onglets supplémentaires
       Widget targetScreen;
       String title;
       
@@ -184,14 +205,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           title = 'Projections';
           break;
         default:
-          targetScreen = const HomeTab();
+          targetScreen = const HomeTab(); // CORRECTION: Maintenant HomeTab existe
           title = 'Dashboard';
       }
       
-      // CORRECTION: Fermer le menu d'abord
-      Navigator.pop(context);
+      Navigator.pop(context); // Fermer le menu d'abord
       
-      // Puis naviguer vers l'écran
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -207,17 +226,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           ),
         ),
       );
-      
-      // Retourner ici pour éviter de fermer le menu deux fois
-      return;
     }
-    
-    _trackTabChange(tabIndex);
-    Navigator.pop(context);
   }
 
   Future<void> _trackTabChange(int index) async {
-    final tabNames = ['home', 'plaisirs', 'entrees', 'sorties', 'analyse', 'tags', 'projections']; // AJOUT
+    final tabNames = ['selection_mois', 'depenses', 'revenus', 'charges', 'analyse', 'tags', 'projections'];
     if (index < tabNames.length) {
       try {
         await _analytics.logEvent(
@@ -235,7 +248,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
   }
 
-  void _showTabSelectionMenu() {
+  // CORRECTION: Ajouter la méthode _showNavigationMenu manquante
+  void _showNavigationMenu() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -342,158 +356,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
-  void _showUserMenu() {
-    final user = _firebaseService.currentUser;
-    
-    // Si pas d'utilisateur, ne pas afficher le menu
-    if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Erreur: Utilisateur non connecté'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        margin: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              // En-tête utilisateur avec icône visible
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Colors.blue.shade100,
-                    child: Text(
-                      user.email?.substring(0, 1).toUpperCase() ?? '?',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue.shade700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          user.displayName ?? 'Utilisateur',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          user.email ?? '',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Informations de sécurité
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.security, color: Colors.green.shade600),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Données chiffrées',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Vos données financières sont automatiquement chiffrées avant d\'être envoyées dans le cloud. Même le développeur ne peut pas voir vos montants !',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-              
-              const SizedBox(height: 16),
-              
-              // Actions
-              Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.logout, color: Colors.orange),
-                    title: const Text('Se déconnecter'),
-                    onTap: () async {
-                      try {
-                        await _firebaseService.signOut();
-                        if (context.mounted) Navigator.of(context).pop();
-                      } catch (e) {
-                        if (kDebugMode) print('❌ Erreur déconnexion: $e');
-                      }
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.delete_forever, color: Colors.red),
-                    title: const Text('Supprimer toutes les données'),
-                    onTap: () async {
-                      Navigator.of(context).pop();
-                      _showDeleteAllDataDialog();
-                    },
-                  ),
-                ],
-              ),
-              
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   void _showDeleteAllDataDialog() {
     showDialog(
       context: context,
@@ -515,11 +377,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           ),
           TextButton(
             onPressed: () async {
-              // Fermer le dialogue d'abord
               Navigator.of(context).pop();
               
-              // Afficher un indicateur de chargement
-              if (!mounted) return;
               showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -531,11 +390,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
               try {
                 await _dataService.deleteAllData();
                 
-                // Fermer l'indicateur de chargement
                 if (context.mounted) {
                   Navigator.of(context).pop();
                   
-                  // Afficher le message de succès
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('🗑️ Toutes les données ont été supprimées'),
@@ -545,11 +402,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                   );
                 }
               } catch (e) {
-                // Fermer l'indicateur de chargement
                 if (context.mounted) {
                   Navigator.of(context).pop();
                   
-                  // Afficher l'erreur
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('Erreur lors de la suppression: $e'),
@@ -570,57 +425,112 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final user = _firebaseService.currentUser;
-    final tabTitles = ['Dashboard', 'Dépenses', 'Revenus', 'Charges'];
-
-    // DEBUG: Ajouter un print pour vérifier l'état de l'utilisateur
-    if (kDebugMode) {
-      print('🔍 Utilisateur connecté: ${user != null}');
-      print('🔍 Email utilisateur: ${user?.email}');
-    }
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(tabTitles[_selectedIndex]),
+        title: Text(_tabTitles[_selectedIndex]),
         leading: IconButton(
-          icon: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              Icons.menu,
-              color: Theme.of(context).primaryColor,
-            ),
-          ),
-          onPressed: _showTabSelectionMenu,
-          tooltip: 'Navigation',
+          icon: const Icon(Icons.menu),
+          onPressed: _showNavigationMenu, // CORRECTION: Méthode maintenant définie
         ),
         actions: [
-          // CORRECTION: Forcer l'affichage de l'icône même si user est null temporairement
-          IconButton(
-            icon: CircleAvatar(
-              radius: 16,
-              backgroundColor: Colors.blue.shade100,
-              child: Text(
-                user?.email?.substring(0, 1).toUpperCase() ?? '?',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blue.shade700,
+          // PROFIL UTILISATEUR - Visible sur tous les onglets
+          StreamBuilder<User?>(
+            stream: _firebaseService.authStateChanges,
+            builder: (context, snapshot) {
+              final user = snapshot.data;
+              
+              return PopupMenuButton<String>(
+                icon: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: user != null ? Colors.blue.shade100 : Colors.grey.shade300,
+                  child: user != null 
+                    ? Text(
+                        user.email?.substring(0, 1).toUpperCase() ?? '?',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      )
+                    : Icon(
+                        Icons.person,
+                        size: 16,
+                        color: Colors.grey.shade600,
+                      ),
                 ),
-              ),
-            ),
-            onPressed: () {
-              if (user != null) {
-                _showUserMenu();
-              } else {
-                // Si pas d'utilisateur, naviguer vers la connexion
-                Navigator.pushReplacementNamed(context, '/login');
-              }
+                onSelected: (value) async {
+                  if (value == 'logout') {
+                    await _firebaseService.signOut();
+                    if (context.mounted) {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    }
+                  } else if (value == 'delete') {
+                    _showDeleteAllDataDialog();
+                  }
+                },
+                // CORRECTION: Fixer l'erreur de liste
+                itemBuilder: (context) {
+                  if (user != null) {
+                    return [
+                      PopupMenuItem(
+                        enabled: false,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              user.displayName ?? 'Utilisateur',
+                              style: const TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Text(
+                              user.email ?? '',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: 'logout',
+                        child: Row(
+                          children: [
+                            Icon(Icons.logout, color: Colors.orange),
+                            SizedBox(width: 8),
+                            Text('Se déconnecter'),
+                          ],
+                        ),
+                      ),
+                      const PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete_forever, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Supprimer toutes les données'),
+                          ],
+                        ),
+                      ),
+                    ];
+                  } else {
+                    return [
+                      const PopupMenuItem(
+                        value: 'login',
+                        child: Row(
+                          children: [
+                            Icon(Icons.login, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text('Se connecter'),
+                          ],
+                        ),
+                      ),
+                    ];
+                  }
+                },
+                tooltip: user != null ? 'Profil' : 'Se connecter',
+              );
             },
-            tooltip: 'Profil',
           ),
         ],
       ),

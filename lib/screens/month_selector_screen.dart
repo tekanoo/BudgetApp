@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:firebase_auth/firebase_auth.dart'; // AJOUT
 import '../services/encrypted_budget_service.dart';
 import 'monthly_budget_screen.dart';
-import 'analyse_tab.dart'; // AJOUT
 
 class MonthSelectorScreen extends StatefulWidget {
   const MonthSelectorScreen({super.key});
@@ -31,13 +29,10 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
     });
     
     try {
-      // Initialiser le service de données chiffrées
       await _dataService.initialize();
       setState(() {
         _isInitialized = true;
       });
-      
-      // Charger les données mensuelles
       await _loadMonthlyData();
     } catch (e) {
       setState(() {
@@ -59,7 +54,6 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
     if (!_isInitialized) return;
     
     try {
-      // CORRECTION: Utiliser les projections avec périodicité au lieu du calcul simple
       final projections = await _dataService.getProjectionsWithPeriodicity(
         yearStart: _currentYear - 1,
         yearEnd: _currentYear + 1,
@@ -87,98 +81,7 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Gestion Budget $_currentYear'),
-        centerTitle: true,
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.analytics),
-            onPressed: () {
-              // CORRECTION: Navigation vers l'analyse globale
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => Scaffold(
-                    appBar: AppBar(
-                      title: const Text('Analyse globale'),
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
-                    body: const AnalyseTab(),
-                  ),
-                ),
-              );
-            },
-          ),
-          // AJOUT: Icône de profil utilisateur
-          StreamBuilder<User?>(
-            stream: FirebaseAuth.instance.authStateChanges(),
-            builder: (context, snapshot) {
-              final user = snapshot.data;
-              
-              if (user != null) {
-                return PopupMenuButton<String>(
-                  icon: CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.white.withOpacity(0.2),
-                    child: Text(
-                      user.email?.substring(0, 1).toUpperCase() ?? '?',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                  onSelected: (value) async {
-                    if (value == 'logout') {
-                      await FirebaseAuth.instance.signOut();
-                    } else if (value == 'delete') {
-                      _showDeleteAllDataDialog();
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'profile',
-                      child: Row(
-                        children: [
-                          const Icon(Icons.person),
-                          const SizedBox(width: 8),
-                          Text(user.email ?? 'Utilisateur'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'logout',
-                      child: Row(
-                        children: [
-                          Icon(Icons.logout, color: Colors.orange),
-                          SizedBox(width: 8),
-                          Text('Se déconnecter'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_forever, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Supprimer toutes les données'),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }
-              
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
-      ),
+      // SUPPRIMER AppBar car maintenant géré par MainMenuScreen
       body: _isLoading 
           ? const Center(
               child: Column(
@@ -204,36 +107,57 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
                 )
               : Column(
         children: [
-          // Sélecteur d'année
+          // En-tête avec année et titre
           Container(
             padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Colors.blue.shade600, Colors.blue.shade800],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
               children: [
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _currentYear--;
-                    });
-                    _loadMonthlyData(); // Recharger les données pour la nouvelle année
-                  },
-                  icon: const Icon(Icons.arrow_back_ios),
-                ),
                 Text(
-                  _currentYear.toString(),
+                  'Gestion Budget Pro',
                   style: const TextStyle(
+                    color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                IconButton(
-                  onPressed: () {
-                    setState(() {
-                      _currentYear++;
-                    });
-                    _loadMonthlyData(); // Recharger les données pour la nouvelle année
-                  },
-                  icon: const Icon(Icons.arrow_forward_ios),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _currentYear--;
+                        });
+                        _loadMonthlyData();
+                      },
+                      icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+                    ),
+                    Text(
+                      _currentYear.toString(),
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          _currentYear++;
+                        });
+                        _loadMonthlyData();
+                      },
+                      icon: const Icon(Icons.arrow_forward_ios, color: Colors.white),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -244,19 +168,14 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
             child: GridView.builder(
               padding: const EdgeInsets.all(16),
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2, // Changé à 2 pour plus d'espace
-                childAspectRatio: 1.1, // Ajusté pour plus de hauteur
+                crossAxisCount: 3,
+                childAspectRatio: 0.8,
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
               ),
               itemCount: 12,
               itemBuilder: (context, index) {
-                final month = index + 1;
-                final monthDate = DateTime(_currentYear, month);
-                final isCurrentMonth = _currentYear == DateTime.now().year && 
-                                     month == DateTime.now().month;
-                
-                return _buildMonthCard(monthDate, isCurrentMonth);
+                return _buildMonthCard(index + 1);
               },
             ),
           ),
@@ -264,11 +183,12 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
       ),
     );
   }
-  
-  Widget _buildMonthCard(DateTime monthDate, bool isCurrentMonth) {
-    final monthKey = '${monthDate.year}-${monthDate.month.toString().padLeft(2, '0')}';
+
+  Widget _buildMonthCard(int month) {
+    final monthDate = DateTime(_currentYear, month);
+    final monthKey = '${_currentYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
     final monthData = _monthlyData[monthKey];
-    final hasData = monthData != null && 
+    final hasData = monthData != null &&
                    (monthData['revenus']! > 0 || monthData['charges']! > 0 || monthData['depenses']! > 0);
     
     final revenus = monthData?['revenus'] ?? 0.0;
@@ -276,12 +196,13 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
     final depenses = monthData?['depenses'] ?? 0.0;
     final solde = revenus - charges - depenses;
     
-    // Utiliser les noms de mois français directement
+    final isCurrentMonth = DateTime.now().year == _currentYear && DateTime.now().month == month;
+    
     const monthNames = [
-      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+      'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun',
+      'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'
     ];
-    final monthName = monthNames[monthDate.month - 1];
+    final monthName = monthNames[month - 1];
     
     return Card(
       elevation: isCurrentMonth ? 8 : (hasData ? 6 : 4),
@@ -305,11 +226,11 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Nom du mois et année
+              // Nom du mois
               Text(
                 monthName.toUpperCase(),
                 style: TextStyle(
-                  fontSize: 14,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: isCurrentMonth 
                       ? Colors.white 
@@ -318,32 +239,16 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
                 textAlign: TextAlign.center,
               ),
               
-              // Icône et indicateur de données
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    hasData ? Icons.account_balance_wallet : Icons.calendar_month,
-                    size: 20,
-                    color: isCurrentMonth 
-                        ? Colors.white 
-                        : (hasData ? Colors.blue.shade600 : Colors.grey.shade600),
-                  ),
-                  if (hasData) ...[
-                    const SizedBox(width: 4),
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: solde >= 0 ? Colors.green : Colors.red,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ],
-                ],
+              // Icône et indicateur
+              Icon(
+                hasData ? Icons.account_balance_wallet : Icons.calendar_month,
+                size: 24,
+                color: isCurrentMonth 
+                    ? Colors.white 
+                    : (hasData ? Colors.blue.shade600 : Colors.grey.shade600),
               ),
               
-              // Données financières si disponibles
+              // Données financières
               if (hasData) ...[
                 Column(
                   children: [
@@ -386,24 +291,13 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
                   textAlign: TextAlign.center,
                 ),
               ],
-              
-              // Année en bas
-              Text(
-                monthDate.year.toString(),
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isCurrentMonth 
-                      ? Colors.white70 
-                      : (hasData ? Colors.blue.shade600 : Colors.grey.shade600),
-                ),
-              ),
             ],
           ),
         ),
       ),
     );
   }
-  
+
   Widget _buildDataRow(String label, double amount, Color color, bool isCurrentMonth) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 1),
@@ -415,9 +309,7 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isCurrentMonth 
-                  ? Colors.white70 
-                  : color.withOpacity(0.8),
+              color: isCurrentMonth ? Colors.white70 : color,
             ),
           ),
           Text(
@@ -425,75 +317,15 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isCurrentMonth 
-                  ? Colors.white 
-                  : color,
+              color: isCurrentMonth ? Colors.white : color,
             ),
           ),
         ],
       ),
     );
   }
-  
+
   String _formatAmount(double amount) {
-    if (amount >= 1000) {
-      return '${(amount / 1000).toStringAsFixed(1)}k';
-    }
     return amount.toStringAsFixed(0);
-  }
-  
-  // AJOUT: Méthode pour supprimer les données
-  void _showDeleteAllDataDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.warning, color: Colors.red),
-            SizedBox(width: 8),
-            Text('Attention !'),
-          ],
-        ),
-        content: const Text(
-          'Cette action supprimera définitivement toutes vos données.\n\nCette action est IRRÉVERSIBLE !',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Annuler'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              
-              try {
-                final dataService = EncryptedBudgetDataService();
-                await dataService.deleteAllData();
-                
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('🗑️ Toutes les données ont été supprimées'),
-                      backgroundColor: Colors.orange,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Erreur: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Supprimer'),
-          ),
-        ],
-      ),
-    );
   }
 }
