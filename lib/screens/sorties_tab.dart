@@ -34,6 +34,11 @@ class _SortiesTabState extends State<SortiesTab> {
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
 
+  // Variables financières
+  double totalRevenus = 0.0;
+  double totalDepenses = 0.0;
+  double totalDepensesPointees = 0.0;
+
   @override
   void initState() {
     super.initState();
@@ -48,8 +53,21 @@ class _SortiesTabState extends State<SortiesTab> {
     try {
       final data = await _dataService.getSorties();
       
+      // Charger aussi les totaux pour les calculs
+      final totals = await _dataService.getTotals();
+      final revenus = await _dataService.getEntrees();
+      final depenses = await _dataService.getPlaisirs();
+      
       setState(() {
         sorties = data;
+        totalRevenus = totals['entrees'] ?? 0.0;
+        totalDepenses = totals['plaisirs'] ?? 0.0;
+        
+        // Calculer dépenses pointées
+        totalDepensesPointees = depenses
+            .where((p) => p['isPointed'] == true)
+            .fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+        
         // Si un mois spécifique est sélectionné, filtrer automatiquement
         if (widget.selectedMonth != null) {
           _currentFilter = 'Mois';
@@ -625,6 +643,191 @@ class _SortiesTabState extends State<SortiesTab> {
     );
   }
 
+  Widget _buildFinancialHeader() {
+    final soldePrevu = totalRevenus - totalSorties - totalDepenses;
+    final soldeDebite = totalRevenus - totalPointe - totalDepensesPointees;
+    
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.red.shade400, Colors.red.shade600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.red.withOpacity(0.3),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Ligne de contrôles (existante)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SizedBox(width: 8),
+              Row(
+                children: [
+                  if (filteredSorties.isNotEmpty)
+                    InkWell(
+                      onTap: _toggleSelectionMode,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: Icon(
+                          _isSelectionMode ? Icons.close : Icons.checklist,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  
+                  const SizedBox(width: 8),
+
+                  InkWell(
+                    onTap: _showFilterDialog,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: const Icon(
+                        Icons.filter_alt,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(width: 8),
+                  
+                  InkWell(
+                    onTap: _addSortie,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                      child: const Icon(
+                        Icons.add,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 15),
+          
+          // Informations financières
+          Column(
+            children: [
+              const Text(
+                'Charges',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                '${AmountParser.formatAmount(totalSorties)} €',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              
+              const SizedBox(height: 10),
+              
+              // Soldes prévu et débité
+              Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Solde Prévu',
+                            style: TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                          Text(
+                            '${AmountParser.formatAmount(soldePrevu)} €',
+                            style: TextStyle(
+                              color: soldePrevu >= 0 ? Colors.white : Colors.orange.shade200,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      ),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Solde Débité',
+                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            '${AmountParser.formatAmount(soldeDebite)} €',
+                            style: TextStyle(
+                              color: soldeDebite >= 0 ? Colors.green.shade200 : Colors.orange.shade200,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              
+              const SizedBox(height: 5),
+              Text(
+                '${filteredSorties.length} charge${filteredSorties.length > 1 ? 's' : ''} • ${filteredSorties.where((s) => s['isPointed'] == true).length} pointée${filteredSorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -689,128 +892,7 @@ class _SortiesTabState extends State<SortiesTab> {
               : Column(
                   children: [
                     // En-tête avec totaux et filtres
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.all(16),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.red.shade400, Colors.red.shade600],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.red.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          // Ligne des actions (filtre + ajout)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const SizedBox(width: 8), // Placeholder pour équilibrer
-                              Row(
-                                children: [
-                                  // Bouton sélection multiple
-                                  if (filteredSorties.isNotEmpty)
-                                    InkWell(
-                                      onTap: _toggleSelectionMode,
-                                      child: Container(
-                                        padding: const EdgeInsets.all(8),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white.withValues(alpha: 0.2),
-                                          borderRadius: BorderRadius.circular(25),
-                                        ),
-                                        child: Icon(
-                                          _isSelectionMode ? Icons.close : Icons.checklist,
-                                          color: Colors.white,
-                                          size: 24,
-                                        ),
-                                      ),
-                                    ),
-                                  
-                                  const SizedBox(width: 8),
-
-                                  // Bouton filtre (conserver uniquement celui-ci)
-                                  InkWell(
-                                    onTap: _showFilterDialog,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(25),
-                                      ),
-                                      child: const Icon(
-                                        Icons.filter_alt,
-                                        color: Colors.white,
-                                        size: 24,
-                                      ),
-                                    ),
-                                  ),
-                                  
-                                  const SizedBox(width: 8),
-                                  
-                                  // Bouton ajout
-                                  InkWell(
-                                    onTap: _addSortie,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.2),
-                                        borderRadius: BorderRadius.circular(25),
-                                      ),
-                                      child: const Icon(
-                                        Icons.add,
-                                        color: Colors.white,
-                                        size: 28,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                          
-                          const SizedBox(height: 15),
-                          
-                          // Informations totaux
-                          Column(
-                            children: [
-                              const Text(
-                                'Total Charges',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              Text(
-                                '${AmountParser.formatAmount(totalSorties)} €',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              Text(
-                                // CORRECTION: Utiliser interpolation
-                                '${filteredSorties.length} charge${filteredSorties.length > 1 ? 's' : ''} • ${filteredSorties.where((s) => s['isPointed'] == true).length} pointée${filteredSorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildFinancialHeader(),
 
                     // Liste des charges filtrées
                     Expanded(

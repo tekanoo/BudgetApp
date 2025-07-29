@@ -27,6 +27,9 @@ class _HomeTabState extends State<HomeTab> {
   double _monthlyEntrees = 0.0;
   double _monthlySorties = 0.0;
   double _monthlyPlaisirs = 0.0;
+  double _monthlySortiesPointees = 0.0;
+  double _monthlyPlaisirsPointees = 0.0;
+  double _soldeDebite = 0.0;
   List<String> _availableTags = [];
   
   @override
@@ -43,45 +46,68 @@ class _HomeTabState extends State<HomeTab> {
   // Modifier la méthode _loadMonthlyData pour filtrer par mois si nécessaire
   Future<void> _loadMonthlyData() async {
     try {
-      final entrees = await _dataService.getEntrees();
-      final sorties = await _dataService.getSorties();
-      final plaisirs = await _dataService.getPlaisirs();
-      
-      // Si un mois spécifique est sélectionné, filtrer les données
       if (widget.selectedMonth != null) {
+        // Filtrer par mois sélectionné
+        final entrees = await _dataService.getEntrees();
+        final sorties = await _dataService.getSorties();
+        final plaisirs = await _dataService.getPlaisirs();
+        
+        // Filtrer par mois
         final monthlyEntrees = entrees.where((e) {
           final date = DateTime.tryParse(e['date'] ?? '');
           return date != null && 
                  date.year == widget.selectedMonth!.year &&
                  date.month == widget.selectedMonth!.month;
-        }).toList();
+        }).fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
         
         final monthlySorties = sorties.where((s) {
           final date = DateTime.tryParse(s['date'] ?? '');
           return date != null && 
                  date.year == widget.selectedMonth!.year &&
                  date.month == widget.selectedMonth!.month;
-        }).toList();
+        }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
         
         final monthlyPlaisirs = plaisirs.where((p) {
           final date = DateTime.tryParse(p['date'] ?? '');
           return date != null && 
                  date.year == widget.selectedMonth!.year &&
                  date.month == widget.selectedMonth!.month;
-        }).toList();
+        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+        
+        // Calculer les montants pointés pour ce mois
+        final monthlySortiesPointees = sorties.where((s) {
+          final date = DateTime.tryParse(s['date'] ?? '');
+          return date != null && 
+                 date.year == widget.selectedMonth!.year &&
+                 date.month == widget.selectedMonth!.month &&
+                 s['isPointed'] == true;
+        }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        
+        final monthlyPlaisirsPointees = plaisirs.where((p) {
+          final date = DateTime.tryParse(p['date'] ?? '');
+          return date != null && 
+                 date.year == widget.selectedMonth!.year &&
+                 date.month == widget.selectedMonth!.month &&
+                 p['isPointed'] == true;
+        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
         
         setState(() {
-          _monthlyEntrees = monthlyEntrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
-          _monthlySorties = monthlySorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
-          _monthlyPlaisirs = monthlyPlaisirs.fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+          _monthlyEntrees = monthlyEntrees;
+          _monthlySorties = monthlySorties;
+          _monthlyPlaisirs = monthlyPlaisirs;
+          _monthlySortiesPointees = monthlySortiesPointees;
+          _monthlyPlaisirsPointees = monthlyPlaisirsPointees;
         });
       } else {
         // Comportement normal (toutes les données)
         final totals = await _dataService.getTotals();
+        final soldeDebite = await _dataService.getSoldeDisponible();
+        
         setState(() {
           _monthlyEntrees = totals['entrees'] ?? 0.0;
           _monthlySorties = totals['sorties'] ?? 0.0;
           _monthlyPlaisirs = totals['plaisirs'] ?? 0.0;
+          _soldeDebite = soldeDebite;
         });
       }
     } catch (e) {
@@ -270,6 +296,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildSummaryCards(double solde) {
+    final soldeDebiteCalcule = _monthlyEntrees - _monthlySortiesPointees - _monthlyPlaisirsPointees;
+    
     return Column(
       children: [
         Row(
@@ -382,6 +410,68 @@ class _HomeTabState extends State<HomeTab> {
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: solde >= 0 ? Colors.blue : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Card(
+                color: Colors.orange.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(Icons.account_balance, color: Colors.orange.shade600, size: 32),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Solde Prévu',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(solde)} €',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: solde >= 0 ? Colors.orange.shade700 : Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Card(
+                color: soldeDebiteCalcule >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(
+                        soldeDebiteCalcule >= 0 ? Icons.check_circle : Icons.warning,
+                        color: soldeDebiteCalcule >= 0 ? Colors.green.shade600 : Colors.red.shade600,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Solde Débité',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(soldeDebiteCalcule)} €',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: soldeDebiteCalcule >= 0 ? Colors.green.shade700 : Colors.red.shade700,
                         ),
                       ),
                     ],
