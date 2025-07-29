@@ -115,172 +115,140 @@ class _HomeTabState extends State<HomeTab> {
   
   @override
   Widget build(BuildContext context) {
+    // Afficher le mois sélectionné si spécifié
     final monthName = widget.selectedMonth != null 
-        ? DateFormat('MMMM yyyy', 'fr_FR').format(widget.selectedMonth!)
+        ? _getMonthName(widget.selectedMonth!)
         : 'Budget Global';
     final solde = _monthlyEntrees - _monthlySorties - _monthlyPlaisirs;
     
     return Scaffold(
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Carte de résumé mensuel
-            Card(
-              elevation: 8,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Theme.of(context).primaryColor, Theme.of(context).primaryColor.withOpacity(0.8)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  children: [
-                    Text(
-                      'Budget $monthName',
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildSummaryItem('Revenus', _monthlyEntrees, Colors.green),
-                        _buildSummaryItem('Charges', _monthlySorties, Colors.red),
-                        _buildSummaryItem('Dépenses', _monthlyPlaisirs, Colors.purple),
-                      ],
-                    ),
-                    const Divider(color: Colors.white54, height: 30),
-                    _buildSummaryItem(
-                      'Solde',
-                      solde,
-                      solde >= 0 ? Colors.green : Colors.red,
-                      isLarge: true,
-                    ),
-                  ],
+            // En-tête avec titre du mois
+            if (widget.selectedMonth != null) ...[
+              Text(
+                'Dashboard - $monthName',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+            ],
             
-            const SizedBox(height: 30),
+            // Cartes de résumé
+            _buildSummaryCards(solde),
             
-            // Formulaire d'ajout de dépense (comme votre HomeTab actuel)
+            const SizedBox(height: 20),
+            
+            // Section d'ajout rapide
             Card(
+              elevation: 4,
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'Ajouter une dépense',
-                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Champ montant
-                    TextField(
-                      controller: _amountController,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      decoration: const InputDecoration(
-                        labelText: 'Montant *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.euro),
-                        suffixText: '€',
-                        helperText: 'Utilisez , ou . pour les décimales',
+                      'Ajout rapide - Dépense',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 20),
-
-                    // Champ catégorie avec suggestions
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 16),
+                    
+                    Row(
                       children: [
-                        TextField(
-                          controller: _tagController,
-                          decoration: const InputDecoration(
-                            labelText: 'Catégorie',
-                            border: OutlineInputBorder(),
-                            prefixIcon: Icon(Icons.tag),
-                            helperText: 'Restaurant, Shopping, Loisirs...',
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: _amountController,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: const InputDecoration(
+                              labelText: 'Montant',
+                              border: OutlineInputBorder(),
+                              prefixIcon: Icon(Icons.euro),
+                              suffixText: '€',
+                            ),
                           ),
                         ),
-                        if (_availableTags.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            children: _availableTags.take(6).map((tag) => 
-                              ActionChip(
-                                label: Text(tag),
-                                onPressed: () {
-                                  _tagController.text = tag;
-                                },
-                              ),
-                            ).toList(),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: TextField(
+                            controller: _tagController,
+                            decoration: InputDecoration(
+                              labelText: 'Catégorie',
+                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.tag),
+                              suffixIcon: _availableTags.isNotEmpty
+                                  ? PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        _tagController.text = value;
+                                      },
+                                      itemBuilder: (context) => _availableTags
+                                          .map((tag) => PopupMenuItem(
+                                                value: tag,
+                                                child: Text(tag),
+                                              ))
+                                          .toList(),
+                                      icon: const Icon(Icons.arrow_drop_down),
+                                    )
+                                  : null,
+                            ),
                           ),
-                        ],
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-
-                    // Sélecteur de date (pré-rempli avec le mois sélectionné)
-                    InkWell(
-                      onTap: _pickDate,
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: Colors.grey.shade400),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.calendar_today),
-                            const SizedBox(width: 12),
-                            Text(
-                              _selectedDate == null
-                                  ? 'Sélectionner une date'
-                                  : 'Date: ${DateFormat('dd/MM/yyyy').format(_selectedDate!)}',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: _selectedDate == null ? Colors.grey.shade600 : null,
+                    
+                    const SizedBox(height: 16),
+                    
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: _pickDate,
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.calendar_today),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    _selectedDate != null 
+                                        ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+                                        : 'Sélectionner une date',
+                                  ),
+                                ],
                               ),
                             ),
-                            const Spacer(),
-                            Icon(Icons.arrow_drop_down, color: Colors.grey.shade600),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 30),
-
-                    // Bouton d'ajout
-                    SizedBox(
-                      height: 56,
-                      child: FilledButton.icon(
-                        onPressed: _isLoading ? null : _addExpense,
-                        icon: _isLoading 
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.add),
-                        label: Text(
-                          _isLoading 
-                            ? 'Enregistrement...'
-                            : 'Ajouter une dépense',
-                          style: const TextStyle(fontSize: 16),
+                        const SizedBox(width: 12),
+                        ElevatedButton.icon(
+                          onPressed: _isLoading ? null : _addExpense, // CORRECTION: Changer _addQuickPlaisir en _addExpense
+                          icon: _isLoading 
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Icon(Icons.add),
+                          label: const Text('Ajouter'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.purple,
+                            foregroundColor: Colors.white,
+                          ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -291,31 +259,143 @@ class _HomeTabState extends State<HomeTab> {
       ),
     );
   }
-  
-  Widget _buildSummaryItem(String label, double amount, Color color, {bool isLarge = false}) {
+
+  // Méthode pour obtenir le nom du mois
+  String _getMonthName(DateTime date) {
+    const monthNames = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    return '${monthNames[date.month - 1]} ${date.year}';
+  }
+
+  Widget _buildSummaryCards(double solde) {
     return Column(
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: isLarge ? 16 : 12,
-            fontWeight: FontWeight.w500,
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: Card(
+                color: Colors.green.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.trending_up, color: Colors.green, size: 32),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Revenus',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(_monthlyEntrees)} €',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Card(
+                color: Colors.red.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.receipt_long, color: Colors.red, size: 32),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Charges',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(_monthlySorties)} €',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          '${amount.toStringAsFixed(2).replaceAll('.', ',')}€',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: isLarge ? 24 : 16,
-            fontWeight: FontWeight.bold,
-          ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Card(
+                color: Colors.purple.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.shopping_cart, color: Colors.purple, size: 32),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Dépenses',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(_monthlyPlaisirs)} €',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purple,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Card(
+                color: solde >= 0 ? Colors.blue.shade50 : Colors.orange.shade50,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      Icon(
+                        solde >= 0 ? Icons.account_balance_wallet : Icons.warning,
+                        color: solde >= 0 ? Colors.blue : Colors.orange,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Solde',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(solde)} €',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: solde >= 0 ? Colors.blue : Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
-  
+
+  // Limiter le sélecteur de date au mois sélectionné
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -335,6 +415,7 @@ class _HomeTabState extends State<HomeTab> {
     }
   }
   
+  // Renommer la méthode pour plus de clarté
   Future<void> _addExpense() async {
     if (_amountController.text.trim().isEmpty || _selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(

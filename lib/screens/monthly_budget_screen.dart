@@ -34,9 +34,18 @@ class _MonthlyBudgetScreenState extends State<MonthlyBudgetScreen> {
     ];
   }
   
+  // Méthode pour obtenir le nom du mois en français
+  String _getMonthName(DateTime date) {
+    const monthNames = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    return '${monthNames[date.month - 1]} ${date.year}';
+  }
+  
   @override
   Widget build(BuildContext context) {
-    final monthName = DateFormat('MMMM yyyy', 'fr_FR').format(widget.selectedMonth);
+    final monthName = _getMonthName(widget.selectedMonth);
     final tabTitles = ['Dashboard', 'Dépenses', 'Revenus', 'Charges'];
     
     return Scaffold(
