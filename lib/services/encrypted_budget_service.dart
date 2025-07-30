@@ -150,15 +150,17 @@ Future<void> togglePlaisirPointing(int index) async {
         }
       }
       
-      // Calcul du total des dépenses pointées
+      // Calcul du total des dépenses pointées - CORRECTION ICI
       double totalDepensesPointees = 0.0;
       for (var plaisir in plaisirs) {
         if (plaisir['isPointed'] == true) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
-            totalDepensesPointees -= amount; // Les crédits s'ajoutent
+            // Les virements/remboursements pointés AJOUTENT au solde disponible
+            totalDepensesPointees -= amount; // On soustrait pour que la formule finale donne +
           } else {
-            totalDepensesPointees += amount; // Les dépenses se soustraient
+            // Les dépenses normales pointées RETIRENT du solde disponible
+            totalDepensesPointees += amount;
           }
         }
       }
@@ -167,7 +169,7 @@ Future<void> togglePlaisirPointing(int index) async {
       final result = totalRevenusPointes - totalChargesPointees - totalDepensesPointees;
       
       if (kDebugMode) {
-        print('🔍 CALCUL SOLDE DÉBITÉ (NOUVEAU):');
+        print('🔍 CALCUL SOLDE DÉBITÉ (CORRIGÉ):');
         print('  - Revenus pointés: $totalRevenusPointes €');
         print('  - Charges pointées: $totalChargesPointees €');
         print('  - Dépenses pointées: $totalDepensesPointees €');
@@ -735,10 +737,21 @@ Future<void> togglePlaisirPointing(int index) async {
       double totalPlaisirsTotaux = 0; // Total des dépenses pointées
       for (var plaisir in plaisirs) {
         final amount = (plaisir['amount'] as num).toDouble();
-        totalPlaisirs += amount;
         
+        // Pour le total général, on compte tous les montants normalement
+        if (plaisir['isCredit'] == true) {
+          totalPlaisirs -= amount; // Les crédits réduisent le total des dépenses
+        } else {
+          totalPlaisirs += amount; // Les dépenses augmentent le total
+        }
+        
+        // Pour les pointés, même logique
         if (plaisir['isPointed'] == true) {
-          totalPlaisirsTotaux += amount;
+          if (plaisir['isCredit'] == true) {
+            totalPlaisirsTotaux -= amount; // Les crédits pointés réduisent
+          } else {
+            totalPlaisirsTotaux += amount; // Les dépenses pointées augmentent
+          }
         }
       }
 
@@ -746,7 +759,7 @@ Future<void> togglePlaisirPointing(int index) async {
         'entrees': totalEntrees,
         'sorties': totalSorties,
         'plaisirs': totalPlaisirs,
-        'plaisirsTotaux': totalPlaisirsTotaux, // Nouveau : total pointé
+        'plaisirsTotaux': totalPlaisirsTotaux,
         'solde': totalEntrees - totalSorties - totalPlaisirs,
       };
     } catch (e) {

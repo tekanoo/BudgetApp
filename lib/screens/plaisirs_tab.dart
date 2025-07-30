@@ -90,15 +90,30 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   }
   
   void _calculateTotals() {
-    final total = filteredPlaisirs.fold(0.0, 
-      (sum, plaisir) => sum + ((plaisir['amount'] as num?)?.toDouble() ?? 0.0));
-    final pointe = filteredPlaisirs
-        .where((p) => p['isPointed'] == true)
-        .fold(0.0, (sum, plaisir) => sum + ((plaisir['amount'] as num?)?.toDouble() ?? 0.0));
+    // CORRECTION : Calcul qui prend en compte les crédits
+    final total = filteredPlaisirs.fold(0.0, (sum, plaisir) {
+      final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+      if (plaisir['isCredit'] == true) {
+        return sum - amount; // Les crédits réduisent le total
+      } else {
+        return sum + amount; // Les dépenses augmentent le total
+      }
+    });
+    
+    final totalPointe = filteredPlaisirs
+        .where((plaisir) => plaisir['isPointed'] == true)
+        .fold(0.0, (sum, plaisir) {
+          final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+          if (plaisir['isCredit'] == true) {
+            return sum - amount; // Les crédits pointés réduisent
+          } else {
+            return sum + amount; // Les dépenses pointées augmentent
+          }
+        });
     
     setState(() {
       totalPlaisirs = total;
-      totalPointe = pointe;
+      this.totalPointe = totalPointe;
     });
   }
 

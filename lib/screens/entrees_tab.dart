@@ -97,14 +97,17 @@ class _EntreesTabState extends State<EntreesTab> {
             .where((s) => s['isPointed'] == true)
             .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
         
+        // CORRECTION : Calcul des dépenses pointées avec gestion des crédits
         totalDepensesPointees = plaisirs
             .where((p) => p['isPointed'] == true)
             .fold(0.0, (sum, p) {
               final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
               if (p['isCredit'] == true) {
-                return sum - amount; // Les crédits s'ajoutent au solde
+                // Les virements/remboursements pointés RÉDUISENT le total des dépenses pointées
+                return sum - amount;
               } else {
-                return sum + amount; // Les dépenses se soustraient du solde
+                // Les dépenses normales pointées AUGMENTENT le total des dépenses pointées
+                return sum + amount;
               }
             });
       });
