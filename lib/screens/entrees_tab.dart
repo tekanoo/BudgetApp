@@ -560,6 +560,107 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
+  Future<void> _togglePointing(int displayIndex) async {
+    if (!mounted) return;
+    
+    try {
+      final entreeToToggle = filteredEntrees[displayIndex];
+      final entreeId = entreeToToggle['id'] ?? '';
+      
+      final originalEntrees = await _dataService.getEntrees();
+      final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+      
+      if (realIndex == -1) {
+        throw Exception('Revenu non trouvé');
+      }
+      
+      await _dataService.toggleEntreePointing(realIndex);
+      await _loadEntrees();
+      
+      if (!mounted) return;
+      final isPointed = entreeToToggle['isPointed'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            !isPointed 
+              ? '✅ Revenu pointé - Solde mis à jour'
+              : '↩️ Revenu dépointé - Solde mis à jour'
+          ),
+          backgroundColor: !isPointed ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du pointage: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Future<void> _batchTogglePointing() async {
+    if (_selectedIndices.isEmpty || _isProcessingBatch) return;
+
+    setState(() {
+      _isProcessingBatch = true;
+    });
+
+    try {
+      final realIndices = <int>[];
+      for (int displayIndex in _selectedIndices) {
+        final entree = filteredEntrees[displayIndex];
+        final entreeId = entree['id'] ?? '';
+        
+        final originalEntrees = await _dataService.getEntrees();
+        final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+        
+        if (realIndex != -1) {
+          realIndices.add(realIndex);
+        }
+      }
+
+      // Pointer en lot (en ordre décroissant pour éviter les problèmes d'index)
+      realIndices.sort((a, b) => b.compareTo(a));
+      for (int realIndex in realIndices) {
+        await _dataService.toggleEntreePointing(realIndex);
+      }
+
+      await _loadEntrees();
+
+      if (!mounted) return;
+      
+      setState(() {
+        _isSelectionMode = false;
+        _selectedIndices.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${realIndices.length} revenu(s) mis à jour'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du traitement: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingBatch = false;
+        });
+      }
+    }
+  }
+
   void _calculateTotals() {
     // Calculer le total des entrées
     totalEntrees = entrees.fold(0.0, (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
@@ -717,89 +818,127 @@ class _EntreesTabState extends State<EntreesTab> {
                         itemBuilder: (context, index) {
                           final entree = filteredEntrees[index];
                           final amount = (entree['amount'] as num?)?.toDouble() ?? 0;
-                          final description = entree['description'] as String? ?? 'Sans description';
-                          final date = DateTime.tryParse(entree['date'] ?? '') ?? DateTime.now();
+                          final description = entree['description'] as String? ?? '';
+                          final dateStr = entree['date'] as String? ?? '';
+                          final date = DateTime.tryParse(dateStr);
+                          final isPointed = entree['isPointed'] == true;
                           final isSelected = _selectedIndices.contains(index);
 
                           return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            elevation: isSelected ? 8 : 2,
-                            color: isSelected ? Colors.green.shade50 : null,
+                            elevation: isSelected ? 4 : 1,
+                            color: isSelected ? Colors.blue.shade50 : null,
                             child: ListTile(
-                              // Mode sélection
+                              // Case à cocher en mode sélection ou indicateur de pointage
                               leading: _isSelectionMode
                                   ? Checkbox(
                                       value: isSelected,
-                                      onChanged: (_) => _toggleSelection(index),
-                                      activeColor: Colors.green,
+                                      onChanged: (value) => _toggleSelection(index),
+                                      activeColor: Colors.blue,
                                     )
-                                  : CircleAvatar(
-                                      backgroundColor: Colors.green.shade100,
-                                      child: const Icon(
-                                        Icons.account_balance_wallet,
-                                        color: Colors.green,
-                                        size: 20,
+                                  : GestureDetector(
+                                      onTap: () => _togglePointing(index),
+                                      child: Container(
+                                        width: 40,
+                                        height: 40,
+                                        decoration: BoxDecoration(
+                                          color: isPointed ? Colors.green.shade100 : Colors.blue.shade100,
+                                          borderRadius: BorderRadius.circular(20),
+                                          border: Border.all(
+                                            color: isPointed ? Colors.green.shade300 : Colors.blue.shade300,
+                                            width: 2,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          isPointed ? Icons.check_circle : Icons.radio_button_unchecked,
+                                          color: isPointed ? Colors.green.shade700 : Colors.blue.shade700,
+                                          size: 24,
+                                        ),
                                       ),
                                     ),
                               title: Text(
                                 description,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              subtitle: Text(
-                                DateFormat('dd/MM/yyyy').format(date),
                                 style: TextStyle(
-                                  color: Colors.grey.shade600,
+                                  fontWeight: FontWeight.bold,
+                                  decoration: isPointed ? TextDecoration.lineThrough : null,
+                                  color: isPointed ? Colors.grey : null,
                                 ),
                               ),
-                              trailing: _isSelectionMode
-                                  ? null
-                                  : Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          '+ ${AmountParser.formatAmount(amount)} €',
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16,
-                                            color: Colors.green.shade700,
+                              subtitle: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${AmountParser.formatAmount(amount)} €',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: isPointed ? Colors.grey : Colors.green.shade700,
+                                    ),
+                                  ),
+                                  if (date != null)
+                                    Text(
+                                      DateFormat('dd/MM/yyyy').format(date),
+                                      style: TextStyle(
+                                        color: isPointed ? Colors.grey : Colors.grey.shade600,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  if (isPointed && entree['pointedAt'] != null)
+                                    Text(
+                                      'Pointé le ${DateFormat('dd/MM/yyyy à HH:mm').format(DateTime.parse(entree['pointedAt']))}',
+                                      style: TextStyle(
+                                        color: Colors.green.shade600,
+                                        fontSize: 10,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              trailing: _isSelectionMode 
+                                  ? null 
+                                  : PopupMenuButton<String>(
+                                      onSelected: (value) async {
+                                        if (value == 'point') {
+                                          await _togglePointing(index);
+                                        } else if (value == 'edit') {
+                                          await _editEntree(index);
+                                        } else if (value == 'delete') {
+                                          await _deleteEntree(index);
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        PopupMenuItem(
+                                          value: 'point',
+                                          child: Row(
+                                            children: [
+                                              Icon(
+                                                isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
+                                                color: isPointed ? Colors.orange : Colors.green,
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(isPointed ? 'Dépointer' : 'Pointer'),
+                                            ],
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        PopupMenuButton<String>(
-                                          onSelected: (value) {
-                                            switch (value) {
-                                              case 'edit':
-                                                _editEntree(index);
-                                                break;
-                                              case 'delete':
-                                                _deleteEntree(index);
-                                                break;
-                                            }
-                                          },
-                                          itemBuilder: (context) => [
-                                            const PopupMenuItem(
-                                              value: 'edit',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.edit, color: Colors.blue),
-                                                  SizedBox(width: 8),
-                                                  Text('Modifier'),
-                                                ],
-                                              ),
-                                            ),
-                                            const PopupMenuItem(
-                                              value: 'delete',
-                                              child: Row(
-                                                children: [
-                                                  Icon(Icons.delete, color: Colors.red),
-                                                  SizedBox(width: 8),
-                                                  Text('Supprimer'),
-                                                ],
-                                              ),
-                                            ),
-                                          ],
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit, color: Colors.blue),
+                                              SizedBox(width: 8),
+                                              Text('Modifier'),
+                                            ],
+                                          ),
+                                        ),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete, color: Colors.red),
+                                              SizedBox(width: 8),
+                                              Text('Supprimer'),
+                                            ],
+                                          ),
                                         ),
                                       ],
                                     ),
@@ -854,6 +993,25 @@ class _EntreesTabState extends State<EntreesTab> {
                         ),
                       ),
                       const SizedBox(width: 16),
+                      // NOUVEAU : Bouton de pointage en lot
+                      ElevatedButton.icon(
+                        onPressed: _selectedIndices.isEmpty || _isProcessingBatch
+                            ? null
+                            : _batchTogglePointing,
+                        icon: _isProcessingBatch
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.check_circle),
+                        label: Text(_isProcessingBatch ? 'Pointage...' : 'Pointer'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       ElevatedButton.icon(
                         onPressed: _selectedIndices.isEmpty || _isProcessingBatch
                             ? null

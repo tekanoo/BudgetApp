@@ -56,6 +56,29 @@ class PointingService {
     }
   }
 
+  /// Basculer le pointage d'un revenu
+  Future<bool> toggleEntreePointing(int index) async {
+    try {
+      await _budgetService.toggleEntreePointing(index);
+      
+      final entrees = await _budgetService.getEntrees();
+      if (index < 0 || index >= entrees.length) return false;
+      
+      final newState = entrees[index]['isPointed'] == true;
+
+      if (kDebugMode) {
+        debugPrint('✅ Revenu ${newState ? 'pointé' : 'dépointé'}');
+      }
+
+      return newState;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Erreur pointage revenu: $e');
+      }
+      rethrow;
+    }
+  }
+
   /// Pointer plusieurs dépenses en lot - VERSION CORRIGÉE
   Future<Map<String, int>> batchTogglePlaisirs(List<int> indices) async {
     int pointed = 0;
@@ -122,18 +145,60 @@ class PointingService {
     };
   }
 
-  /// Calculer les statistiques de pointage
+  /// Pointer plusieurs revenus en lot
+  Future<Map<String, int>> batchToggleEntrees(List<int> indices) async {
+    int pointed = 0;
+    int unpointed = 0;
+    List<String> errors = [];
+
+    final sortedIndices = indices.toList()..sort((a, b) => b.compareTo(a));
+
+    for (int index in sortedIndices) {
+      try {
+        final newState = await toggleEntreePointing(index);
+        if (newState) {
+          pointed++;
+        } else {
+          unpointed++;
+        }
+      } catch (e) {
+        errors.add('Index $index: $e');
+      }
+    }
+
+    if (kDebugMode && errors.isNotEmpty) {
+      debugPrint('❌ Erreurs traitement lot revenus: ${errors.join(', ')}');
+    }
+
+    return {
+      'pointed': pointed,
+      'unpointed': unpointed,
+      'errors': errors.length,
+    };
+  }
+
+  /// Calculer les statistiques de pointage (mise à jour pour inclure revenus)
   Future<Map<String, dynamic>> getPointingStats() async {
     try {
+      final entrees = await _budgetService.getEntrees();
       final plaisirs = await _budgetService.getPlaisirs();
       final sorties = await _budgetService.getSorties();
 
+      // Statistiques revenus
+      int totalEntrees = entrees.length;
+      int entreesPointees = entrees.where((e) => e['isPointed'] == true).length;
+      double montantEntreesPointees = entrees
+          .where((e) => e['isPointed'] == true)
+          .fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+
+      // Statistiques dépenses
       int totalPlaisirs = plaisirs.length;
       int plaisirsPoinetes = plaisirs.where((p) => p['isPointed'] == true).length;
       double montantPlaisirsPoinetes = plaisirs
           .where((p) => p['isPointed'] == true)
           .fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
 
+      // Statistiques charges
       int totalSorties = sorties.length;
       int sortiesPointees = sorties.where((s) => s['isPointed'] == true).length;
       double montantSortiesPointees = sorties
@@ -141,6 +206,12 @@ class PointingService {
           .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
 
       return {
+        'entrees': {
+          'total': totalEntrees,
+          'pointed': entreesPointees,
+          'percentage': totalEntrees > 0 ? (entreesPointees / totalEntrees * 100).round() : 0,
+          'amount': montantEntreesPointees,
+        },
         'plaisirs': {
           'total': totalPlaisirs,
           'pointed': plaisirsPoinetes,
@@ -153,13 +224,14 @@ class PointingService {
           'percentage': totalSorties > 0 ? (sortiesPointees / totalSorties * 100).round() : 0,
           'amount': montantSortiesPointees,
         },
-        'totalPointedAmount': montantPlaisirsPoinetes + montantSortiesPointees,
+        'totalPointedAmount': montantEntreesPointees + montantPlaisirsPoinetes + montantSortiesPointees,
       };
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ Erreur statistiques pointage: $e');
       }
       return {
+        'entrees': {'total': 0, 'pointed': 0, 'percentage': 0, 'amount': 0.0},
         'plaisirs': {'total': 0, 'pointed': 0, 'percentage': 0, 'amount': 0.0},
         'sorties': {'total': 0, 'pointed': 0, 'percentage': 0, 'amount': 0.0},
         'totalPointedAmount': 0.0,

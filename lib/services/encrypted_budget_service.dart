@@ -134,10 +134,12 @@ Future<void> togglePlaisirPointing(int index) async {
       final sorties = await getSorties();
       final plaisirs = await getPlaisirs();
       
-      // Calcul du total des revenus
-      double totalRevenus = 0.0;
+      // Calcul du total des revenus POINTÉS seulement
+      double totalRevenusPointes = 0.0;
       for (var entree in entrees) {
-        totalRevenus += (entree['amount'] as num?)?.toDouble() ?? 0.0;
+        if (entree['isPointed'] == true) {
+          totalRevenusPointes += (entree['amount'] as num?)?.toDouble() ?? 0.0;
+        }
       }
       
       // Calcul du total des charges pointées
@@ -154,22 +156,22 @@ Future<void> togglePlaisirPointing(int index) async {
         if (plaisir['isPointed'] == true) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
-            totalDepensesPointees -= amount; // Les crédits s'ajoutent (donc on soustrait la soustraction)
+            totalDepensesPointees -= amount; // Les crédits s'ajoutent
           } else {
             totalDepensesPointees += amount; // Les dépenses se soustraient
           }
         }
       }
       
-      // Formule : Revenus - Charges pointées - Dépenses pointées
-      final result = totalRevenus - totalChargesPointees - totalDepensesPointees;
+      // Nouvelle formule : Revenus pointés - Charges pointées - Dépenses pointées
+      final result = totalRevenusPointes - totalChargesPointees - totalDepensesPointees;
       
       if (kDebugMode) {
-        print('🔍 CALCUL SOLDE DÉBITÉ:');
-        print('  - Total revenus: $totalRevenus €');
+        print('🔍 CALCUL SOLDE DÉBITÉ (NOUVEAU):');
+        print('  - Revenus pointés: $totalRevenusPointes €');
         print('  - Charges pointées: $totalChargesPointees €');
         print('  - Dépenses pointées: $totalDepensesPointees €');
-        print('  - FORMULE: $totalRevenus - $totalChargesPointees - $totalDepensesPointees = $result €');
+        print('  - FORMULE: $totalRevenusPointes - $totalChargesPointees - $totalDepensesPointees = $result €');
       }
       
       return result;
@@ -203,11 +205,73 @@ Future<void> togglePlaisirPointing(int index) async {
     }
   }
 
+  /// SYSTÈME DE POINTAGE DES REVENUS
+  
+  /// Bascule le statut de pointage d'un revenu
+  Future<void> toggleEntreePointing(int index) async {
+    _ensureInitialized();
+    try {
+      final entrees = await _firebaseService.loadEntrees();
+      if (index >= 0 && index < entrees.length) {
+        // Déchiffrer d'abord la transaction pour la modifier
+        final decryptedEntree = _encryption.decryptTransaction(entrees[index]);
+        
+        final bool currentlyPointed = decryptedEntree['isPointed'] == true;
+        
+        // Bascule le statut
+        decryptedEntree['isPointed'] = !currentlyPointed;
+        
+        if (!currentlyPointed) {
+          // Si on pointe, on ajoute la date
+          decryptedEntree['pointedAt'] = DateTime.now().toIso8601String();
+        } else {
+          // Si on dépointe, on supprime la date
+          decryptedEntree.remove('pointedAt');
+        }
+        
+        // Rechiffrer la transaction modifiée
+        entrees[index] = _encryption.encryptTransaction(decryptedEntree);
+        
+        // Sauvegarder
+        await _firebaseService.saveEntrees(entrees);
+        
+        if (kDebugMode) {
+          print('✅ Revenu ${currentlyPointed ? 'dépointé' : 'pointé'}');
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur basculement pointage revenu: $e');
+      }
+      rethrow;
+    }
+  }
+
+  /// Calcule le total des revenus pointés
+  Future<double> getTotalEntreesTotaux() async {
+    try {
+      final entrees = await getEntrees();
+      double total = 0.0;
+      
+      for (var entree in entrees) {
+        if (entree['isPointed'] == true) {
+          total += (entree['amount'] as num?)?.toDouble() ?? 0.0;
+        }
+      }
+      
+      return total;
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur calcul total revenus pointés: $e');
+      }
+      return 0.0;
+    }
+  }
+
   Future<void> addEntree({
     required String amountStr,
     required String description,
     DateTime? date,
-    // Suppression du paramètre periodicity
   }) async {
     _ensureInitialized();
     try {
@@ -220,7 +284,7 @@ Future<void> togglePlaisirPointing(int index) async {
         'date': (date ?? DateTime.now()).toIso8601String(),
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        // Suppression de 'periodicity': periodicity ?? 'ponctuel',
+        'isPointed': false, // Par défaut, non pointé
       };
       
       final encryptedEntree = _encryption.encryptTransaction(newEntree);
@@ -244,7 +308,6 @@ Future<void> togglePlaisirPointing(int index) async {
     required String amountStr,
     required String description,
     DateTime? date,
-    // Suppression du paramètre periodicity
   }) async {
     _ensureInitialized();
     try {
@@ -259,7 +322,8 @@ Future<void> togglePlaisirPointing(int index) async {
           'date': (date ?? DateTime.tryParse(oldEntree['date'] ?? '') ?? DateTime.now()).toIso8601String(),
           'timestamp': oldEntree['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
           'id': oldEntree['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
-          // Suppression de 'periodicity': periodicity ?? oldEntree['periodicity'] ?? 'ponctuel',
+          'isPointed': oldEntree['isPointed'] ?? false, // Conserver le statut de pointage
+          'pointedAt': oldEntree['pointedAt'], // Conserver la date de pointage si elle existe
         };
         
         entrees[index] = _encryption.encryptTransaction(updatedEntree);
