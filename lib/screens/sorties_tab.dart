@@ -55,7 +55,6 @@ class _SortiesTabState extends State<SortiesTab> {
       
       // Charger aussi les totaux pour les calculs
       final totals = await _dataService.getTotals();
-      final revenus = await _dataService.getEntrees();
       final depenses = await _dataService.getPlaisirs();
       
       setState(() {
@@ -246,6 +245,8 @@ class _SortiesTabState extends State<SortiesTab> {
   }
 
   Future<void> _togglePointing(int displayIndex) async {
+    if (!mounted) return;
+    
     try {
       final sortieToToggle = filteredSorties[displayIndex];
       final sortieId = sortieToToggle['id'] ?? '';
@@ -680,7 +681,7 @@ class _SortiesTabState extends State<SortiesTab> {
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(25),
                         ),
                         child: Icon(
@@ -698,7 +699,7 @@ class _SortiesTabState extends State<SortiesTab> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(25),
                       ),
                       child: const Icon(
@@ -716,7 +717,7 @@ class _SortiesTabState extends State<SortiesTab> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(25),
                       ),
                       child: const Icon(
@@ -761,9 +762,9 @@ class _SortiesTabState extends State<SortiesTab> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withOpacity(0.3)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                       ),
                       child: Column(
                         children: [
@@ -788,9 +789,9 @@ class _SortiesTabState extends State<SortiesTab> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withOpacity(0.5)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                       ),
                       child: Column(
                         children: [

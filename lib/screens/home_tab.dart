@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../utils/amount_parser.dart';
 
@@ -29,7 +28,6 @@ class _HomeTabState extends State<HomeTab> {
   double _monthlyPlaisirs = 0.0;
   double _monthlySortiesPointees = 0.0;
   double _monthlyPlaisirsPointees = 0.0;
-  double _soldeDebite = 0.0;
   List<String> _availableTags = [];
   
   @override
@@ -101,13 +99,11 @@ class _HomeTabState extends State<HomeTab> {
       } else {
         // Comportement normal (toutes les données)
         final totals = await _dataService.getTotals();
-        final soldeDebite = await _dataService.getSoldeDisponible();
         
         setState(() {
           _monthlyEntrees = totals['entrees'] ?? 0.0;
           _monthlySorties = totals['sorties'] ?? 0.0;
           _monthlyPlaisirs = totals['plaisirs'] ?? 0.0;
-          _soldeDebite = soldeDebite;
         });
       }
     } catch (e) {

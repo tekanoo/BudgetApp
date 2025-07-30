@@ -51,7 +51,6 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
       
       // Charger aussi les totaux pour les calculs
       final totals = await _dataService.getTotals();
-      final revenus = await _dataService.getEntrees();
       final charges = await _dataService.getSorties();
       
       setState(() {
@@ -584,7 +583,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                   : null,
                               onTap: _isSelectionMode
                                   ? () => _toggleSelection(index)
-                                  : () => _togglePointing(index),
+                                  : () => _showPlaisirDetails(index),
                             ),
                           );
                         },

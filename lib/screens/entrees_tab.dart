@@ -160,12 +160,13 @@ class _EntreesTabState extends State<EntreesTab> {
                     lastDate: DateTime(2030),
                   );
                   if (date != null) {
+                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser setState
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = date;
                     });
                     _applyFilter();
-                    if (!mounted) return; // Protection async
+                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser Navigator
                     Navigator.pop(context);
                   }
                 },
@@ -188,12 +189,13 @@ class _EntreesTabState extends State<EntreesTab> {
                     lastDate: DateTime(2030),
                   );
                   if (date != null) {
+                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser setState
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = date;
                     });
                     _applyFilter();
-                    if (!mounted) return; // Protection async
+                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser Navigator
                     Navigator.pop(context);
                   }
                 },
@@ -664,7 +666,7 @@ class _EntreesTabState extends State<EntreesTab> {
                         borderRadius: BorderRadius.circular(15),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.green.withOpacity(0.3),
+                            color: Colors.green.withValues(alpha: 0.3),
                             blurRadius: 10,
                             offset: const Offset(0, 5),
                           ),
@@ -836,7 +838,7 @@ class _EntreesTabState extends State<EntreesTab> {
                   color: Colors.green.shade600,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
+                      color: Colors.black.withValues(alpha: 0.2),
                       blurRadius: 10,
                       offset: const Offset(0, -2),
                     ),
