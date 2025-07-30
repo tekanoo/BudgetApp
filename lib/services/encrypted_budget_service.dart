@@ -207,30 +207,29 @@ Future<void> togglePlaisirPointing(int index) async {
     required String amountStr,
     required String description,
     DateTime? date,
-    String? periodicity, // Nouveau : 'ponctuel', 'mensuel', 'hebdomadaire', 'annuel'
+    // Suppression du paramètre periodicity
   }) async {
     _ensureInitialized();
     try {
       final entrees = await _firebaseService.loadEntrees();
-      final double amount = AmountParser.parseAmount(amountStr);
       
+      final double amount = AmountParser.parseAmount(amountStr);
       final newEntree = {
         'amount': amount,
         'description': description,
         'date': (date ?? DateTime.now()).toIso8601String(),
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
-        'periodicity': periodicity ?? 'ponctuel', // Par défaut ponctuel
+        // Suppression de 'periodicity': periodicity ?? 'ponctuel',
       };
       
-      // Chiffre avant d'ajouter
       final encryptedEntree = _encryption.encryptTransaction(newEntree);
       entrees.add(encryptedEntree);
       
       await _firebaseService.saveEntrees(entrees);
       
       if (kDebugMode) {
-        print('✅ Entrée chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description (${periodicity ?? 'ponctuel'})');
+        print('✅ Entrée chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -244,13 +243,13 @@ Future<void> togglePlaisirPointing(int index) async {
     required int index,
     required String amountStr,
     required String description,
-    DateTime? date, // Nouveau paramètre optionnel
+    DateTime? date,
+    // Suppression du paramètre periodicity
   }) async {
     _ensureInitialized();
     try {
       final entrees = await _firebaseService.loadEntrees();
       if (index >= 0 && index < entrees.length) {
-        // Récupérer l'ancienne entrée pour préserver certaines données
         final oldEntree = _encryption.decryptTransaction(entrees[index]);
         
         final double amount = AmountParser.parseAmount(amountStr);
@@ -260,6 +259,7 @@ Future<void> togglePlaisirPointing(int index) async {
           'date': (date ?? DateTime.tryParse(oldEntree['date'] ?? '') ?? DateTime.now()).toIso8601String(),
           'timestamp': oldEntree['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
           'id': oldEntree['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
+          // Suppression de 'periodicity': periodicity ?? oldEntree['periodicity'] ?? 'ponctuel',
         };
         
         entrees[index] = _encryption.encryptTransaction(updatedEntree);
@@ -876,7 +876,7 @@ Future<void> togglePlaisirPointing(int index) async {
     }
   }
 
-  /// Génère les projections avec périodicité (mise à jour pour les sorties)
+  /// Génère les projections SANS périodicité (tous ponctuels maintenant)
   Future<Map<String, Map<String, double>>> getProjectionsWithPeriodicity({
     int yearStart = 2024,
     int yearEnd = 2030,
@@ -896,17 +896,20 @@ Future<void> togglePlaisirPointing(int index) async {
         }
       }
       
-      // Traiter les revenus avec périodicité
+      // Traiter les revenus SANS périodicité (toujours ponctuels)
       for (var entree in entrees) {
-        final periodicity = entree['periodicity'] as String? ?? 'ponctuel';
         final amount = (entree['amount'] as num).toDouble();
         final dateStr = entree['date'] as String? ?? '';
-        final startDate = DateTime.tryParse(dateStr) ?? DateTime.now();
-        
-        _applyPeriodicity(projections, startDate, amount, 'revenus', periodicity, yearStart, yearEnd);
+        final date = DateTime.tryParse(dateStr);
+        if (date != null) {
+          final monthKey = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}';
+          if (projections.containsKey(monthKey)) {
+            projections[monthKey]!['revenus'] = projections[monthKey]!['revenus']! + amount;
+          }
+        }
       }
       
-      // Traiter les charges SANS périodicité (toujours ponctuelles)
+      // Traiter les charges (toujours ponctuelles)
       for (var sortie in sorties) {
         final amount = (sortie['amount'] as num).toDouble();
         final dateStr = sortie['date'] as String? ?? '';
@@ -944,76 +947,6 @@ Future<void> togglePlaisirPointing(int index) async {
         print('❌ Erreur génération projections: $e');
       }
       return {};
-    }
-  }
-  
-  void _applyPeriodicity(
-    Map<String, Map<String, double>> projections,
-    DateTime startDate,
-    double amount,
-    String category,
-    String periodicity,
-    int yearStart,
-    int yearEnd,
-  ) {
-    switch (periodicity) {
-      case 'ponctuel':
-        final monthKey = '${startDate.year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}';
-        if (projections.containsKey(monthKey)) {
-          projections[monthKey]![category] = projections[monthKey]![category]! + amount;
-        }
-        break;
-        
-      case 'mensuel':
-        // CORRECTION: Appliquer à tous les mois à partir de la date de début
-        DateTime currentDate = DateTime(startDate.year, startDate.month);
-        final endDate = DateTime(yearEnd, 12, 31);
-        
-        while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
-          // CORRECTION: Vérifier que la date actuelle est >= à la date de début
-          if (currentDate.isAfter(DateTime(startDate.year, startDate.month - 1)) || 
-              currentDate.isAtSameMomentAs(DateTime(startDate.year, startDate.month))) {
-            final monthKey = '${currentDate.year.toString().padLeft(4, '0')}-${currentDate.month.toString().padLeft(2, '0')}';
-            if (projections.containsKey(monthKey)) {
-              projections[monthKey]![category] = projections[monthKey]![category]! + amount;
-            }
-          }
-          // Passer au mois suivant
-          if (currentDate.month == 12) {
-            currentDate = DateTime(currentDate.year + 1, 1);
-          } else {
-            currentDate = DateTime(currentDate.year, currentDate.month + 1);
-          }
-        }
-        break;
-        
-      case 'hebdomadaire':
-        // Appliquer ~4.33 fois par mois (52 semaines / 12 mois)
-        DateTime currentDate = DateTime(startDate.year, startDate.month);
-        final endDate = DateTime(yearEnd, 12);
-        
-        while (currentDate.isBefore(endDate) || currentDate.isAtSameMomentAs(endDate)) {
-          if (currentDate.isAfter(startDate) || currentDate.isAtSameMomentAs(DateTime(startDate.year, startDate.month))) {
-            final monthKey = '${currentDate.year.toString().padLeft(4, '0')}-${currentDate.month.toString().padLeft(2, '0')}';
-            if (projections.containsKey(monthKey)) {
-              projections[monthKey]![category] = projections[monthKey]![category]! + (amount * 4.33);
-            }
-          }
-          currentDate = DateTime(currentDate.year, currentDate.month + 1);
-        }
-        break;
-        
-      case 'annuel':
-        // Appliquer uniquement au mois de début de chaque année
-        for (int year = startDate.year; year <= yearEnd; year++) {
-          if (year >= yearStart) {
-            final monthKey = '${year.toString().padLeft(4, '0')}-${startDate.month.toString().padLeft(2, '0')}';
-            if (projections.containsKey(monthKey)) {
-              projections[monthKey]![category] = projections[monthKey]![category]! + amount;
-            }
-          }
-        }
-        break;
     }
   }
 }

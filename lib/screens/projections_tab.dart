@@ -562,7 +562,7 @@ class _ProjectionsTabState extends State<ProjectionsTab> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Projections par année ($currentYear en premier). Les montants sont calculés à partir de vos données réelles.',
+                        'Projections par année ($currentYear en premier). Les montants correspondent aux transactions réelles saisies.',
                         style: TextStyle(
                           color: Colors.blue.shade700,
                           fontSize: 14,

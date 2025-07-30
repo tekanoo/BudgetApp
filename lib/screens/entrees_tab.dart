@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
-import '../services/encryption_service.dart';
-import '../widgets/periodicity_selector.dart';
+import '../utils/amount_parser.dart';
 
 class EntreesTab extends StatefulWidget {
   final DateTime? selectedMonth; // Ajouter ce paramètre optionnel
@@ -221,87 +220,6 @@ class _EntreesTabState extends State<EntreesTab> {
     return months[month - 1];
   }
 
-  // Ajout de la méthode _addEntree manquante
-  Future<void> _addEntree() async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => _AddEntreeDialog(
-        onAdd: (amount, description, date, periodicity) async {
-          try {
-            await _dataService.addEntree(
-              amountStr: amount,
-              description: description,
-              date: date,
-              periodicity: periodicity,
-            );
-            return true;
-          } catch (e) {
-            return false;
-          }
-        },
-      ),
-    );
-
-    if (result != null && result['success'] == true) {
-      _loadEntrees();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Revenu ajouté avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    }
-  }
-
-  // Ajout de la méthode _editEntree manquante
-  Future<void> _editEntree(int displayIndex) async {
-    final entree = entrees[displayIndex];
-    final entreeId = entree['id'] ?? '';
-    
-    // Trouver l'index réel
-    final originalEntrees = await _dataService.getEntrees();
-    final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
-    
-    if (realIndex == -1) return;
-    
-    final result = await _showEntreeDialog(
-      isEdit: true,
-      description: entree['description'],
-      amount: entree['amount'],
-      date: DateTime.tryParse(entree['date'] ?? ''), // Ajouter la date existante
-    );
-    
-    if (result != null) {
-      try {
-        await _dataService.updateEntree(
-          index: realIndex,
-          amountStr: result['amountStr'],
-          description: result['description'],
-          date: result['date'], // Ajouter la date
-        );
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔐 Revenu modifié et chiffré avec succès'),
-            backgroundColor: Colors.blue,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la modification: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
   Future<Map<String, dynamic>?> _showEntreeDialog({
     String? description,
     double? amount,
@@ -312,9 +230,7 @@ class _EntreesTabState extends State<EntreesTab> {
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
-    // CORRECTION: Utiliser le mois sélectionné par défaut
-    DateTime? selectedDate = date ?? widget.selectedMonth ?? DateTime.now();
-    String? selectedPeriodicity = 'ponctuel';
+    DateTime? selectedDate = date ?? (widget.selectedMonth ?? DateTime.now());
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -330,72 +246,65 @@ class _EntreesTabState extends State<EntreesTab> {
               Text(isEdit ? 'Modifier le revenu' : 'Ajouter un revenu'),
             ],
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: descriptionController,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.description),
-                  helperText: 'Salaire, Prime, Freelance...',
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: montantController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Montant',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.euro),
-                  suffixText: '€',
-                  helperText: 'Utilisez , ou . pour les décimales',
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Sélecteur de date
-              InkWell(
-                onTap: () async {
-                  final pickedDate = await showDatePicker(
-                    context: context,
-                    initialDate: selectedDate ?? DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (pickedDate != null) {
-                    setState(() {
-                      selectedDate = pickedDate;
-                    });
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey),
-                    borderRadius: BorderRadius.circular(4),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.description),
+                    helperText: 'Salaire, prime, freelance...',
                   ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today, color: Colors.grey),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          selectedDate != null 
-                            ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
-                            : 'Sélectionner une date',
-                          style: TextStyle(
-                            color: selectedDate != null ? Colors.black87 : Colors.grey,
-                            fontSize: 16,
-                          ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: montantController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Montant (€)',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.euro),
+                    helperText: 'Ex: 2500.00',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                InkWell(
+                  onTap: () async {
+                    final picked = await showDatePicker(
+                      context: context,
+                      initialDate: selectedDate ?? DateTime.now(),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
+                    );
+                    if (picked != null) {
+                      setState(() {
+                        selectedDate = picked;
+                      });
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Date: ${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
+                          style: const TextStyle(fontSize: 16),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           actions: [
             TextButton(
@@ -404,15 +313,14 @@ class _EntreesTabState extends State<EntreesTab> {
             ),
             FilledButton(
               onPressed: () {
-                final desc = descriptionController.text.trim();
-                final amountStr = montantController.text.trim();
-                final montant = AmountParser.parseAmount(amountStr);
-                if (desc.isNotEmpty && montant > 0 && selectedDate != null) {
+                if (descriptionController.text.trim().isNotEmpty &&
+                    montantController.text.trim().isNotEmpty &&
+                    selectedDate != null) {
                   Navigator.pop(context, {
-                    'description': desc,
-                    'amountStr': amountStr,
-                    'date': selectedDate, // S'assurer que la date est bien passée
-                    'periodicity': selectedPeriodicity,
+                    'description': descriptionController.text.trim(),
+                    'amount': AmountParser.parseAmount(montantController.text),
+                    'date': selectedDate,
+                    'success': true,
                   });
                 }
               },
@@ -422,6 +330,85 @@ class _EntreesTabState extends State<EntreesTab> {
         ),
       ),
     );
+  }
+
+  Future<void> _addEntree() async {
+    final result = await _showEntreeDialog();
+    if (result != null) {
+      try {
+        await _dataService.addEntree(
+          amountStr: result['amount'].toString(),
+          description: result['description'],
+          date: result['date'],
+        );
+        await _loadEntrees();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Revenu ajouté'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _editEntree(int displayIndex) async {
+    final entree = entrees[displayIndex];
+    final entreeId = entree['id'] ?? '';
+    
+    final originalEntrees = await _dataService.getEntrees();
+    final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+    
+    if (realIndex == -1) return;
+    
+    final result = await _showEntreeDialog(
+      description: entree['description'],
+      amount: (entree['amount'] as num?)?.toDouble(),
+      date: DateTime.tryParse(entree['date'] ?? ''),
+      isEdit: true,
+    );
+    
+    if (result != null) {
+      try {
+        await _dataService.updateEntree(
+          index: realIndex,
+          amountStr: result['amount'].toString(),
+          description: result['description'],
+          date: result['date'],
+        );
+        await _loadEntrees();
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Revenu modifié'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _deleteEntree(int index) async {
@@ -991,15 +978,7 @@ class _AddEntreeDialogState extends State<_AddEntreeDialog> {
               const SizedBox(height: 20),
 
               // Sélecteur de périodicité
-              PeriodicitySelector(
-                selectedPeriodicity: _selectedPeriodicity,
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPeriodicity = value ?? 'ponctuel';
-                  });
-                },
-                enabled: !_isLoading,
-              ),
+              // Suppression du sélecteur de périodicité
             ],
           ),
         ),
