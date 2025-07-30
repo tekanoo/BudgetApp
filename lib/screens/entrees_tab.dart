@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // Ajouter cet import pour kDebugMode
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../utils/amount_parser.dart';
@@ -32,10 +33,17 @@ class _EntreesTabState extends State<EntreesTab> {
   final Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
 
+  // Variables financières à ajouter
+  double totalSorties = 0.0;
+  double totalDepenses = 0.0;
+  double totalSortiesPointees = 0.0;
+  double totalDepensesPointees = 0.0;
+
   @override
   void initState() {
     super.initState();
     _loadEntrees();
+    _loadFinancialData(); // Nouvelle méthode pour charger les données financières
   }
 
   Future<void> _loadEntrees() async {
@@ -74,150 +82,240 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
-  void _applyFilter() {
-    if (_currentFilter == 'Tous' || _selectedFilterDate == null) {
-      filteredEntrees = List.from(entrees);
-    } else {
-      filteredEntrees = entrees.where((entree) {
-        final entreeDate = DateTime.tryParse(entree['date'] ?? '');
-        if (entreeDate == null) return false;
+  // Nouvelle méthode pour charger toutes les données financières
+  Future<void> _loadFinancialData() async {
+    try {
+      final sorties = await _dataService.getSorties();
+      final plaisirs = await _dataService.getPlaisirs();
+      
+      setState(() {
+        totalSorties = sorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        totalDepenses = plaisirs.fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
         
-        if (_currentFilter == 'Mois') {
+        // Calculer les montants pointés
+        totalSortiesPointees = sorties
+            .where((s) => s['isPointed'] == true)
+            .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        
+        totalDepensesPointees = plaisirs
+            .where((p) => p['isPointed'] == true)
+            .fold(0.0, (sum, p) {
+              final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+              if (p['isCredit'] == true) {
+                return sum - amount; // Les crédits s'ajoutent au solde
+              } else {
+                return sum + amount; // Les dépenses se soustraient du solde
+              }
+            });
+      });
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur chargement données financières: $e');
+      }
+    }
+  }
+
+  void _applyFilter() {
+    setState(() {
+      if (_currentFilter == 'Tous') {
+        filteredEntrees = List.from(entrees);
+      } else if (_currentFilter == 'Pointés') {
+        filteredEntrees = entrees.where((entree) => entree['isPointed'] == true).toList();
+      } else if (_currentFilter == 'Non pointés') {
+        filteredEntrees = entrees.where((entree) => entree['isPointed'] != true).toList();
+      } else if (_currentFilter == 'Mois' && _selectedFilterDate != null) {
+        filteredEntrees = entrees.where((entree) {
+          final entreeDate = DateTime.tryParse(entree['date'] ?? '');
+          if (entreeDate == null) return false;
           return entreeDate.year == _selectedFilterDate!.year &&
                  entreeDate.month == _selectedFilterDate!.month;
-        } else if (_currentFilter == 'Année') {
-          return entreeDate.year == _selectedFilterDate!.year;
-        }
-        return true;
-      }).toList();
-    }
-    
-    // Recalculer le total des entrées filtrées
-    final filteredTotal = filteredEntrees.fold(0.0, 
-      (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
-    
-    setState(() {
-      totalEntrees = filteredTotal;
+        }).toList();
+      } else {
+        filteredEntrees = List.from(entrees);
+      }
+      
+      // Recalculer le total des entrées filtrées
+      totalEntrees = filteredEntrees.fold(0.0, 
+        (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
     });
   }
 
-  void _showFilterDialog() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            
-            const Text(
-              'Filtrer les revenus',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            
-            // Options de filtre
-            ListTile(
-              leading: Radio<String>(
-                value: 'Tous',
-                groupValue: _currentFilter,
-                onChanged: (value) {
-                  setState(() {
-                    _currentFilter = value!;
-                    _selectedFilterDate = null;
-                  });
-                  _applyFilter();
-                  Navigator.pop(context);
-                },
-              ),
-              title: const Text('Tous les revenus'),
-              subtitle: Text('${entrees.length} revenus'),
-            ),
-            
-            ListTile(
-              leading: Radio<String>(
-                value: 'Mois',
-                groupValue: _currentFilter,
-                onChanged: (value) async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (date != null) {
-                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser setState
-                    setState(() {
-                      _currentFilter = value!;
-                      _selectedFilterDate = date;
-                    });
-                    _applyFilter();
-                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser Navigator
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-              title: const Text('Par mois'),
-              subtitle: _currentFilter == 'Mois' && _selectedFilterDate != null
-                  ? Text('${_getMonthName(_selectedFilterDate!.month)} ${_selectedFilterDate!.year}')
-                  : const Text('Sélectionner un mois'),
-            ),
-            
-            ListTile(
-              leading: Radio<String>(
-                value: 'Année',
-                groupValue: _currentFilter,
-                onChanged: (value) async {
-                  final date = await showDatePicker(
-                    context: context,
-                    initialDate: DateTime.now(),
-                    firstDate: DateTime(2020),
-                    lastDate: DateTime(2030),
-                  );
-                  if (date != null) {
-                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser setState
-                    setState(() {
-                      _currentFilter = value!;
-                      _selectedFilterDate = date;
-                    });
-                    _applyFilter();
-                    if (!mounted) return; // Vérifier mounted AVANT d'utiliser Navigator
-                    Navigator.pop(context);
-                  }
-                },
-              ),
-              title: const Text('Par année'),
-              subtitle: _currentFilter == 'Année' && _selectedFilterDate != null
-                  ? Text('Année ${_selectedFilterDate!.year}')
-                  : const Text('Sélectionner une année'),
-            ),
-            
-            const SizedBox(height: 20),
-          ],
+  void _calculateTotals() {
+    // Calculer le total des entrées
+    totalEntrees = entrees.fold(0.0, (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
+    
+    // Si un filtre est appliqué, recalculer le total des entrées filtrées
+    if (_currentFilter != 'Tous' && _selectedFilterDate != null) {
+      final filteredTotal = filteredEntrees.fold(0.0, 
+        (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
+      
+      setState(() {
+        totalEntrees = filteredTotal;
+      });
+    }
+  }
+
+  Widget _buildFinancialHeader() {
+    final soldePrevu = totalEntrees - totalSorties - totalDepenses; 
+    final soldeDebite = totalEntrees - totalSortiesPointees - totalDepensesPointees;
+    
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.green.shade400, Colors.green.shade600],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.trending_up, color: Colors.white, size: 24),
+              const SizedBox(width: 8),
+              const Text(
+                'REVENUS',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 1.2,
+                ),
+              ),
+              const Spacer(),
+              // Menu filtres
+              PopupMenuButton<String>(
+                icon: const Icon(Icons.filter_list, color: Colors.white),
+                onSelected: (value) {
+                  setState(() {
+                    _currentFilter = value;
+                    if (value == 'Mois') {
+                      _pickFilterDate();
+                    } else {
+                      _selectedFilterDate = null;
+                      _applyFilter();
+                    }
+                  });
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'Tous', child: Text('Tous')),
+                  const PopupMenuItem(value: 'Pointés', child: Text('Pointés')),
+                  const PopupMenuItem(value: 'Non pointés', child: Text('Non pointés')),
+                  const PopupMenuItem(value: 'Mois', child: Text('Par mois')),
+                ],
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Total des revenus
+          Text(
+            '${AmountParser.formatAmount(filteredEntrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0)))} €',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          
+          const SizedBox(height: 10),
+          
+          // Soldes prévu et débité
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Solde Prévu',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(soldePrevu)} €',
+                        style: TextStyle(
+                          color: soldePrevu >= 0 ? Colors.white : Colors.red.shade200,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Solde Débité',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(soldeDebite)} €',
+                        style: TextStyle(
+                          color: soldeDebite >= 0 ? Colors.green.shade200 : Colors.orange.shade200,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 5),
+          Text(
+            '${filteredEntrees.length} revenu${filteredEntrees.length > 1 ? 's' : ''} • ${filteredEntrees.where((e) => e['isPointed'] == true).length} pointé${filteredEntrees.where((e) => e['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  String _getMonthName(int month) {
-    const months = [
-      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
-    ];
-    return months[month - 1];
+  Future<void> _pickFilterDate() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (date != null) {
+      setState(() {
+        _selectedFilterDate = date;
+      });
+      _applyFilter();
+    }
   }
 
   Future<Map<String, dynamic>?> _showEntreeDialog({
@@ -455,13 +553,45 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
-  void _toggleSelectionMode() {
-    setState(() {
-      _isSelectionMode = !_isSelectionMode;
-      if (!_isSelectionMode) {
-        _selectedIndices.clear();
+  Future<void> _togglePointing(int displayIndex) async {
+    if (!mounted) return;
+    
+    try {
+      final entreeToToggle = filteredEntrees[displayIndex];
+      final entreeId = entreeToToggle['id'] ?? '';
+      
+      final originalEntrees = await _dataService.getEntrees();
+      final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+      
+      if (realIndex == -1) {
+        throw Exception('Revenu non trouvé');
       }
-    });
+      
+      await _dataService.toggleEntreePointing(realIndex);
+      await _loadEntrees();
+      
+      if (!mounted) return;
+      final isPointed = entreeToToggle['isPointed'] == true;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            !isPointed 
+              ? '✅ Revenu pointé - Solde mis à jour'
+              : '↩️ Revenu dépointé - Solde mis à jour'
+          ),
+          backgroundColor: !isPointed ? Colors.green : Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du pointage: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   void _toggleSelection(int index) {
@@ -472,6 +602,66 @@ class _EntreesTabState extends State<EntreesTab> {
         _selectedIndices.add(index);
       }
     });
+  }
+
+  Future<void> _batchTogglePointing() async {
+    if (_selectedIndices.isEmpty || _isProcessingBatch) return;
+
+    setState(() {
+      _isProcessingBatch = true;
+    });
+
+    try {
+      final realIndices = <int>[];
+      for (int displayIndex in _selectedIndices) {
+        final entree = filteredEntrees[displayIndex];
+        final entreeId = entree['id'] ?? '';
+        
+        final originalEntrees = await _dataService.getEntrees();
+        final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+        
+        if (realIndex != -1) {
+          realIndices.add(realIndex);
+        }
+      }
+
+      // Pointer en lot (en ordre décroissant pour éviter les problèmes d'index)
+      realIndices.sort((a, b) => b.compareTo(a));
+      for (int realIndex in realIndices) {
+        await _dataService.toggleEntreePointing(realIndex);
+      }
+
+      await _loadEntrees();
+
+      if (!mounted) return;
+      
+      setState(() {
+        _isSelectionMode = false;
+        _selectedIndices.clear();
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('✅ ${realIndices.length} revenu(s) mis à jour'),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors du traitement: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isProcessingBatch = false;
+        });
+      }
+    }
   }
 
   Future<void> _batchDeleteEntrees() async {
@@ -560,122 +750,6 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
-  Future<void> _togglePointing(int displayIndex) async {
-    if (!mounted) return;
-    
-    try {
-      final entreeToToggle = filteredEntrees[displayIndex];
-      final entreeId = entreeToToggle['id'] ?? '';
-      
-      final originalEntrees = await _dataService.getEntrees();
-      final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
-      
-      if (realIndex == -1) {
-        throw Exception('Revenu non trouvé');
-      }
-      
-      await _dataService.toggleEntreePointing(realIndex);
-      await _loadEntrees();
-      
-      if (!mounted) return;
-      final isPointed = entreeToToggle['isPointed'] == true;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            !isPointed 
-              ? '✅ Revenu pointé - Solde mis à jour'
-              : '↩️ Revenu dépointé - Solde mis à jour'
-          ),
-          backgroundColor: !isPointed ? Colors.green : Colors.orange,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors du pointage: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
-  Future<void> _batchTogglePointing() async {
-    if (_selectedIndices.isEmpty || _isProcessingBatch) return;
-
-    setState(() {
-      _isProcessingBatch = true;
-    });
-
-    try {
-      final realIndices = <int>[];
-      for (int displayIndex in _selectedIndices) {
-        final entree = filteredEntrees[displayIndex];
-        final entreeId = entree['id'] ?? '';
-        
-        final originalEntrees = await _dataService.getEntrees();
-        final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
-        
-        if (realIndex != -1) {
-          realIndices.add(realIndex);
-        }
-      }
-
-      // Pointer en lot (en ordre décroissant pour éviter les problèmes d'index)
-      realIndices.sort((a, b) => b.compareTo(a));
-      for (int realIndex in realIndices) {
-        await _dataService.toggleEntreePointing(realIndex);
-      }
-
-      await _loadEntrees();
-
-      if (!mounted) return;
-      
-      setState(() {
-        _isSelectionMode = false;
-        _selectedIndices.clear();
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ ${realIndices.length} revenu(s) mis à jour'),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors du traitement: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isProcessingBatch = false;
-        });
-      }
-    }
-  }
-
-  void _calculateTotals() {
-    // Calculer le total des entrées
-    totalEntrees = entrees.fold(0.0, (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
-    
-    // Si un filtre est appliqué, recalculer le total des entrées filtrées
-    if (_currentFilter != 'Tous' && _selectedFilterDate != null) {
-      final filteredTotal = filteredEntrees.fold(0.0, 
-        (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
-      
-      setState(() {
-        totalEntrees = filteredTotal;
-      });
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -696,16 +770,15 @@ class _EntreesTabState extends State<EntreesTab> {
     return Scaffold(
       body: Stack(
         children: [
-          // Contenu principal
           filteredEntrees.isEmpty
               ? Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
-                        Icons.account_balance_wallet,
+                        Icons.trending_up,
                         size: 100,
-                        color: Colors.grey.shade400,
+                        color: Colors.grey.shade300,
                       ),
                       const SizedBox(height: 20),
                       Text(
@@ -741,77 +814,32 @@ class _EntreesTabState extends State<EntreesTab> {
               : Column(
                   children: [
                     // En-tête avec totaux et filtres
-                    Container(
-                      width: double.infinity,
-                      margin: const EdgeInsets.all(16),
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.green.shade400, Colors.green.shade600],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.withValues(alpha: 0.3),
-                            blurRadius: 10,
-                            offset: const Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Total Revenus',
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                Text(
-                                  '${AmountParser.formatAmount(totalEntrees)} €',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 5),
-                                Text(
-                                  '${filteredEntrees.length} revenu${filteredEntrees.length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
-                                  style: const TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            children: [
-                              // Bouton de sélection multiple
-                              if (!_isSelectionMode)
-                                IconButton(
-                                  onPressed: _toggleSelectionMode,
-                                  icon: const Icon(Icons.checklist, color: Colors.white),
-                                  tooltip: 'Sélection multiple',
-                                ),
-                              IconButton(
-                                onPressed: _showFilterDialog,
-                                icon: const Icon(Icons.filter_list, color: Colors.white),
-                                tooltip: 'Filtrer',
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    _buildFinancialHeader(),
 
+                    // Barre d'outils avec bouton sélection multiple
+                    if (filteredEntrees.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isSelectionMode = !_isSelectionMode;
+                                  if (!_isSelectionMode) {
+                                    _selectedIndices.clear();
+                                  }
+                                });
+                              },
+                              icon: Icon(_isSelectionMode ? Icons.close : Icons.checklist),
+                              label: Text(_isSelectionMode ? 'Annuler sélection' : 'Sélection multiple'),
+                            ),
+                            const Spacer(),
+                          ],
+                        ),
+                      ),
+
+                    // Liste des entrées filtrées
                     Expanded(
                       child: ListView.builder(
                         itemCount: filteredEntrees.length,
@@ -952,7 +980,7 @@ class _EntreesTabState extends State<EntreesTab> {
                     ),
                   ],
                 ),
-
+          
           // Barre d'actions en mode sélection
           if (_isSelectionMode)
             Positioned(
@@ -993,7 +1021,6 @@ class _EntreesTabState extends State<EntreesTab> {
                         ),
                       ),
                       const SizedBox(width: 16),
-                      // NOUVEAU : Bouton de pointage en lot
                       ElevatedButton.icon(
                         onPressed: _selectedIndices.isEmpty || _isProcessingBatch
                             ? null
