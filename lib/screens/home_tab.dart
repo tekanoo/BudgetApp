@@ -296,136 +296,22 @@ class _HomeTabState extends State<HomeTab> {
     
     return Column(
       children: [
+        // NOUVELLE SECTION : Seulement Solde Prévu et Solde Débité
         Row(
           children: [
+            // Solde Prévu
             Expanded(
               child: Card(
-                color: Colors.green.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.trending_up, color: Colors.green, size: 32),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Revenus',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${AmountParser.formatAmount(_monthlyEntrees)} €',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Card(
-                color: Colors.red.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.receipt_long, color: Colors.red, size: 32),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Charges',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${AmountParser.formatAmount(_monthlySorties)} €',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Card(
-                color: Colors.purple.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      const Icon(Icons.shopping_cart, color: Colors.purple, size: 32),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Dépenses',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${AmountParser.formatAmount(_monthlyPlaisirs)} €',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.purple,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Card(
-                color: solde >= 0 ? Colors.blue.shade50 : Colors.orange.shade50,
+                color: solde >= 0 ? Colors.blue.shade50 : Colors.red.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
                       Icon(
-                        solde >= 0 ? Icons.account_balance_wallet : Icons.warning,
-                        color: solde >= 0 ? Colors.blue : Colors.orange,
+                        solde >= 0 ? Icons.trending_up : Icons.trending_down,
+                        color: solde >= 0 ? Colors.blue.shade600 : Colors.red.shade600,
                         size: 32,
                       ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Solde',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${AmountParser.formatAmount(solde)} €',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: solde >= 0 ? Colors.blue : Colors.orange,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Card(
-                color: Colors.orange.shade50,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: [
-                      Icon(Icons.account_balance, color: Colors.orange.shade600, size: 32),
                       const SizedBox(height: 8),
                       const Text(
                         'Solde Prévu',
@@ -436,7 +322,7 @@ class _HomeTabState extends State<HomeTab> {
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: solde >= 0 ? Colors.orange.shade700 : Colors.red,
+                          color: solde >= 0 ? Colors.blue.shade700 : Colors.red.shade700,
                         ),
                       ),
                     ],
@@ -445,6 +331,7 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
             const SizedBox(width: 8),
+            // Solde Débité
             Expanded(
               child: Card(
                 color: soldeDebiteCalcule >= 0 ? Colors.green.shade50 : Colors.red.shade50,
@@ -476,6 +363,63 @@ class _HomeTabState extends State<HomeTab> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 16),
+        
+        // SECTION DÉTAILS : Revenus, Charges, Dépenses (en plus petit)
+        Card(
+          color: Colors.grey.shade50,
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Détails',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildDetailItem('Revenus', _monthlyEntrees, Colors.green, Icons.trending_up),
+                    _buildDetailItem('Charges', _monthlySorties, Colors.red, Icons.receipt_long),
+                    _buildDetailItem('Dépenses', _monthlyPlaisirs, Colors.purple, Icons.shopping_cart),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // NOUVELLE MÉTHODE : Widget pour les détails en petit
+  Widget _buildDetailItem(String label, double amount, Color color, IconData icon) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey,
+          ),
+        ),
+        Text(
+          '${AmountParser.formatAmount(amount)} €',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
         ),
       ],
     );
