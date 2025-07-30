@@ -7,10 +7,7 @@ import '../services/encrypted_budget_service.dart' as encrypted;
 
 // CORRECTION: Importer home_tab.dart aussi pour éviter l'erreur
 import 'month_selector_screen.dart';
-import 'home_tab.dart'; // AJOUT pour éviter l'erreur HomeTab
-import 'plaisirs_tab.dart';
-import 'entrees_tab.dart';
-import 'sorties_tab.dart';
+
 import 'analyse_tab.dart';
 import 'tags_management_tab.dart';
 import 'projections_tab.dart';
