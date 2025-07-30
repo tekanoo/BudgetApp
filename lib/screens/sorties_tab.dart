@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../utils/amount_parser.dart'; // GARDER SEULEMENT CELUI-CI
-import '../widgets/periodicity_selector.dart';
 
 class SortiesTab extends StatefulWidget {
   final DateTime? selectedMonth;
@@ -290,28 +289,30 @@ class _SortiesTabState extends State<SortiesTab> {
     if (result != null) {
       try {
         await _dataService.addSortie(
-          amountStr: result['amountStr'],
+          amountStr: result['amount'].toString(),
           description: result['description'],
           date: result['date'],
-          periodicity: result['periodicity'],
+          // Suppression du paramètre periodicity
         );
         await _loadSorties();
         
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔐 Charge ajoutée et chiffrée avec succès'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Charge ajoutée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de l\'ajout: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -326,39 +327,40 @@ class _SortiesTabState extends State<SortiesTab> {
     if (realIndex == -1) return;
     
     final result = await _showSortieDialog(
-      isEdit: true,
       description: sortie['description'],
-      amount: sortie['amount'],
+      amount: (sortie['amount'] as num?)?.toDouble(),
       date: DateTime.tryParse(sortie['date'] ?? ''),
-      periodicity: sortie['periodicity'],
+      isEdit: true,
     );
     
     if (result != null) {
       try {
         await _dataService.updateSortie(
           index: realIndex,
-          amountStr: result['amountStr'],
+          amountStr: result['amount'].toString(),
           description: result['description'],
           date: result['date'],
-          periodicity: result['periodicity'],
+          // Suppression du paramètre periodicity
         );
         await _loadSorties();
         
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔐 Charge modifiée et chiffrée avec succès'),
-            backgroundColor: Colors.blue,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Charge modifiée'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la modification: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -513,14 +515,12 @@ class _SortiesTabState extends State<SortiesTab> {
     double? amount,
     DateTime? date,
     bool isEdit = false,
-    String? periodicity,
   }) async {
     final descriptionController = TextEditingController(text: description ?? '');
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
     DateTime? selectedDate = date ?? (widget.selectedMonth ?? DateTime.now());
-    String? selectedPeriodicity = periodicity ?? 'ponctuel';
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -554,66 +554,46 @@ class _SortiesTabState extends State<SortiesTab> {
                   controller: montantController,
                   keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
-                    labelText: 'Montant',
+                    labelText: 'Montant (€)',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.euro),
-                    suffixText: '€',
-                    helperText: 'Utilisez , ou . pour les décimales',
+                    helperText: 'Ex: 50.00',
                   ),
                 ),
                 const SizedBox(height: 16),
                 InkWell(
                   onTap: () async {
-                    final pickedDate = await showDatePicker(
+                    final picked = await showDatePicker(
                       context: context,
                       initialDate: selectedDate ?? DateTime.now(),
-                      firstDate: widget.selectedMonth != null 
-                          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month, 1)
-                          : DateTime(2020),
-                      lastDate: widget.selectedMonth != null 
-                          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month + 1, 0)
-                          : DateTime(2030),
+                      firstDate: DateTime(2020),
+                      lastDate: DateTime(2030),
                     );
-                    if (pickedDate != null) {
+                    if (picked != null) {
                       setState(() {
-                        selectedDate = pickedDate;
+                        selectedDate = picked;
                       });
                     }
                   },
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
+                      border: Border.all(color: Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       children: [
-                        const Icon(Icons.calendar_today, color: Colors.grey),
+                        const Icon(Icons.calendar_today),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            selectedDate != null 
-                              ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
-                              : 'Sélectionner une date',
-                            style: TextStyle(
-                              color: selectedDate != null ? Colors.black87 : Colors.grey,
-                              fontSize: 16,
-                            ),
-                          ),
+                        Text(
+                          'Date: ${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}',
+                          style: const TextStyle(fontSize: 16),
                         ),
                       ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
-                PeriodicitySelector(
-                  selectedPeriodicity: selectedPeriodicity,
-                  onChanged: (value) {
-                    setState(() {
-                      selectedPeriodicity = value;
-                    });
-                  },
-                ),
+                // Suppression du sélecteur de périodicité
               ],
             ),
           ),
@@ -624,15 +604,14 @@ class _SortiesTabState extends State<SortiesTab> {
             ),
             FilledButton(
               onPressed: () {
-                final desc = descriptionController.text.trim();
-                final amountStr = montantController.text.trim();
-                final montant = AmountParser.parseAmount(amountStr);
-                if (desc.isNotEmpty && montant > 0 && selectedDate != null) {
+                if (descriptionController.text.trim().isNotEmpty &&
+                    montantController.text.trim().isNotEmpty &&
+                    selectedDate != null) {
                   Navigator.pop(context, {
-                    'description': desc,
-                    'amountStr': amountStr,
+                    'description': descriptionController.text.trim(),
+                    'amount': AmountParser.parseAmount(montantController.text),
                     'date': selectedDate,
-                    'periodicity': selectedPeriodicity,
+                    'success': true,
                   });
                 }
               },

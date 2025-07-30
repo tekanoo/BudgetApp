@@ -323,13 +323,13 @@ Future<void> togglePlaisirPointing(int index) async {
     required String amountStr,
     required String description,
     DateTime? date,
-    String? periodicity, // Nouveau
+    // Suppression du paramètre periodicity
   }) async {
     _ensureInitialized();
     try {
       final sorties = await _firebaseService.loadSorties();
-      final double amount = AmountParser.parseAmount(amountStr);
       
+      final double amount = AmountParser.parseAmount(amountStr);
       final newSortie = {
         'amount': amount,
         'description': description,
@@ -337,17 +337,16 @@ Future<void> togglePlaisirPointing(int index) async {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
         'id': DateTime.now().millisecondsSinceEpoch.toString(),
         'isPointed': false,
-        'periodicity': periodicity ?? 'ponctuel', // Par défaut ponctuel
+        // Suppression de 'periodicity': periodicity ?? 'ponctuel',
       };
       
-      // Chiffre avant d'ajouter
       final encryptedSortie = _encryption.encryptTransaction(newSortie);
       sorties.add(encryptedSortie);
       
       await _firebaseService.saveSorties(sorties);
       
       if (kDebugMode) {
-        print('✅ Sortie chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description (${periodicity ?? 'ponctuel'})');
+        print('✅ Sortie chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
       }
     } catch (e) {
       if (kDebugMode) {
@@ -362,13 +361,12 @@ Future<void> togglePlaisirPointing(int index) async {
     required String amountStr,
     required String description,
     DateTime? date,
-    String? periodicity, // Ajouter ce paramètre
+    // Suppression du paramètre periodicity
   }) async {
     _ensureInitialized();
     try {
       final sorties = await _firebaseService.loadSorties();
       if (index >= 0 && index < sorties.length) {
-        // Récupérer l'ancienne sortie pour préserver certaines données
         final oldSortie = _encryption.decryptTransaction(sorties[index]);
         
         final double amount = AmountParser.parseAmount(amountStr);
@@ -379,14 +377,15 @@ Future<void> togglePlaisirPointing(int index) async {
           'timestamp': oldSortie['timestamp'] ?? DateTime.now().millisecondsSinceEpoch,
           'id': oldSortie['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
           'isPointed': oldSortie['isPointed'] ?? false,
-          'periodicity': periodicity ?? oldSortie['periodicity'] ?? 'ponctuel', // Ajouter la périodicité
+          'pointedAt': oldSortie['pointedAt'],
+          // Suppression de 'periodicity': periodicity ?? oldSortie['periodicity'] ?? 'ponctuel',
         };
         
         sorties[index] = _encryption.encryptTransaction(updatedSortie);
         await _firebaseService.saveSorties(sorties);
         
         if (kDebugMode) {
-          print('✅ Sortie mise à jour avec périodicité: ${periodicity ?? 'ponctuel'}');
+          print('✅ Sortie mise à jour');
         }
       }
     } catch (e) {
@@ -877,7 +876,7 @@ Future<void> togglePlaisirPointing(int index) async {
     }
   }
 
-  /// Génère les projections avec périodicité
+  /// Génère les projections avec périodicité (mise à jour pour les sorties)
   Future<Map<String, Map<String, double>>> getProjectionsWithPeriodicity({
     int yearStart = 2024,
     int yearEnd = 2030,
@@ -907,17 +906,20 @@ Future<void> togglePlaisirPointing(int index) async {
         _applyPeriodicity(projections, startDate, amount, 'revenus', periodicity, yearStart, yearEnd);
       }
       
-      // Traiter les charges avec périodicité
+      // Traiter les charges SANS périodicité (toujours ponctuelles)
       for (var sortie in sorties) {
-        final periodicity = sortie['periodicity'] as String? ?? 'ponctuel';
         final amount = (sortie['amount'] as num).toDouble();
         final dateStr = sortie['date'] as String? ?? '';
-        final startDate = DateTime.tryParse(dateStr) ?? DateTime.now();
-        
-        _applyPeriodicity(projections, startDate, amount, 'charges', periodicity, yearStart, yearEnd);
+        final date = DateTime.tryParse(dateStr);
+        if (date != null) {
+          final monthKey = '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}';
+          if (projections.containsKey(monthKey)) {
+            projections[monthKey]!['charges'] = projections[monthKey]!['charges']! + amount;
+          }
+        }
       }
       
-      // Traiter les dépenses (toujours ponctuelles pour l'instant)
+      // Traiter les dépenses (toujours ponctuelles)
       for (var plaisir in plaisirs) {
         final dateStr = plaisir['date'] as String? ?? '';
         final date = DateTime.tryParse(dateStr);
