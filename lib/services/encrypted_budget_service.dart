@@ -545,7 +545,7 @@ Future<void> togglePlaisirPointing(int index) async {
     }
   }
 
-  /// Mettre à jour un plaisir avec support du pointage
+  /// Mettre à jour un plaisir avec support du pointage et crédit
   Future<void> updatePlaisir({
     required int index,
     required String amountStr,
@@ -553,6 +553,7 @@ Future<void> togglePlaisirPointing(int index) async {
     DateTime? date,
     bool? isPointed,
     String? pointedAt,
+    bool? isCredit, // Nouveau paramètre
   }) async {
     _ensureInitialized();
     try {
@@ -569,6 +570,7 @@ Future<void> togglePlaisirPointing(int index) async {
           'date': (date ?? DateTime.now()).toIso8601String(),
           'id': oldPlaisir['id'] ?? DateTime.now().millisecondsSinceEpoch.toString(),
           'isPointed': isPointed ?? oldPlaisir['isPointed'] ?? false,
+          'isCredit': isCredit ?? oldPlaisir['isCredit'] ?? false, // Nouveau champ
         };
 
         // Ajouter pointedAt si fourni
@@ -588,7 +590,7 @@ Future<void> togglePlaisirPointing(int index) async {
         }
         
         if (kDebugMode) {
-          print('✅ Plaisir chiffré mis à jour: [MONTANT_CHIFFRÉ] - $tag');
+          print('✅ Plaisir chiffré mis à jour: [MONTANT_CHIFFRÉ] - $tag${isCredit == true ? " (CRÉDIT)" : ""}');
         }
       }
     } catch (e) {

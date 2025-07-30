@@ -447,71 +447,199 @@ class _HomeTabState extends State<HomeTab> {
   
   // Renommer la méthode pour plus de clarté
   Future<void> _addExpense() async {
-    if (_amountController.text.trim().isEmpty || _selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez remplir le montant et la date.'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
+    bool isCredit = false; // Variable locale pour la case à cocher
+    
+    return showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.shopping_cart, color: Colors.purple),
+                SizedBox(width: 8),
+                Text('Ajouter une dépense'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: _tagController,
+                    decoration: const InputDecoration(
+                      labelText: 'Catégorie',
+                      hintText: 'Restaurant, Courses...',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.category),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _amountController,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      labelText: 'Montant',
+                      hintText: '0.00',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.euro),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Case à cocher pour virement/remboursement
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                      color: isCredit ? Colors.green.shade50 : null,
+                    ),
+                    child: Row(
+                      children: [
+                        Checkbox(
+                          value: isCredit,
+                          onChanged: (value) {
+                            setState(() {
+                              isCredit = value ?? false;
+                            });
+                          },
+                          activeColor: Colors.green,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Virement/Remboursement',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isCredit ? Colors.green.shade700 : Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                'Cochez si c\'est un virement entrant',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
-    final amount = AmountParser.parseAmount(_amountController.text);
-    if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Veuillez entrer un montant valide.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.calendar_today, color: Colors.blue),
+                        const SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                            Text(
+                              _selectedDate != null 
+                                  ? '${_selectedDate!.day}/${_selectedDate!.month}/${_selectedDate!.year}'
+                                  : 'Aujourd\'hui',
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ],
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: _pickDate,
+                          child: const Text('Modifier'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+                child: const Text('Annuler'),
+              ),
+              ElevatedButton(
+                onPressed: _isLoading ? null : () async {
+                  if (_amountController.text.trim().isNotEmpty && 
+                      _tagController.text.trim().isNotEmpty) {
+                    setState(() {
+                      _isLoading = true;
+                    });
 
+                    try {
+                      await _dataService.addPlaisir(
+                        amountStr: _amountController.text,
+                        tag: _tagController.text.trim(),
+                        date: _selectedDate ?? DateTime.now(),
+                        isCredit: isCredit, // Passer la valeur de la case à cocher
+                      );
+
+                      if (mounted) {
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              isCredit 
+                                  ? '💰 Virement/Remboursement ajouté avec succès'
+                                  : '✅ Dépense ajoutée avec succès'
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                        _clearFields();
+                        await _loadMonthlyData(); // CORRECTION: Changer _loadMonthData en _loadMonthlyData
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Erreur: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    } finally {
+                      if (mounted) {
+                        setState(() {
+                          _isLoading = false;
+                        });
+                      }
+                    }
+                  }
+                },
+                child: _isLoading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Ajouter'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _clearFields() {
+    _amountController.clear();
+    _tagController.clear();
     setState(() {
-      _isLoading = true;
+      _selectedDate = null;
     });
-
-    try {
-      final tag = _tagController.text.trim().isEmpty 
-          ? 'Sans catégorie' 
-          : _tagController.text.trim();
-
-      await _dataService.addPlaisir(
-        amountStr: _amountController.text,
-        tag: tag,
-        date: _selectedDate,
-      );
-
-      // Recharger les données du mois
-      await _loadMonthlyData();
-      await _loadAvailableTags();
-
-      // Réinitialiser le formulaire
-      _amountController.clear();
-      _tagController.clear();
-
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Dépense ajoutée avec succès'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Erreur lors de la sauvegarde: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
   }
 }

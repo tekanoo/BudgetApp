@@ -425,56 +425,37 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                           final date = DateTime.tryParse(dateStr);
                           final isPointed = plaisir['isPointed'] == true;
                           final isSelected = _selectedIndices.contains(index);
-                          final pointedAt = plaisir['pointedAt'] != null 
-                              ? DateTime.tryParse(plaisir['pointedAt']) 
-                              : null;
+                        
                           
-                          return Container(
+                       
+                          
+                          return Card(
                             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: isSelected 
-                                  ? Colors.blue.shade50 
-                                  : (isPointed ? Colors.green.shade50 : Colors.white),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isSelected 
-                                    ? Colors.blue.shade300
-                                    : (isPointed ? Colors.green.shade300 : Colors.grey.shade200),
-                                width: isSelected ? 2 : 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
+                            elevation: isSelected ? 4 : 1,
+                            color: isSelected ? Colors.blue.shade50 : null,
                             child: ListTile(
+                              // Case à cocher en mode sélection ou indicateur de pointage
                               leading: _isSelectionMode
                                   ? Checkbox(
                                       value: isSelected,
-                                      onChanged: (value) => _toggleSelection(index),
-                                      activeColor: Colors.blue,
+                                      onChanged: (_) => _toggleSelection(index),
                                     )
                                   : GestureDetector(
                                       onTap: () => _togglePointing(index),
                                       child: Container(
-                                        width: 40,
-                                        height: 40,
+                                        width: 24,
+                                        height: 24,
                                         decoration: BoxDecoration(
-                                          color: isPointed ? Colors.green.shade100 : Colors.purple.shade100,
-                                          borderRadius: BorderRadius.circular(20),
+                                          shape: BoxShape.circle,
                                           border: Border.all(
-                                            color: isPointed ? Colors.green.shade300 : Colors.purple.shade300,
+                                            color: isPointed ? Colors.green : Colors.grey,
                                             width: 2,
                                           ),
+                                          color: isPointed ? Colors.green : Colors.transparent,
                                         ),
-                                        child: Icon(
-                                          isPointed ? Icons.check_circle : Icons.radio_button_unchecked,
-                                          color: isPointed ? Colors.green.shade700 : Colors.purple.shade700,
-                                          size: 24,
-                                        ),
+                                        child: isPointed
+                                            ? const Icon(Icons.check, color: Colors.white, size: 16)
+                                            : null,
                                       ),
                                     ),
                               title: Row(
@@ -485,102 +466,49 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         color: isPointed ? Colors.green.shade700 : null,
+                                        decoration: isPointed ? TextDecoration.lineThrough : null,
                                       ),
                                     ),
                                   ),
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        '${AmountParser.formatAmount(amount)} €',
+                                  // Indicateur visuel pour les virements/remboursements
+                                  if (plaisir['isCredit'] == true) ...[
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade100,
+                                        borderRadius: BorderRadius.circular(10),
+                                        border: Border.all(color: Colors.green.shade300),
+                                      ),
+                                      child: Text(
+                                        '💰',
                                         style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: isPointed ? Colors.green.shade700 : Colors.purple,
+                                          fontSize: 12,
+                                          color: Colors.green.shade700,
                                         ),
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Icon(
-                                        Icons.lock_open,
-                                        size: 12,
-                                        color: isPointed ? Colors.green.shade400 : Colors.purple.shade400,
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (date != null)
-                                    Text(
-                                      DateFormat('dd/MM/yyyy').format(date),
-                                      style: TextStyle(
-                                        color: isPointed ? Colors.green.shade600 : Colors.grey,
                                       ),
                                     ),
-                                  if (isPointed && pointedAt != null)
-                                    Text(
-                                      'Pointée le ${pointedAt.day}/${pointedAt.month} à ${pointedAt.hour}:${pointedAt.minute.toString().padLeft(2, '0')}',
-                                      style: TextStyle(
-                                        color: Colors.green.shade600,
-                                        fontSize: 10,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
+                                  ],
                                 ],
                               ),
-                              trailing: !_isSelectionMode
-                                  ? PopupMenuButton<String>(
-                                      onSelected: (value) {
-                                        switch (value) {
-                                          case 'toggle':
-                                            _togglePointing(index);
-                                            break;
-                                          case 'edit':
-                                            _editPlaisir(index);
-                                            break;
-                                          case 'delete':
-                                            _deletePlaisir(index);
-                                            break;
-                                        }
-                                      },
-                                      itemBuilder: (context) => [
-                                        PopupMenuItem(
-                                          value: 'toggle',
-                                          child: Row(
-                                            children: [
-                                              Icon(
-                                                isPointed ? Icons.radio_button_unchecked : Icons.check_circle,
-                                                color: isPointed ? Colors.orange : Colors.green,
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Text(isPointed ? 'Dépointer' : 'Pointer'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'edit',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.edit, color: Colors.blue),
-                                              SizedBox(width: 8),
-                                              Text('Modifier'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'delete',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.delete, color: Colors.red),
-                                              SizedBox(width: 8),
-                                              Text('Supprimer'),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    )
-                                  : null,
+                              subtitle: Text(
+                                DateFormat('dd/MM/yyyy').format(date ?? DateTime.now()),
+                                style: TextStyle(
+                                  color: isPointed ? Colors.green.shade600 : Colors.grey.shade600,
+                                ),
+                              ),
+                              trailing: Text(
+                                // Afficher le montant avec un signe différent selon le type
+                                '${plaisir['isCredit'] == true ? '+' : '-'}${AmountParser.formatAmount(amount)} €',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: plaisir['isCredit'] == true 
+                                      ? Colors.green.shade600 
+                                      : (isPointed ? Colors.green.shade700 : Colors.red.shade600),
+                                  decoration: isPointed ? TextDecoration.lineThrough : null,
+                                ),
+                              ),
                               onTap: _isSelectionMode
                                   ? () => _toggleSelection(index)
                                   : () => _showPlaisirDetails(index),
@@ -738,16 +666,21 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     if (result != null) {
       try {
         await _dataService.addPlaisir(
-          amountStr: result['amountStr'],
+          amountStr: result['amount'].toString(),
           tag: result['tag'],
           date: result['date'],
+          isCredit: result['isCredit'] ?? false, // Nouveau paramètre
         );
         await _loadPlaisirs();
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('🔐 Dépense ajoutée et chiffrée avec succès'),
+          SnackBar(
+            content: Text(
+              result['isCredit'] == true 
+                  ? '💰 Virement/Remboursement ajouté avec succès'
+                  : '🔐 Dépense ajoutée et chiffrée avec succès'
+            ),
             backgroundColor: Colors.green,
           ),
         );
@@ -771,36 +704,38 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     final realIndex = originalPlaisirs.indexWhere((p) => p['id'] == plaisirId);
     
     if (realIndex == -1) return;
-    
+
     final result = await _showPlaisirDialog(
-      isEdit: true,
       tag: plaisir['tag'],
-      amount: plaisir['amount'],
-      date: DateTime.tryParse(plaisir['date'] ?? ''),
+      amount: (plaisir['amount'] as num?)?.toDouble(),
+      date: DateTime.tryParse(plaisir['date'] ?? '') ?? DateTime.now(), // Correction ici
+      isEdit: true,
+      isCredit: plaisir['isCredit'] == true, // Passer la valeur actuelle
     );
-    
+
     if (result != null) {
       try {
         await _dataService.updatePlaisir(
           index: realIndex,
-          amountStr: result['amountStr'],
+          amountStr: result['amount'].toString(),
           tag: result['tag'],
           date: result['date'],
+          isCredit: result['isCredit'] ?? false, // Nouveau paramètre
         );
         await _loadPlaisirs();
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🔐 Dépense modifiée et chiffrée avec succès'),
-            backgroundColor: Colors.blue,
+            content: Text('✅ Dépense modifiée'),
+            backgroundColor: Colors.green,
           ),
         );
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Erreur lors de la modification: $e'),
+            content: Text('Erreur: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -988,12 +923,14 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     double? amount,
     DateTime? date,
     bool isEdit = false,
+    bool? isCredit, // Nouveau paramètre
   }) async {
     final tagController = TextEditingController(text: tag ?? '');
     final montantController = TextEditingController(
       text: amount != null ? AmountParser.formatAmount(amount) : ''
     );
     DateTime? selectedDate = date ?? (widget.selectedMonth ?? DateTime.now());
+    bool isCreditValue = isCredit ?? false; // Valeur locale pour la case à cocher
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
@@ -1025,57 +962,101 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: montantController,
-                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   decoration: const InputDecoration(
-                    labelText: 'Montant',
+                    labelText: 'Montant (€)',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.euro),
-                    suffixText: '€',
-                    helperText: 'Utilisez , ou . pour les décimales',
+                  ),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                ),
+                const SizedBox(height: 16),
+                
+                // Nouvelle case à cocher pour les virements/remboursements
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                    color: isCreditValue ? Colors.green.shade50 : null,
+                  ),
+                  child: Row(
+                    children: [
+                      Checkbox(
+                        value: isCreditValue,
+                        onChanged: (value) {
+                          setState(() {
+                            isCreditValue = value ?? false;
+                          });
+                        },
+                        activeColor: Colors.green,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Virement/Remboursement',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: isCreditValue ? Colors.green.shade700 : Colors.black87,
+                              ),
+                            ),
+                            Text(
+                              'Cochez si c\'est un virement entrant ou un remboursement prévu',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
-                InkWell(
-                  onTap: () async {
-                    final pickedDate = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate ?? DateTime.now(),
-                      firstDate: widget.selectedMonth != null 
-                          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month, 1)
-                          : DateTime(2020),
-                      lastDate: widget.selectedMonth != null 
-                          ? DateTime(widget.selectedMonth!.year, widget.selectedMonth!.month + 1, 0)
-                          : DateTime(2030),
-                    );
-                    if (pickedDate != null) {
-                      setState(() {
-                        selectedDate = pickedDate;
-                      });
-                    }
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.grey),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.calendar_today, color: Colors.grey),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
+                
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade300),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, color: Colors.blue),
+                      const SizedBox(width: 12),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Date', style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(
                             selectedDate != null 
-                              ? '${selectedDate!.day.toString().padLeft(2, '0')}/${selectedDate!.month.toString().padLeft(2, '0')}/${selectedDate!.year}'
-                              : 'Sélectionner une date',
-                            style: TextStyle(
-                              color: selectedDate != null ? Colors.black87 : Colors.grey,
-                              fontSize: 16,
-                            ),
+                                ? '${selectedDate!.day}/${selectedDate!.month}/${selectedDate!.year}'
+                                : 'Aucune date sélectionnée',
+                            style: const TextStyle(fontSize: 16),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate ?? DateTime.now(),
+                            firstDate: DateTime(2020),
+                            lastDate: DateTime(2030),
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              selectedDate = picked;
+                            });
+                          }
+                        },
+                        child: const Text('Modifier'),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -1088,14 +1069,14 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             ),
             FilledButton(
               onPressed: () {
-                final tagText = tagController.text.trim();
-                final amountStr = montantController.text.trim();
-                final montant = AmountParser.parseAmount(amountStr);
-                if (tagText.isNotEmpty && montant > 0 && selectedDate != null) {
+                if (tagController.text.trim().isNotEmpty &&
+                    montantController.text.trim().isNotEmpty &&
+                    selectedDate != null) {
                   Navigator.pop(context, {
-                    'tag': tagText,
-                    'amountStr': amountStr,
+                    'tag': tagController.text.trim(),
+                    'amount': AmountParser.parseAmount(montantController.text),
                     'date': selectedDate,
+                    'isCredit': isCreditValue, // Retourner la valeur de la case à cocher
                   });
                 }
               },
