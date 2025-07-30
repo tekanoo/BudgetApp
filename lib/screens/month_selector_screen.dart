@@ -118,9 +118,9 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
             ),
             child: Column(
               children: [
-                Text(
+                const Text(
                   'Gestion Budget Pro',
-                  style: const TextStyle( // CORRECTION: Ajouter 'const'
+                  style: TextStyle( // CORRECTION: Ajouter 'const'
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,

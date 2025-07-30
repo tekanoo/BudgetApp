@@ -1063,7 +1063,7 @@ class _AddEntreeDialogState extends State<_AddEntreeDialog> {
   final _amountController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
-  String _selectedPeriodicity = 'ponctuel';
+  final String _selectedPeriodicity = 'ponctuel';
   bool _isLoading = false;
 
   @override
