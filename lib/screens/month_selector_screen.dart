@@ -120,7 +120,7 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
               children: [
                 Text(
                   'Gestion Budget Pro',
-                  style: const TextStyle(
+                  style: const TextStyle( // CORRECTION: Ajouter 'const'
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -184,7 +184,7 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
   }
 
   Widget _buildMonthCard(int month) {
-    final monthDate = DateTime(_currentYear, month);
+    // Supprimer la variable monthDate inutilisée
     final monthKey = '${_currentYear.toString().padLeft(4, '0')}-${month.toString().padLeft(2, '0')}';
     final monthData = _monthlyData[monthKey];
     final hasData = monthData != null &&
@@ -210,11 +210,14 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
           : (hasData ? Colors.blue.shade50 : null),
       child: InkWell(
         onTap: () {
+          final selectedDate = DateTime(_currentYear, month); // CORRECTION: utiliser 'month' au lieu de 'monthIndex + 1'
+                    
+          // Navigation vers l'écran de budget mensuel avec les 4 onglets
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => MonthlyBudgetScreen(
-                selectedMonth: monthDate,
+                selectedMonth: selectedDate,
               ),
             ),
           );
@@ -262,7 +265,7 @@ class _MonthSelectorScreenState extends State<MonthSelectorScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: (solde >= 0 ? Colors.green : Colors.red).withOpacity(0.1),
+                        color: (solde >= 0 ? Colors.green : Colors.red).withValues(alpha: 0.1), // CORRECTION: remplacer withOpacity par withValues
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
                           color: solde >= 0 ? Colors.green : Colors.red,

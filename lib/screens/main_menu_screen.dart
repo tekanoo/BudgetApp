@@ -29,23 +29,19 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService();
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
-  // Onglets principaux avec MonthSelectorScreen en premier
+  // Onglets principaux - SUPPRESSION des onglets dépenses, revenus, charges
   final List<Widget> _mainTabs = [
     const MonthSelectorScreen(), // Premier onglet = Sélection des mois
-    const PlaisirsTab(),
-    const EntreesTab(),
-    const SortiesTab(),
+    // Supprimer PlaisirsTab(), EntreesTab(), SortiesTab()
   ];
 
-  // Titres des onglets
+  // Titres des onglets - MISE À JOUR
   final List<String> _tabTitles = [
     'Sélection Mois',
-    'Dépenses',
-    'Revenus', 
-    'Charges'
+    // Supprimer 'Dépenses', 'Revenus', 'Charges'
   ];
 
-  // Options du menu de navigation
+  // Options du menu de navigation - MISE À JOUR
   List<Map<String, dynamic>> get _menuOptions => [
     {
       'title': 'Sélection Mois',
@@ -53,65 +49,36 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       'color': Colors.blue,
       'index': 0,
     },
-    {
-      'title': 'Dépenses',
-      'icon': Icons.shopping_cart,
-      'color': Colors.purple,
-      'index': 1,
-    },
-    {
-      'title': 'Revenus',
-      'icon': Icons.trending_up,
-      'color': Colors.green,
-      'index': 2,
-    },
-    {
-      'title': 'Charges',
-      'icon': Icons.receipt_long,
-      'color': Colors.red,
-      'index': 3,
-    },
+    // Supprimer les options dépenses, revenus, charges
+    // Garder seulement les onglets supplémentaires
     {
       'title': 'Analyse',
       'icon': Icons.analytics,
       'color': Colors.orange,
-      'index': 4,
+      'index': 1, // Maintenant index 1 au lieu de 4
     },
     {
       'title': 'Catégories',
-      'icon': Icons.category,
+      'icon': Icons.label,
       'color': Colors.teal,
-      'index': 5,
+      'index': 2, // Maintenant index 2 au lieu de 5
     },
     {
       'title': 'Projections',
       'icon': Icons.trending_up,
       'color': Colors.indigo,
-      'index': 6,
+      'index': 3, // Maintenant index 3 au lieu de 6
     },
   ];
 
-  List<NavigationDestination> get _mainDestinations => [
+  // Destinations de la barre de navigation - MISE À JOUR
+  final List<NavigationDestination> _mainDestinations = [
     const NavigationDestination(
       icon: Icon(Icons.calendar_month_outlined),
       selectedIcon: Icon(Icons.calendar_month),
       label: 'Mois',
     ),
-    const NavigationDestination(
-      icon: Icon(Icons.shopping_cart_outlined),
-      selectedIcon: Icon(Icons.shopping_cart),
-      label: 'Dépenses',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.trending_up_outlined),
-      selectedIcon: Icon(Icons.trending_up),
-      label: 'Revenus',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.receipt_long_outlined),
-      selectedIcon: Icon(Icons.receipt_long),
-      label: 'Charges',
-    ),
+    // Supprimer les destinations dépenses, revenus, charges
   ];
 
   @override
@@ -174,8 +141,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _navigateToTab(int tabIndex) {
-    if (tabIndex < 4) {
-      // Onglets principaux
+    if (tabIndex < _mainTabs.length) {
+      // Seul l'onglet principal (sélection de mois)
       setState(() {
         _selectedIndex = tabIndex;
       });
@@ -187,26 +154,26 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       _trackTabChange(tabIndex);
       Navigator.pop(context); // Fermer le menu
     } else {
-      // Onglets supplémentaires
+      // Onglets supplémentaires (analyse, catégories, projections)
       Widget targetScreen;
       String title;
       
       switch (tabIndex) {
-        case 4:
+        case 1: // Maintenant analyse est à l'index 1
           targetScreen = const AnalyseTab();
           title = 'Analyse';
           break;
-        case 5:
+        case 2: // Maintenant catégories est à l'index 2
           targetScreen = const TagsManagementTab();
           title = 'Catégories';
           break;
-        case 6:
+        case 3: // Maintenant projections est à l'index 3
           targetScreen = const ProjectionsTab();
           title = 'Projections';
           break;
         default:
-          targetScreen = const HomeTab(); // CORRECTION: Maintenant HomeTab existe
-          title = 'Dashboard';
+          targetScreen = const MonthSelectorScreen();
+          title = 'Sélection Mois';
       }
       
       Navigator.pop(context); // Fermer le menu d'abord
@@ -230,7 +197,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   Future<void> _trackTabChange(int index) async {
-    final tabNames = ['selection_mois', 'depenses', 'revenus', 'charges', 'analyse', 'tags', 'projections'];
+    final tabNames = ['selection_mois']; // Supprimer 'depenses', 'revenus', 'charges'
     if (index < tabNames.length) {
       try {
         await _analytics.logEvent(
@@ -430,7 +397,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         title: Text(_tabTitles[_selectedIndex]),
         leading: IconButton(
           icon: const Icon(Icons.menu),
-          onPressed: _showNavigationMenu, // CORRECTION: Méthode maintenant définie
+          onPressed: _showNavigationMenu,
         ),
         actions: [
           // PROFIL UTILISATEUR - Visible sur tous les onglets
@@ -468,7 +435,6 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                     _showDeleteAllDataDialog();
                   }
                 },
-                // CORRECTION: Fixer l'erreur de liste
                 itemBuilder: (context) {
                   if (user != null) {
                     return [
@@ -544,11 +510,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         },
         children: _mainTabs,
       ),
-      bottomNavigationBar: NavigationBar(
+      // Supprimer la barre de navigation en bas ou la garder seulement avec l'onglet mois
+      bottomNavigationBar: _mainDestinations.length > 1 ? NavigationBar(
         destinations: _mainDestinations,
         selectedIndex: _selectedIndex,
         onDestinationSelected: _onItemTapped,
-      ),
+      ) : null, // Pas de barre si un seul onglet
     );
   }
 }
