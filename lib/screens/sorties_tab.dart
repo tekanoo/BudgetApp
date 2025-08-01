@@ -150,6 +150,8 @@ class _SortiesTabState extends State<SortiesTab> {
   void _applyFilter() {
     if (_currentFilter == 'Tous' || _selectedFilterDate == null) {
       filteredSorties = List.from(sorties);
+      // Restaurer les totaux globaux
+      _loadSorties();
     } else {
       filteredSorties = sorties.where((sortie) {
         final sortieDate = DateTime.tryParse(sortie['date'] ?? '');
@@ -163,12 +165,13 @@ class _SortiesTabState extends State<SortiesTab> {
         }
         return true;
       }).toList();
+      
+      _calculateTotals();
     }
-    
-    _calculateTotals();
   }
 
   void _calculateTotals() {
+    // Calcul des charges filtrées
     totalSorties = filteredSorties.fold(0.0, 
       (sum, sortie) => sum + ((sortie['amount'] as num?)?.toDouble() ?? 0.0));
     
@@ -176,7 +179,60 @@ class _SortiesTabState extends State<SortiesTab> {
         .where((s) => s['isPointed'] == true)
         .fold(0.0, (sum, sortie) => sum + ((sortie['amount'] as num?)?.toDouble() ?? 0.0));
     
+    // CORRECTION : Recalculer les dépenses selon le filtre appliqué
+    if (_currentFilter != 'Tous' && _selectedFilterDate != null) {
+      // Recharger les dépenses avec le même filtre que les charges
+      _loadDepensesByFilter();
+    }
+    
     setState(() {});
+  }
+
+  // Nouvelle méthode pour recalculer les dépenses selon le filtre
+  Future<void> _loadDepensesByFilter() async {
+    try {
+      final plaisirsData = await _dataService.getPlaisirs();
+      
+      // Filtrer les dépenses avec les mêmes critères que les charges
+      final filteredPlaisirs = plaisirsData.where((p) {
+        final date = DateTime.tryParse(p['date'] ?? '');
+        if (date == null) return false;
+        
+        if (_currentFilter == 'Mois') {
+          return date.year == _selectedFilterDate!.year &&
+                 date.month == _selectedFilterDate!.month;
+        } else if (_currentFilter == 'Année') {
+          return date.year == _selectedFilterDate!.year;
+        }
+        return true;
+      }).toList();
+      
+      // Recalculer totalDepenses avec les dépenses filtrées
+      totalDepenses = filteredPlaisirs.fold(0.0, (sum, p) {
+        final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+        if (p['isCredit'] == true) {
+          return sum - amount; // Les crédits réduisent le total des dépenses
+        } else {
+          return sum + amount; // Les dépenses normales augmentent le total
+        }
+      });
+      
+      // Recalculer totalDepensesPointees avec les dépenses filtrées ET pointées
+      totalDepensesPointees = filteredPlaisirs
+          .where((p) => p['isPointed'] == true)
+          .fold(0.0, (sum, p) {
+            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+            if (p['isCredit'] == true) {
+              return sum - amount; // Les crédits pointés réduisent
+            } else {
+              return sum + amount; // Les dépenses pointées augmentent
+            }
+          });
+      
+      setState(() {});
+    } catch (e) {
+      print('Erreur lors du recalcul des dépenses filtrées: $e');
+    }
   }
 
   void _showFilterDialog() {
@@ -756,9 +812,9 @@ class _SortiesTabState extends State<SortiesTab> {
           // CORRECTION : Affichage du total net des charges (charges - remboursements des dépenses)
           Column(
             children: [
-              Text(
+              const Text(
                 'Charges nettes',
-                style: const TextStyle(
+                style: TextStyle(
                   color: Colors.white70,
                   fontSize: 14,
                 ),
