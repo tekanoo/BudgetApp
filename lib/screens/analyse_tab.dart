@@ -34,21 +34,23 @@ class _AnalyseTabState extends State<AnalyseTab> {
       final totalEntreesAmount = entrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
       final totalSortiesAmount = sorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
       
-      // Pour les plaisirs, tenir compte des crédits (isCredit)
+      // CORRECTION : Séparer les virements des dépenses normales
       double totalPlaisirsAmount = 0.0;
+      double totalVirementsAmount = 0.0;
+      
       for (var plaisir in plaisirs) {
         final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
         if (plaisir['isCredit'] == true) {
-          totalPlaisirsAmount -= amount; // Les crédits réduisent le total
+          totalVirementsAmount += amount; // Les virements sont ajoutés aux revenus
         } else {
-          totalPlaisirsAmount += amount; // Les dépenses augmentent le total
+          totalPlaisirsAmount += amount; // Les dépenses normales restent en dépenses
         }
       }
       
       setState(() {
-        totalEntrees = totalEntreesAmount;
+        totalEntrees = totalEntreesAmount + totalVirementsAmount; // Ajouter les virements aux revenus
         totalSorties = totalSortiesAmount;
-        totalPlaisirs = totalPlaisirsAmount;
+        totalPlaisirs = totalPlaisirsAmount; // Seulement les vraies dépenses
         isLoading = false;
       });
     } catch (e) {

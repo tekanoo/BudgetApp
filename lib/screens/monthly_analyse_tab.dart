@@ -35,7 +35,6 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
     });
 
     try {
-      // Charger toutes les données puis filtrer par mois
       final entrees = await _dataService.getEntrees();
       final sorties = await _dataService.getSorties();
       final plaisirs = await _dataService.getPlaisirs();
@@ -55,8 +54,10 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
                date.month == widget.selectedMonth.month;
       }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
       
-      // Pour les plaisirs, tenir compte des crédits (isCredit)
+      // CORRECTION : Séparer les virements des dépenses pour le mois
       double monthlyPlaisirs = 0.0;
+      double monthlyVirements = 0.0;
+      
       for (var plaisir in plaisirs) {
         final date = DateTime.tryParse(plaisir['date'] ?? '');
         if (date != null && 
@@ -64,17 +65,17 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
             date.month == widget.selectedMonth.month) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
-            monthlyPlaisirs -= amount; // Les crédits réduisent le total
+            monthlyVirements += amount; // Les virements vont aux revenus
           } else {
-            monthlyPlaisirs += amount; // Les dépenses augmentent le total
+            monthlyPlaisirs += amount; // Les dépenses restent en dépenses
           }
         }
       }
       
       setState(() {
-        totalEntrees = monthlyEntrees;
+        totalEntrees = monthlyEntrees + monthlyVirements; // Ajouter les virements aux revenus
         totalSorties = monthlySorties;
-        totalPlaisirs = monthlyPlaisirs;
+        totalPlaisirs = monthlyPlaisirs; // Seulement les vraies dépenses
         isLoading = false;
       });
     } catch (e) {
