@@ -5,8 +5,10 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import '../services/firebase_service.dart';
 import '../services/encrypted_budget_service.dart' as encrypted;
 
-// CORRECTION: Importer home_tab.dart aussi pour éviter l'erreur
 import 'month_selector_screen.dart';
+import 'monthly_analyse_tab.dart'; // AJOUTER cette ligne
+import 'tags_management_tab.dart';
+import 'projections_tab.dart';
 
 
 class MainMenuScreen extends StatefulWidget {
@@ -26,7 +28,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   // Onglets principaux - SUPPRESSION des onglets dépenses, revenus, charges
   final List<Widget> _mainTabs = [
     const MonthSelectorScreen(), // Premier onglet = Sélection des mois
-    // Supprimer PlaisirsTab(), EntreesTab(), SortiesTab()
+    // SUPPRIMER MonthlyAnalyseTab d'ici car il nécessite un paramètre
+    // MonthlyAnalyseTab sera accessible uniquement via le menu
+    const TagsManagementTab(), // Onglet pour la gestion des tags
+    const ProjectionsTab(), // Onglet pour les projections
   ];
 
   // SUPPRIMER cette section complètement car elle n'est plus utilisée
@@ -131,13 +136,13 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       'title': 'Catégories',
       'icon': Icons.label,
       'color': Colors.teal,
-      'index': 2,
+      'index': 1, // Changer de 2 à 1 car l'onglet analyse n'est plus dans _mainTabs
     },
     {
       'title': 'Projections',
       'icon': Icons.trending_up,
       'color': Colors.indigo,
-      'index': 3,
+      'index': 2, // Changer de 3 à 2 car l'onglet analyse n'est plus dans _mainTabs
     },
   ];
 
@@ -148,7 +153,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       selectedIcon: Icon(Icons.calendar_month),
       label: 'Mois',
     ),
-    // Supprimer les destinations dépenses, revenus, charges
+    // SUPPRIMER l'onglet Analyse car il sera dans le menu
+    const NavigationDestination(
+      icon: Icon(Icons.label_outline),
+      selectedIcon: Icon(Icons.label),
+      label: 'Tags',
+    ),
+    const NavigationDestination(
+      icon: Icon(Icons.trending_up_outlined),
+      selectedIcon: Icon(Icons.trending_up),
+      label: 'Projections',
+    ),
   ];
 
   @override
@@ -250,6 +265,86 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     );
   }
 
+  void _navigateToTab(int tabIndex) {
+    final option = _menuOptions[tabIndex];
+    
+    if (option['isMonthlyAnalysis'] == true) {
+      // Navigation vers l'analyse mensuelle
+      final month = option['month'] as int;
+      final currentYear = DateTime.now().year;
+      final selectedDate = DateTime(currentYear, month);
+      
+      Navigator.pop(context); // Fermer le menu d'abord
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: Text('Analyse ${option['title'].toString().split(' ')[1]}'),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            body: MonthlyAnalyseTab(selectedMonth: selectedDate),
+          ),
+        ),
+      );
+      return;
+    }
+    
+    if (tabIndex < _mainTabs.length) {
+      // Seul l'onglet principal (sélection de mois)
+      setState(() {
+        _selectedIndex = tabIndex;
+      });
+      _pageController.animateToPage(
+        tabIndex,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+      _trackTabChange(tabIndex);
+      Navigator.pop(context); // Fermer le menu
+    } else {
+      // Onglets supplémentaires (catégories, projections)
+      Widget targetScreen;
+      String title;
+      
+      switch (option['index']) {
+        case 1: // Catégories (changé de 2 à 1)
+          targetScreen = const TagsManagementTab();
+          title = 'Catégories';
+          break;
+        case 2: // Projections (changé de 3 à 2)
+          targetScreen = const ProjectionsTab();
+          title = 'Projections';
+          break;
+        default:
+          targetScreen = const MonthSelectorScreen();
+          title = 'Sélection Mois';
+      }
+      
+      Navigator.pop(context); // Fermer le menu d'abord
+      
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Scaffold(
+            appBar: AppBar(
+              title: Text(title),
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ),
+            body: targetScreen,
+          ),
+        ),
+      );
+    }
+  }
+
   void _showNavigationMenu() {
     showModalBottomSheet(
       context: context,
@@ -275,10 +370,5 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         ),
       ),
     );
-  }
-
-  void _navigateToTab(int index) {
-    Navigator.pop(context); // Fermer le menu
-    _onItemTapped(index);
   }
 }
