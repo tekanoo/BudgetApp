@@ -476,14 +476,7 @@ class _SortiesTabState extends State<SortiesTab> {
     }
   }
 
-  void _toggleSelectionMode() {
-    setState(() {
-      _isSelectionMode = !_isSelectionMode;
-      if (!_isSelectionMode) {
-        _selectedIndices.clear();
-      }
-    });
-  }
+  
 
   void _toggleSelection(int index) {
     setState(() {
@@ -679,8 +672,10 @@ class _SortiesTabState extends State<SortiesTab> {
   }
 
   Widget _buildFinancialHeader() {
-    // Utiliser les totaux calculés dans _loadSorties()
+    // CORRECTION : Calcul correct du solde avec prise en compte des crédits dans les dépenses
     final soldePrevu = totalRevenus - totalSorties - totalDepenses;
+    
+    // Pour le solde débité, on utilise les charges pointées ET les dépenses pointées
     final soldeDebite = totalRevenus - totalPointe - totalDepensesPointees;
     
     return Container(
@@ -758,14 +753,33 @@ class _SortiesTabState extends State<SortiesTab> {
           
           const SizedBox(height: 16),
           
-          // Total des charges
-          Text(
-            '${AmountParser.formatAmount(totalSorties)} €',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 28,
-              fontWeight: FontWeight.bold,
-            ),
+          // CORRECTION : Affichage du total net des charges (charges - remboursements des dépenses)
+          Column(
+            children: [
+              Text(
+                'Charges nettes',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                '${AmountParser.formatAmount(totalSorties + totalDepenses)} €',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (totalDepenses != 0)
+                Text(
+                  '(${AmountParser.formatAmount(totalSorties)} € charges ${totalDepenses > 0 ? '+' : '-'} ${AmountParser.formatAmount(totalDepenses.abs())} € ${totalDepenses > 0 ? 'dépenses' : 'remboursements'})',
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 12,
+                  ),
+                ),
+            ],
           ),
           
           const SizedBox(height: 10),
