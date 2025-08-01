@@ -1,7 +1,7 @@
 // lib/screens/monthly_analyse_tab.dart - Version corrigée
 
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
+// import 'package:fl_chart/fl_chart.dart'; // SUPPRIMER CETTE LIGNE
 import '../services/encrypted_budget_service.dart';
 
 class MonthlyAnalyseTab extends StatefulWidget {
@@ -241,41 +241,8 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
 
           // Affichage des données ou message si vide
           if (totalEntrees > 0 || totalSorties > 0 || totalPlaisirs > 0) ...[
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Column(
-                  children: [
-                    Text(
-                      'Répartition des finances',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      height: 200,
-                      child: PieChart(
-                        PieChartData(
-                          sections: _buildPieChartSections(),
-                          centerSpaceRadius: 60,
-                          sectionsSpace: 4,
-                          borderData: FlBorderData(show: false),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _buildLegendItem('Revenus', Colors.green, totalEntrees),
-                        _buildLegendItem('Charges', Colors.red, totalSorties),
-                        _buildLegendItem('Dépenses', Colors.purple, totalPlaisirs),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            // NOUVEAU : Évaluation globale de la santé financière
+            _buildOverallAssessment(),
           ] else ...[
             Card(
               elevation: 4,
@@ -341,99 +308,6 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
     );
   }
 
-  Widget _buildLegendItem(String label, Color color, double value) {
-    final total = totalEntrees + totalSorties + totalPlaisirs.abs();
-    final percentage = total > 0 ? (value.abs() / total) * 100 : 0;
-    
-    return Column(
-      children: [
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: color,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          '${value.toStringAsFixed(2)} €',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: color,
-          ),
-        ),
-        Text(
-          '${percentage.toStringAsFixed(1)}%',
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-          ),
-        ),
-      ],
-    );
-  }
-
-  List<PieChartSectionData> _buildPieChartSections() {
-    final double total = totalEntrees + totalSorties + totalPlaisirs.abs();
-    final List<PieChartSectionData> sections = [];
-
-    if (totalEntrees > 0) {
-      sections.add(PieChartSectionData(
-        color: Colors.green,
-        value: totalEntrees,
-        title: '${((totalEntrees / total) * 100).toStringAsFixed(1)}%',
-        radius: 80.0,
-        titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ));
-    }
-
-    if (totalSorties > 0) {
-      sections.add(PieChartSectionData(
-        color: Colors.red,
-        value: totalSorties,
-        title: '${((totalSorties / total) * 100).toStringAsFixed(1)}%',
-        radius: 80.0,
-        titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ));
-    }
-
-    if (totalPlaisirs.abs() > 0) {
-      sections.add(PieChartSectionData(
-        color: Colors.purple,
-        value: totalPlaisirs.abs(),
-        title: '${((totalPlaisirs.abs() / total) * 100).toStringAsFixed(1)}%',
-        radius: 80.0,
-        titleStyle: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ));
-    }
-
-    return sections;
-  }
-
-  // CORRECTION : Méthode _buildFinancialRatios corrigée
   List<Widget> _buildFinancialRatios() {
     if (totalEntrees <= 0) {
       return [
@@ -492,8 +366,6 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
         Icons.savings,
         epargneRatio >= 0 ? Colors.green : Colors.red,
       ),
-      const SizedBox(height: 20),
-      _buildOverallAssessment(),
     ];
   }
 
@@ -742,7 +614,7 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
       scoreColor = Colors.red;
       scoreLabel = 'Critique';
       scoreIcon = Icons.error;
-      globalAdvice = 'Situation préoccupante. Révisez urgently votre budget.';
+      globalAdvice = 'Situation préoccupante. Révisez urgemment votre budget.'; // Correction : "urgemment" au lieu de "urgently"
     }
 
     return Container(
