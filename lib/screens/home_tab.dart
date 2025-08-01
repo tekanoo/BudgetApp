@@ -28,6 +28,7 @@ class _HomeTabState extends State<HomeTab> {
   double _monthlyPlaisirs = 0.0;
   double _monthlySortiesPointees = 0.0;
   double _monthlyPlaisirsPointees = 0.0;
+  double _monthlyVirementsPointes = 0.0; // NOUVEAU : pour le solde débité
   List<String> _availableTags = [];
   
   @override
@@ -64,6 +65,15 @@ class _HomeTabState extends State<HomeTab> {
                  date.year == widget.selectedMonth!.year &&
                  date.month == widget.selectedMonth!.month;
         }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        
+        // CORRECTION : Calculer les virements pour les ajouter aux revenus
+        final monthlyVirements = plaisirs.where((p) {
+          final date = DateTime.tryParse(p['date'] ?? '');
+          return date != null && 
+                 date.year == widget.selectedMonth!.year &&
+                 date.month == widget.selectedMonth!.month &&
+                 p['isCredit'] == true; // Seulement les virements
+        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
         
         final monthlyPlaisirs = plaisirs.where((p) {
           final date = DateTime.tryParse(p['date'] ?? '');
@@ -109,21 +119,67 @@ class _HomeTabState extends State<HomeTab> {
           }
         });
         
-        setState(() {
-          _monthlyEntrees = monthlyEntrees;
-          _monthlySorties = monthlySorties;
-          _monthlyPlaisirs = monthlyPlaisirs;
-          _monthlySortiesPointees = monthlySortiesPointees;
-          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // Maintenant corrigé
-        });
-      } else {
-        // Comportement normal (toutes les données)
-        final totals = await _dataService.getTotals();
+        // NOUVEAU : Calculer les virements pointés pour le solde débité
+        final monthlyVirementsPointes = plaisirs.where((p) {
+          final date = DateTime.tryParse(p['date'] ?? '');
+          return date != null && 
+                 date.year == widget.selectedMonth!.year &&
+                 date.month == widget.selectedMonth!.month &&
+                 p['isPointed'] == true &&
+                 p['isCredit'] == true; // Seulement les virements pointés
+        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
         
         setState(() {
-          _monthlyEntrees = totals['entrees'] ?? 0.0;
-          _monthlySorties = totals['sorties'] ?? 0.0;
-          _monthlyPlaisirs = totals['plaisirs'] ?? 0.0;
+          _monthlyEntrees = monthlyEntrees + monthlyVirements; // CORRECTION : Ajouter virements aux revenus
+          _monthlySorties = monthlySorties;
+          _monthlyPlaisirs = monthlyPlaisirs; // Maintenant sans les virements
+          _monthlySortiesPointees = monthlySortiesPointees;
+          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // Maintenant sans les virements pointés
+          _monthlyVirementsPointes = monthlyVirementsPointes; // NOUVEAU
+        });
+      } else {
+        // CORRECTION : Pour le calcul global, séparer aussi les virements
+        final entrees = await _dataService.getEntrees();
+        final sorties = await _dataService.getSorties();
+        final plaisirs = await _dataService.getPlaisirs();
+        
+        final totalEntreesAmount = entrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+        final totalSortiesAmount = sorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        
+        double totalPlaisirsAmount = 0.0;
+        double totalVirementsAmount = 0.0;
+        double totalSortiesPointees = 0.0;
+        double totalPlaisirsPointees = 0.0;
+        double totalVirementsPointes = 0.0;
+        
+        for (var plaisir in plaisirs) {
+          final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+          if (plaisir['isCredit'] == true) {
+            totalVirementsAmount += amount; // Les virements vont aux revenus
+            // Pour les virements pointés
+            if (plaisir['isPointed'] == true) {
+              totalVirementsPointes += amount;
+            }
+          } else {
+            totalPlaisirsAmount += amount; // Les vraies dépenses
+            // Pour les dépenses pointées
+            if (plaisir['isPointed'] == true) {
+              totalPlaisirsPointees += amount; // Seulement les vraies dépenses pointées
+            }
+          }
+        }
+        
+        // Calculer les sorties pointées
+        totalSortiesPointees = sorties.where((s) => s['isPointed'] == true)
+            .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        
+        setState(() {
+          _monthlyEntrees = totalEntreesAmount + totalVirementsAmount; // Revenus + virements
+          _monthlySorties = totalSortiesAmount;
+          _monthlyPlaisirs = totalPlaisirsAmount; // Seulement les vraies dépenses
+          _monthlySortiesPointees = totalSortiesPointees;
+          _monthlyPlaisirsPointees = totalPlaisirsPointees; // Seulement les vraies dépenses pointées
+          _monthlyVirementsPointes = totalVirementsPointes; // NOUVEAU
         });
       }
     } catch (e) {
@@ -276,7 +332,7 @@ class _HomeTabState extends State<HomeTab> {
                         ),
                         const SizedBox(width: 12),
                         ElevatedButton.icon(
-                          onPressed: _isLoading ? null : _addExpense, // CORRECTION: Changer _addQuickPlaisir en _addExpense
+                          onPressed: _isLoading ? null : _addExpense,
                           icon: _isLoading 
                               ? const SizedBox(
                                   width: 16,
@@ -312,7 +368,8 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildSummaryCards(double solde) {
-    final soldeDebiteCalcule = _monthlyEntrees - _monthlySortiesPointees - _monthlyPlaisirsPointees;
+    // CORRECTION : Ajouter les virements pointés au solde débité
+    final soldeDebiteCalcule = _monthlyEntrees + _monthlyVirementsPointes - _monthlySortiesPointees - _monthlyPlaisirsPointees;
     
     return Column(
       children: [
@@ -620,7 +677,7 @@ class _HomeTabState extends State<HomeTab> {
                           ),
                         );
                         _clearFields();
-                        await _loadMonthlyData(); // CORRECTION: Changer _loadMonthData en _loadMonthlyData
+                        await _loadMonthlyData();
                       }
                     } catch (e) {
                       if (mounted) {
