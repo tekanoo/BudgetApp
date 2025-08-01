@@ -154,29 +154,29 @@ Future<void> togglePlaisirPointing(int index) async {
         }
       }
       
-      // Calcul du total des dépenses pointées - CORRECTION ICI
+      // CORRECTION : Calcul des dépenses pointées avec gestion correcte des crédits
       double totalDepensesPointees = 0.0;
       for (var plaisir in plaisirs) {
         if (plaisir['isPointed'] == true) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
-            // Les virements/remboursements pointés AJOUTENT au solde disponible
-            totalDepensesPointees -= amount; // On soustrait pour que la formule finale donne +
+            // Les virements/remboursements pointés AUGMENTENT le solde disponible
+            totalDepensesPointees -= amount; // On soustrait pour l'ajouter dans la formule finale
           } else {
-            // Les dépenses normales pointées RETIRENT du solde disponible
+            // Les dépenses normales pointées DIMINUENT le solde disponible
             totalDepensesPointees += amount;
           }
         }
       }
       
-      // Nouvelle formule : Revenus pointés - Charges pointées - Dépenses pointées
+      // Formule : Revenus pointés - Charges pointées - Dépenses pointées (avec crédits en positif)
       final result = totalRevenusPointes - totalChargesPointees - totalDepensesPointees;
       
       if (kDebugMode) {
         print('🔍 CALCUL SOLDE DÉBITÉ (CORRIGÉ):');
         print('  - Revenus pointés: $totalRevenusPointes €');
         print('  - Charges pointées: $totalChargesPointees €');
-        print('  - Dépenses pointées: $totalDepensesPointees €');
+        print('  - Dépenses pointées (net): $totalDepensesPointees €');
         print('  - FORMULE: $totalRevenusPointes - $totalChargesPointees - $totalDepensesPointees = $result €');
       }
       
@@ -742,19 +742,19 @@ Future<void> togglePlaisirPointing(int index) async {
       for (var plaisir in plaisirs) {
         final amount = (plaisir['amount'] as num).toDouble();
         
-        // Pour le total général, on compte tous les montants normalement
+        // Pour le total général (solde prévu)
         if (plaisir['isCredit'] == true) {
-          totalPlaisirs -= amount; // Les crédits réduisent le total des dépenses
+          totalPlaisirs -= amount; // Les crédits AUGMENTENT le solde (donc on soustrait du total dépenses)
         } else {
-          totalPlaisirs += amount; // Les dépenses augmentent le total
+          totalPlaisirs += amount; // Les dépenses DIMINUENT le solde
         }
         
-        // Pour les pointés, même logique
+        // Pour les pointés (solde pointé)
         if (plaisir['isPointed'] == true) {
           if (plaisir['isCredit'] == true) {
-            totalPlaisirsTotaux -= amount; // Les crédits pointés réduisent
+            totalPlaisirsTotaux -= amount; // Les crédits pointés AUGMENTENT le solde pointé
           } else {
-            totalPlaisirsTotaux += amount; // Les dépenses pointées augmentent
+            totalPlaisirsTotaux += amount; // Les dépenses pointées DIMINUENT le solde pointé
           }
         }
       }
@@ -762,9 +762,9 @@ Future<void> togglePlaisirPointing(int index) async {
       return {
         'entrees': totalEntrees,
         'sorties': totalSorties,
-        'plaisirs': totalPlaisirs,
-        'plaisirsTotaux': totalPlaisirsTotaux,
-        'solde': totalEntrees - totalSorties - totalPlaisirs,
+        'plaisirs': totalPlaisirs, // Peut être négatif si plus de crédits que de dépenses
+        'plaisirsTotaux': totalPlaisirsTotaux, // Idem pour les pointés
+        'solde': totalEntrees - totalSorties - totalPlaisirs, // Le solde sera correct
       };
     } catch (e) {
       if (kDebugMode) {
