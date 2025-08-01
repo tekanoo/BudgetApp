@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
-import '../utils/amount_parser.dart'; // GARDER SEULEMENT CELUI-CI
+import '../utils/amount_parser.dart';
 
 class SortiesTab extends StatefulWidget {
   final DateTime? selectedMonth;
@@ -403,7 +403,6 @@ class _SortiesTabState extends State<SortiesTab> {
           amountStr: result['amount'].toString(),
           description: result['description'],
           date: result['date'],
-          // Suppression du paramètre periodicity
         );
         await _loadSorties();
         
@@ -451,7 +450,6 @@ class _SortiesTabState extends State<SortiesTab> {
           amountStr: result['amount'].toString(),
           description: result['description'],
           date: result['date'],
-          // Suppression du paramètre periodicity
         );
         await _loadSorties();
         
@@ -531,8 +529,6 @@ class _SortiesTabState extends State<SortiesTab> {
       }
     }
   }
-
-  
 
   void _toggleSelection(int index) {
     setState(() {
@@ -697,7 +693,6 @@ class _SortiesTabState extends State<SortiesTab> {
                     ),
                   ),
                 ),
-                // Suppression du sélecteur de périodicité
               ],
             ),
           ),
@@ -743,66 +738,109 @@ class _SortiesTabState extends State<SortiesTab> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(15),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color: Colors.red.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Ligne de contrôles
+          // Titre et boutons d'actions
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              const Icon(Icons.receipt_long, color: Colors.white, size: 24),
               const SizedBox(width: 8),
-              Row(
-                children: [
-                  if (filteredSorties.isNotEmpty)
-                    InkWell(
-                      onTap: () {
-                        setState(() {
-                          _isSelectionMode = !_isSelectionMode;
-                          if (!_isSelectionMode) {
-                            _selectedIndices.clear();
-                          }
-                        });
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withOpacity(0.5)),
-                        ),
-                        child: Icon(
-                          _isSelectionMode ? Icons.close : Icons.checklist,
-                          color: Colors.white,
-                          size: 20,
-                        ),
-                      ),
+              const Text(
+                'Charges',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              // AJOUTER le bouton de copie vers le mois suivant
+              if (widget.selectedMonth != null) ...[
+                InkWell(
+                  onTap: _copyChargesToNextMonth,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
                     ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: _showFilterDialog,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withOpacity(0.5)),
-                      ),
-                      child: const Icon(
-                        Icons.filter_list,
-                        color: Colors.white,
-                        size: 20,
-                      ),
+                    child: const Icon(
+                      Icons.content_copy,
+                      color: Colors.white,
+                      size: 20,
                     ),
                   ),
-                ],
+                ),
+                const SizedBox(width: 8),
+              ],
+              if (_isSelectionMode)
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isSelectionMode = false;
+                      _selectedIndices.clear();
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isSelectionMode = true;
+                    });
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                    ),
+                    child: Icon(
+                      _isSelectionMode ? Icons.close : Icons.checklist,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: _showFilterDialog,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white.withOpacity(0.5)),
+                  ),
+                  child: const Icon(
+                    Icons.filter_list,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
               ),
             ],
           ),
@@ -820,96 +858,335 @@ class _SortiesTabState extends State<SortiesTab> {
                 ),
               ),
               Text(
-                '${AmountParser.formatAmount(totalSorties + totalDepenses)} €',
+                '${totalSorties.toStringAsFixed(2).replaceAll('.', ',')} €',
                 style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
+                  fontSize: 32,
                   fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
-              if (totalDepenses != 0)
-                Text(
-                  '(${AmountParser.formatAmount(totalSorties)} € charges ${totalDepenses > 0 ? '+' : '-'} ${AmountParser.formatAmount(totalDepenses.abs())} € ${totalDepenses > 0 ? 'dépenses' : 'remboursements'})',
-                  style: const TextStyle(
-                    color: Colors.white60,
-                    fontSize: 12,
-                  ),
-                ),
             ],
           ),
-          
-          const SizedBox(height: 10),
-          
-          // Soldes prévu et débité
+
+          const SizedBox(height: 16),
+
+          // Statistiques en ligne
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+              Column(
+                children: [
+                  const Text(
+                    'Pointées',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Solde Prévu',
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
-                      ),
-                      Text(
-                        '${AmountParser.formatAmount(soldePrevu)} €',
-                        style: TextStyle(
-                          color: soldePrevu >= 0 ? Colors.white : Colors.orange.shade200,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${totalPointe.toStringAsFixed(2).replaceAll('.', ',')} €',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
+                ],
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.5)),
+              Container(
+                height: 30,
+                width: 1,
+                color: Colors.white30,
+              ),
+              Column(
+                children: [
+                  const Text(
+                    'Non pointées',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Solde Débité',
-                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        '${AmountParser.formatAmount(soldeDebite)} €',
-                        style: TextStyle(
-                          color: soldeDebite >= 0 ? Colors.green.shade200 : Colors.orange.shade200,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${(totalSorties - totalPointe).toStringAsFixed(2).replaceAll('.', ',')} €',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
                   ),
-                ),
+                ],
+              ),
+              Container(
+                height: 30,
+                width: 1,
+                color: Colors.white30,
+              ),
+              Column(
+                children: [
+                  const Text(
+                    'Solde',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                  Text(
+                    '${soldeDebite.toStringAsFixed(2).replaceAll('.', ',')} €',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: soldeDebite >= 0 ? Colors.white : Colors.red.shade200,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-          
-          const SizedBox(height: 5),
-          Text(
-            '${filteredSorties.length} charge${filteredSorties.length > 1 ? 's' : ''} • ${filteredSorties.where((s) => s['isPointed'] == true).length} pointée${filteredSorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-            ),
           ),
         ],
       ),
     );
+  }
+
+  // AJOUTER cette nouvelle méthode pour copier les charges vers le mois suivant
+  Future<void> _copyChargesToNextMonth() async {
+    if (widget.selectedMonth == null) return;
+
+    // Calculer le mois suivant
+    final nextMonth = DateTime(
+      widget.selectedMonth!.month == 12 
+          ? widget.selectedMonth!.year + 1 
+          : widget.selectedMonth!.year,
+      widget.selectedMonth!.month == 12 
+          ? 1 
+          : widget.selectedMonth!.month + 1,
+    );
+
+    final currentMonthName = _getMonthName(widget.selectedMonth!.month);
+    final nextMonthName = _getMonthName(nextMonth.month);
+
+    // Vérifier s'il y a des charges à copier pour le mois actuel
+    final currentMonthCharges = sorties.where((charge) {
+      final date = DateTime.tryParse(charge['date'] ?? '');
+      return date != null && 
+             date.year == widget.selectedMonth!.year &&
+             date.month == widget.selectedMonth!.month;
+    }).toList();
+
+    if (currentMonthCharges.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Aucune charge trouvée pour $currentMonthName ${widget.selectedMonth!.year}'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Demander confirmation
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.content_copy, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Copier les charges'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Copier toutes les charges de $currentMonthName ${widget.selectedMonth!.year} vers $nextMonthName ${nextMonth.year} ?',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Text('📋 ${currentMonthCharges.length} charge(s) à copier :'),
+            const SizedBox(height: 8),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: SingleChildScrollView(
+                child: Column(
+                  children: currentMonthCharges.map((charge) {
+                    final amount = (charge['amount'] as num?)?.toDouble() ?? 0;
+                    final description = charge['description'] as String? ?? '';
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Row(
+                        children: [
+                          const Text('• '),
+                          Expanded(
+                            child: Text(
+                              description,
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                          ),
+                          Text(
+                            '${amount.toStringAsFixed(2)} €',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.blue.shade600),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Les charges seront copiées avec les mêmes montants et descriptions, mais adaptées aux dates du mois suivant.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.blue),
+            child: const Text('Copier'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      // Afficher le dialogue de chargement
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const AlertDialog(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(height: 16),
+                Text('📋 Copie des charges en cours...'),
+              ],
+            ),
+          ),
+        );
+      }
+
+      int copiedCount = 0;
+      int skippedCount = 0;
+      List<String> errors = [];
+
+      // Copier chaque charge vers le mois suivant
+      for (var charge in currentMonthCharges) {
+        try {
+          final originalDate = DateTime.tryParse(charge['date'] ?? '');
+          if (originalDate == null) {
+            skippedCount++;
+            continue;
+          }
+
+          // Calculer la nouvelle date dans le mois suivant
+          // Garder le même jour, mais ajuster si le mois suivant n'a pas assez de jours
+          final lastDayOfNextMonth = DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
+          final newDay = originalDate.day > lastDayOfNextMonth ? lastDayOfNextMonth : originalDate.day;
+          
+          final newDate = DateTime(nextMonth.year, nextMonth.month, newDay);
+
+          // Ajouter la nouvelle charge
+          await _dataService.addSortie(
+            amountStr: (charge['amount'] as num).toString(),
+            description: charge['description'] as String,
+            date: newDate,
+          );
+
+          copiedCount++;
+        } catch (e) {
+          errors.add('${charge['description']}: $e');
+          skippedCount++;
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // Fermer le dialogue de chargement
+        
+        // Recharger les données pour voir les nouvelles charges
+        await _loadSorties();
+        
+        // Afficher le résultat
+        String message;
+        Color backgroundColor;
+        
+        if (copiedCount > 0 && errors.isEmpty) {
+          message = '✅ $copiedCount charge(s) copiée(s) vers $nextMonthName ${nextMonth.year}';
+          backgroundColor = Colors.green;
+        } else if (copiedCount > 0 && errors.isNotEmpty) {
+          message = '⚠️ $copiedCount copiée(s), $skippedCount échec(s)';
+          backgroundColor = Colors.orange;
+        } else {
+          message = '❌ Aucune charge n\'a pu être copiée';
+          backgroundColor = Colors.red;
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+            action: errors.isNotEmpty ? SnackBarAction(
+              label: 'Détails',
+              textColor: Colors.white,
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Erreurs de copie'),
+                    content: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: errors.map((error) => Text('• $error')).toList(),
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Fermer'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ) : null,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Fermer le dialogue de chargement
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur lors de la copie: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -930,7 +1207,6 @@ class _SortiesTabState extends State<SortiesTab> {
     }
 
     return Scaffold(
-      // AJOUTER un FloatingActionButton pour toujours avoir accès au bouton d'ajout
       floatingActionButton: FloatingActionButton(
         onPressed: _addSortie,
         backgroundColor: Colors.red,
@@ -967,26 +1243,12 @@ class _SortiesTabState extends State<SortiesTab> {
                         style: TextStyle(color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
-                      // RETIRER ce bouton car on a maintenant le FloatingActionButton
-                      // const SizedBox(height: 30),
-                      // ElevatedButton.icon(
-                      //   onPressed: _addSortie,
-                      //   icon: const Icon(Icons.add),
-                      //   label: const Text('Ajouter une charge'),
-                      //   style: ElevatedButton.styleFrom(
-                      //     backgroundColor: Colors.red,
-                      //     foregroundColor: Colors.white,
-                      //   ),
-                      // ),
                     ],
                   ),
                 )
               : Column(
                   children: [
-                    // En-tête avec totaux et filtres
                     _buildFinancialHeader(),
-
-                    // Barre d'outils avec bouton sélection multiple
                     if (filteredSorties.isNotEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -1005,7 +1267,6 @@ class _SortiesTabState extends State<SortiesTab> {
                               label: Text(_isSelectionMode ? 'Annuler' : 'Sélection multiple'),
                             ),
                             const Spacer(),
-                            // AJOUTER un bouton d'ajout dans la barre d'outils aussi
                             IconButton(
                               onPressed: _addSortie,
                               icon: const Icon(Icons.add),
@@ -1018,8 +1279,6 @@ class _SortiesTabState extends State<SortiesTab> {
                           ],
                         ),
                       ),
-
-                    // Liste des charges filtrées
                     Expanded(
                       child: ListView.builder(
                         itemCount: filteredSorties.length,
@@ -1050,14 +1309,13 @@ class _SortiesTabState extends State<SortiesTab> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.grey.withValues(alpha: 0.1),
+                                  color: Colors.grey.withOpacity(0.1),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 ),
                               ],
                             ),
                             child: ListTile(
-                              // Case à cocher en mode sélection
                               leading: _isSelectionMode
                                   ? Checkbox(
                                       value: isSelected,
@@ -1225,8 +1483,6 @@ class _SortiesTabState extends State<SortiesTab> {
                     ),
                   ],
                 ),
-
-          // CORRECTION: Créer un widget simple au lieu d'utiliser PointingWidget
           if (_isSelectionMode && _selectedIndices.isNotEmpty)
             Positioned(
               bottom: 0,
