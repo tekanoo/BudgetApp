@@ -1096,6 +1096,14 @@ class _EntreesTabState extends State<EntreesTab> {
       return;
     }
 
+    // Vérifier s'il existe déjà des revenus pour le mois suivant
+    final existingNextMonthRevenus = entrees.where((revenu) {
+      final date = DateTime.tryParse(revenu['date'] ?? '');
+      return date != null && 
+             date.year == nextMonth.year &&
+             date.month == nextMonth.month;
+    }).toList();
+
     // Demander confirmation
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
@@ -1137,6 +1145,29 @@ class _EntreesTabState extends State<EntreesTab> {
                 ),
               ),
             ),
+            if (existingNextMonthRevenus.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.shade200),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.orange.shade600),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Attention : ${existingNextMonthRevenus.length} revenu(s) existe(nt) déjà pour $nextMonthName ${nextMonth.year}. Les nouveaux revenus seront ajoutés.',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
@@ -1151,7 +1182,7 @@ class _EntreesTabState extends State<EntreesTab> {
                   const SizedBox(width: 8),
                   const Expanded(
                     child: Text(
-                      'Les revenus seront copiés avec les mêmes montants et descriptions, mais adaptés aux dates du mois suivant.',
+                      'Les revenus seront copiés comme nouveaux éléments indépendants. Modifier ou supprimer l\'un n\'affectera pas l\'autre.',
                       style: TextStyle(fontSize: 12),
                     ),
                   ),
@@ -1197,7 +1228,7 @@ class _EntreesTabState extends State<EntreesTab> {
       int skippedCount = 0;
       List<String> errors = [];
 
-      // Copier chaque revenu vers le mois suivant
+      // Copier chaque revenu vers le mois suivant en créant de NOUVEAUX éléments
       for (var revenu in currentMonthRevenus) {
         try {
           final originalDate = DateTime.tryParse(revenu['date'] ?? '');
@@ -1213,11 +1244,17 @@ class _EntreesTabState extends State<EntreesTab> {
           
           final newDate = DateTime(nextMonth.year, nextMonth.month, newDay);
 
-          // Ajouter le nouveau revenu
+          // IMPORTANT : Créer un NOUVEAU revenu complètement indépendant
+          // Ne pas copier l'ID, les dates de pointage, etc.
           await _dataService.addEntree(
             amountStr: (revenu['amount'] as num).toString(),
             description: revenu['description'] as String,
             date: newDate,
+            // Note : Le service addEntree va automatiquement :
+            // - Générer un nouvel ID unique
+            // - Définir isPointed à false par défaut
+            // - Créer une nouvelle date de création
+            // - Ne pas copier les métadonnées de pointage
           );
 
           copiedCount++;
