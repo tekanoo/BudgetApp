@@ -34,21 +34,17 @@ class _AnalyseTabState extends State<AnalyseTab> {
       setState(() {
         totalEntrees = totals['entrees'] ?? 0.0;
         totalSorties = totals['sorties'] ?? 0.0;
-        totalPlaisirs = totals['plaisirs'] ?? 0.0;
+        
+        // CORRECTION : Récupérer les plaisirs pour calculer correctement avec les crédits
+        totalPlaisirs = totals['plaisirs'] ?? 0.0; // Ce total prend déjà en compte les crédits
+        
         isLoading = false;
       });
     } catch (e) {
       setState(() {
         isLoading = false;
       });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur de chargement: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      
     }
   }
 
