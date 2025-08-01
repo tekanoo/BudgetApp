@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/firebase_service.dart';
 import 'login_screen.dart';
-import 'main_menu_screen.dart'; // IMPORTANT: Utiliser main_menu_screen, pas month_selector_screen
+import 'main_menu_screen.dart';
 
 class AuthWrapper extends StatelessWidget {
   final FirebaseService _firebaseService = FirebaseService();
@@ -17,17 +17,24 @@ class AuthWrapper extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
-              child: CircularProgressIndicator(),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('🔐 Vérification de l\'authentification...'),
+                ],
+              ),
             ),
           );
         }
         
         // Si utilisateur connecté
-        if (snapshot.hasData) {
-          return const MainMenuScreen(); // CORRECTION: Utiliser MainMenuScreen
+        if (snapshot.hasData && snapshot.data != null) {
+          return const MainMenuScreen();
         }
         
-        // Si pas connecté
+        // Si pas connecté ou déconnecté
         return const LoginScreen();
       },
     );

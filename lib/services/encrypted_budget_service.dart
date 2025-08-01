@@ -30,7 +30,11 @@ class EncryptedBudgetDataService {
 
   void _ensureInitialized() {
     if (!_isInitialized) {
-      throw Exception('Service non initialisé. Appelez initialize() d\'abord.');
+      throw Exception('Service non initialisé');
+    }
+    // AJOUTER cette vérification
+    if (!_firebaseService.isSignedIn) {
+      throw Exception('Utilisateur non connecté - Accès refusé');
     }
   }
 

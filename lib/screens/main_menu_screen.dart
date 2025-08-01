@@ -6,6 +6,7 @@ import '../services/firebase_service.dart';
 import '../services/encrypted_budget_service.dart' as encrypted;
 
 import 'month_selector_screen.dart';
+import 'auth_wrapper.dart'; // AJOUTER cet import
 import 'tags_management_tab.dart';
 import 'projections_tab.dart';
 
@@ -539,10 +540,37 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
     if (confirmed == true) {
       try {
+        // Afficher un indicateur de déconnexion
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('🔓 Déconnexion en cours...'),
+                ],
+              ),
+            ),
+          );
+        }
+
         await _firebaseService.signOut();
+        
         // La navigation sera gérée automatiquement par AuthWrapper
+        // Mais on peut forcer le retour à la racine pour être sûr
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => AuthWrapper()),
+          );
+        }
       } catch (e) {
         if (mounted) {
+          Navigator.pop(context); // Fermer le dialogue de chargement
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('❌ Erreur de déconnexion: $e'),

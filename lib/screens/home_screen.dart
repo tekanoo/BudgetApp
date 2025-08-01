@@ -1,6 +1,6 @@
-import 'package:budget_app/screens/main_menu_screen.dart';
+import 'package:budget_app/screens/auth_wrapper.dart'; // CHANGEMENT: Importer AuthWrapper au lieu de MainMenuScreen
 import 'package:flutter/material.dart';
-import '../services/storage_service.dart';
+
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -16,15 +16,14 @@ class HomeScreen extends StatelessWidget {
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 20),
-              Text('Chargement...'),
+              Text('Redirection...'),
             ],
           ),
         ),
       );
       
-      // Initialiser le stockage local
-      final storage = StorageService();
-      await storage.loadData();
+      // Petit délai pour l'UX
+      await Future.delayed(const Duration(milliseconds: 500));
       
       // Vérifier si le widget est monté
       if (!context.mounted) return;
@@ -32,9 +31,9 @@ class HomeScreen extends StatelessWidget {
       // Fermer le dialogue de chargement
       Navigator.of(context).pop();
       
-      // Rediriger vers l'écran principal
+      // CORRECTION: Rediriger vers AuthWrapper au lieu de MainMenuScreen
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const MainMenuScreen()),
+        MaterialPageRoute(builder: (_) => AuthWrapper()),
       );
       
     } catch (e) {
