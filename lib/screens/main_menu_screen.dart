@@ -249,13 +249,70 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Budget App'),
-        // SUPPRIMER le bouton menu
-        // actions: [
-        //   IconButton(
-        //     icon: const Icon(Icons.menu),
-        //     onPressed: () => _showNavigationMenu(),
-        //   ),
-        // ],
+        // AJOUTER le menu utilisateur
+        actions: [
+          PopupMenuButton<String>(
+            icon: CircleAvatar(
+              backgroundColor: Colors.blue.shade100,
+              child: Icon(
+                Icons.person,
+                color: Colors.blue.shade700,
+              ),
+            ),
+            onSelected: (value) => _handleUserMenuAction(value),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.account_circle, color: Colors.blue.shade600),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _firebaseService.currentUser?.displayName ?? 'Utilisateur',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        Text(
+                          _firebaseService.currentUser?.email ?? '',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const PopupMenuDivider(),
+              PopupMenuItem(
+                value: 'deleteData',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever, color: Colors.red.shade600),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Supprimer les données',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout, color: Colors.orange.shade600),
+                    const SizedBox(width: 12),
+                    const Text('Se déconnecter'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: PageView(
         controller: _pageController,
@@ -268,5 +325,232 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         destinations: _mainDestinations,
       ),
     );
+  }
+
+  // AJOUTER cette méthode pour gérer les actions du menu utilisateur
+  void _handleUserMenuAction(String action) {
+    switch (action) {
+      case 'profile':
+        // Afficher les informations du profil
+        _showUserProfile();
+        break;
+      case 'deleteData':
+        // Supprimer les données
+        _deleteAllData();
+        break;
+      case 'logout':
+        // Se déconnecter
+        _signOut();
+        break;
+    }
+  }
+
+  void _showUserProfile() {
+    final user = _firebaseService.currentUser;
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.account_circle, color: Colors.blue),
+            SizedBox(width: 12),
+            Text('Profil utilisateur'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (user?.photoURL != null) ...[
+              Center(
+                child: CircleAvatar(
+                  radius: 40,
+                  backgroundImage: NetworkImage(user!.photoURL!),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
+            _buildProfileInfo('Nom', user?.displayName ?? 'Non défini'),
+            const SizedBox(height: 8),
+            _buildProfileInfo('Email', user?.email ?? 'Non défini'),
+            const SizedBox(height: 8),
+            _buildProfileInfo('UID', user?.uid ?? 'Non défini'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileInfo(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Colors.grey.shade600,
+          ),
+        ),
+        Text(
+          value,
+          style: const TextStyle(fontSize: 14),
+        ),
+      ],
+    );
+  }
+
+  void _deleteAllData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.warning, color: Colors.red),
+            SizedBox(width: 12),
+            Text('Supprimer toutes les données'),
+          ],
+        ),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '⚠️ ATTENTION ⚠️',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Cette action va supprimer définitivement TOUTES vos données :',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            SizedBox(height: 8),
+            Text('• Tous vos revenus'),
+            Text('• Toutes vos charges'),
+            Text('• Toutes vos dépenses'),
+            Text('• Toutes vos catégories'),
+            Text('• Tous vos pointages'),
+            SizedBox(height: 16),
+            Text(
+              'Cette action est IRRÉVERSIBLE !',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('SUPPRIMER TOUT'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Afficher le dialogue de chargement
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('🗑️ Suppression des données...'),
+                ],
+              ),
+            ),
+          );
+        }
+
+        await _dataService.deleteAllUserData();
+
+        if (mounted) {
+          Navigator.pop(context); // Fermer le dialogue de chargement
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Toutes les données ont été supprimées'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          Navigator.pop(context); // Fermer le dialogue de chargement
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Erreur: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  void _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.logout, color: Colors.orange),
+            SizedBox(width: 12),
+            Text('Se déconnecter'),
+          ],
+        ),
+        content: const Text('Voulez-vous vraiment vous déconnecter ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            child: const Text('Se déconnecter'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _firebaseService.signOut();
+        // La navigation sera gérée automatiquement par AuthWrapper
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('❌ Erreur de déconnexion: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 }
