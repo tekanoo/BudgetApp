@@ -772,7 +772,8 @@ class _EntreesTabState extends State<EntreesTab> {
   }
 
   Future<void> _editEntree(int displayIndex) async {
-    final entree = entrees[displayIndex];
+    // CORRECTION : Utiliser filteredEntrees au lieu de entrees
+    final entree = filteredEntrees[displayIndex];
     final entreeId = entree['id'] ?? '';
     
     final originalEntrees = await _dataService.getEntrees();
@@ -818,12 +819,64 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
-  Future<void> _deleteEntree(int index) async {
+  Future<void> _deleteEntree(int displayIndex) async {
+    // CORRECTION : Utiliser filteredEntrees et trouver le vrai index
+    final entree = filteredEntrees[displayIndex];
+    final entreeId = entree['id'] ?? '';
+    
+    // Trouver l'index réel dans la liste complète
+    final originalEntrees = await _dataService.getEntrees();
+    final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
+    
+    if (realIndex == -1) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('❌ Revenu non trouvé'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Supprimer'),
-        content: const Text('Voulez-vous vraiment supprimer ce revenu ?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Voulez-vous vraiment supprimer ce revenu ?'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entree['description'] ?? 'Sans description',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    '${(entree['amount'] as num?)?.toDouble().toStringAsFixed(2).replaceAll('.', ',')} €',
+                    style: TextStyle(color: Colors.green.shade700),
+                  ),
+                  if (entree['date'] != null)
+                    Text(
+                      'Date: ${DateTime.tryParse(entree['date']).toString().split(' ')[0]}',
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -840,13 +893,13 @@ class _EntreesTabState extends State<EntreesTab> {
 
     if (confirmed == true) {
       try {
-        await _dataService.deleteEntree(index);
+        await _dataService.deleteEntree(realIndex);
         await _loadEntrees();
         
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Revenu supprimé'),
+          SnackBar(
+            content: Text('✅ Revenu "${entree['description']}" supprimé'),
             backgroundColor: Colors.orange,
           ),
         );
