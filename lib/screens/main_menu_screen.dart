@@ -25,11 +25,9 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   final encrypted.EncryptedBudgetDataService _dataService = encrypted.EncryptedBudgetDataService();
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
 
-  // Onglets principaux - SUPPRESSION des onglets dépenses, revenus, charges
-  final List<Widget> _mainTabs = [
+  // MODIFIER: Retirer final pour permettre la réassignation
+  List<Widget> _mainTabs = [
     const MonthSelectorScreen(), // Premier onglet = Sélection des mois
-    // SUPPRIMER MonthlyAnalyseTab d'ici car il nécessite un paramètre
-    // MonthlyAnalyseTab sera accessible uniquement via le menu
     const TagsManagementTab(), // Onglet pour la gestion des tags
     const ProjectionsTab(), // Onglet pour les projections
   ];
@@ -490,9 +488,12 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         if (mounted) {
           Navigator.pop(context); // Fermer le dialogue de chargement
           
+          // AJOUT: Actualiser tous les onglets après suppression
+          await _refreshAllTabs();
+          
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('✅ Toutes les données ont été supprimées'),
+              content: Text('✅ Toutes les données ont été supprimées et actualisées'),
               backgroundColor: Colors.green,
             ),
           );
@@ -508,6 +509,40 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
             ),
           );
         }
+      }
+    }
+  }
+
+  // MODIFIER: Actualiser la méthode _refreshAllTabs
+  Future<void> _refreshAllTabs() async {
+    try {
+      // Forcer la reconstruction de tous les onglets
+      setState(() {
+        _mainTabs = [
+          const MonthSelectorScreen(), // Onglet sélection de mois
+          const TagsManagementTab(),   // Onglet gestion des tags
+          const ProjectionsTab(),      // Onglet projections
+        ];
+      });
+
+      // Optionnel: revenir au premier onglet
+      if (_pageController.hasClients) {
+        _pageController.animateToPage(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+        setState(() {
+          _selectedIndex = 0;
+        });
+      }
+
+      if (kDebugMode) {
+        print('✅ Tous les onglets ont été actualisés');
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('❌ Erreur actualisation onglets: $e');
       }
     }
   }
