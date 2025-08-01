@@ -934,8 +934,8 @@ class _SortiesTabState extends State<SortiesTab> {
       floatingActionButton: FloatingActionButton(
         onPressed: _addSortie,
         backgroundColor: Colors.red,
-        child: const Icon(Icons.add, color: Colors.white),
         tooltip: 'Ajouter une charge',
+        child: const Icon(Icons.add, color: Colors.white),
       ),
       body: Stack(
         children: [
