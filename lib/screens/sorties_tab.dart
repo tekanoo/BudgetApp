@@ -52,19 +52,74 @@ class _SortiesTabState extends State<SortiesTab> {
     try {
       final data = await _dataService.getSorties();
       
-      // Charger aussi les totaux pour les calculs
-      final totals = await _dataService.getTotals();
-      final depenses = await _dataService.getPlaisirs();
+      // Charger TOUTES les données pour les calculs
+      final entreesData = await _dataService.getEntrees();
+      final plaisirsData = await _dataService.getPlaisirs();
       
       setState(() {
         sorties = data;
-        totalRevenus = totals['entrees'] ?? 0.0;
-        totalDepenses = totals['plaisirs'] ?? 0.0;
         
-        // Calculer dépenses pointées
-        totalDepensesPointees = depenses
-            .where((p) => p['isPointed'] == true)
-            .fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+        // Calculer les totaux selon le mois sélectionné
+        if (widget.selectedMonth != null) {
+          // Calculs mensuels pour le mois sélectionné
+          totalRevenus = entreesData.where((e) {
+            final date = DateTime.tryParse(e['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month;
+          }).fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          
+          totalDepenses = plaisirsData.where((p) {
+            final date = DateTime.tryParse(p['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month;
+          }).fold(0.0, (sum, p) {
+            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+            if (p['isCredit'] == true) {
+              return sum - amount; // Les crédits réduisent le total des dépenses
+            } else {
+              return sum + amount; // Les dépenses normales augmentent le total
+            }
+          });
+          
+          totalDepensesPointees = plaisirsData.where((p) {
+            final date = DateTime.tryParse(p['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month &&
+                   p['isPointed'] == true;
+          }).fold(0.0, (sum, p) {
+            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+            if (p['isCredit'] == true) {
+              return sum - amount; // Les crédits pointés réduisent
+            } else {
+              return sum + amount; // Les dépenses pointées augmentent
+            }
+          });
+        } else {
+          // Calculs globaux (code existant)
+          totalRevenus = entreesData.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          totalDepenses = plaisirsData.fold(0.0, (sum, p) {
+            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+            if (p['isCredit'] == true) {
+              return sum - amount;
+            } else {
+              return sum + amount;
+            }
+          });
+          
+          totalDepensesPointees = plaisirsData
+              .where((p) => p['isPointed'] == true)
+              .fold(0.0, (sum, p) {
+                final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+                if (p['isCredit'] == true) {
+                  return sum - amount;
+                } else {
+                  return sum + amount;
+                }
+              });
+        }
         
         // Si un mois spécifique est sélectionné, filtrer automatiquement
         if (widget.selectedMonth != null) {
@@ -624,6 +679,7 @@ class _SortiesTabState extends State<SortiesTab> {
   }
 
   Widget _buildFinancialHeader() {
+    // Utiliser les totaux calculés dans _loadSorties()
     final soldePrevu = totalRevenus - totalSorties - totalDepenses;
     final soldeDebite = totalRevenus - totalPointe - totalDepensesPointees;
     
@@ -647,7 +703,7 @@ class _SortiesTabState extends State<SortiesTab> {
       ),
       child: Column(
         children: [
-          // Ligne de contrôles (existante)
+          // Ligne de contrôles
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -656,53 +712,42 @@ class _SortiesTabState extends State<SortiesTab> {
                 children: [
                   if (filteredSorties.isNotEmpty)
                     InkWell(
-                      onTap: _toggleSelectionMode,
+                      onTap: () {
+                        setState(() {
+                          _isSelectionMode = !_isSelectionMode;
+                          if (!_isSelectionMode) {
+                            _selectedIndices.clear();
+                          }
+                        });
+                      },
                       child: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(25),
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withOpacity(0.5)),
                         ),
                         child: Icon(
                           _isSelectionMode ? Icons.close : Icons.checklist,
                           color: Colors.white,
-                          size: 24,
+                          size: 20,
                         ),
                       ),
                     ),
-                  
                   const SizedBox(width: 8),
-
                   InkWell(
                     onTap: _showFilterDialog,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(25),
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white.withOpacity(0.5)),
                       ),
                       child: const Icon(
-                        Icons.filter_alt,
+                        Icons.filter_list,
                         color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(width: 8),
-                  
-                  InkWell(
-                    onTap: _addSortie,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 28,
+                        size: 20,
                       ),
                     ),
                   ),
@@ -711,97 +756,86 @@ class _SortiesTabState extends State<SortiesTab> {
             ],
           ),
           
-          const SizedBox(height: 15),
+          const SizedBox(height: 16),
           
-          // Informations financières
-          Column(
+          // Total des charges
+          Text(
+            '${AmountParser.formatAmount(totalSorties)} €',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          
+          const SizedBox(height: 10),
+          
+          // Soldes prévu et débité
+          Row(
             children: [
-              const Text(
-                'Charges',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Solde Prévu',
+                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                      ),
+                      Text(
+                        '${AmountParser.formatAmount(soldePrevu)} €',
+                        style: TextStyle(
+                          color: soldePrevu >= 0 ? Colors.white : Colors.orange.shade200,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              Text(
-                '${AmountParser.formatAmount(totalSorties)} €',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              
-              const SizedBox(height: 10),
-              
-              // Soldes prévu et débité
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Solde Prévu',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
-                          ),
-                          Text(
-                            '${AmountParser.formatAmount(soldePrevu)} €',
-                            style: TextStyle(
-                              color: soldePrevu >= 0 ? Colors.white : Colors.orange.shade200,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.white.withOpacity(0.5)),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Solde Débité',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Solde Débité',
-                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            '${AmountParser.formatAmount(soldeDebite)} €',
-                            style: TextStyle(
-                              color: soldeDebite >= 0 ? Colors.green.shade200 : Colors.orange.shade200,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      Text(
+                        '${AmountParser.formatAmount(soldeDebite)} €',
+                        style: TextStyle(
+                          color: soldeDebite >= 0 ? Colors.green.shade200 : Colors.orange.shade200,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ],
-              ),
-              
-              const SizedBox(height: 5),
-              Text(
-                '${filteredSorties.length} charge${filteredSorties.length > 1 ? 's' : ''} • ${filteredSorties.where((s) => s['isPointed'] == true).length} pointée${filteredSorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
                 ),
               ),
             ],
+          ),
+          
+          const SizedBox(height: 5),
+          Text(
+            '${filteredSorties.length} charge${filteredSorties.length > 1 ? 's' : ''} • ${filteredSorties.where((s) => s['isPointed'] == true).length} pointée${filteredSorties.where((s) => s['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
           ),
         ],
       ),

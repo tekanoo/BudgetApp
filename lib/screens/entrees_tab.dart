@@ -54,8 +54,87 @@ class _EntreesTabState extends State<EntreesTab> {
     try {
       final data = await _dataService.getEntrees();
       
+      // Charger TOUTES les données pour les calculs
+      final sortiesData = await _dataService.getSorties();
+      final plaisirsData = await _dataService.getPlaisirs();
+      
       setState(() {
         entrees = data;
+        
+        // Calculer les totaux selon le mois sélectionné
+        if (widget.selectedMonth != null) {
+          // Calculs mensuels pour le mois sélectionné
+          totalSorties = sortiesData.where((s) {
+            final date = DateTime.tryParse(s['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month;
+          }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+          
+          totalDepenses = plaisirsData.where((p) {
+            final date = DateTime.tryParse(p['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month;
+          }).fold(0.0, (sum, p) {
+            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+            if (p['isCredit'] == true) {
+              return sum - amount; // Les crédits réduisent le total des dépenses
+            } else {
+              return sum + amount; // Les dépenses normales augmentent le total
+            }
+          });
+          
+          totalSortiesPointees = sortiesData.where((s) {
+            final date = DateTime.tryParse(s['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month &&
+                   s['isPointed'] == true;
+          }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+          
+          totalDepensesPointees = plaisirsData.where((p) {
+            final date = DateTime.tryParse(p['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month &&
+                   p['isPointed'] == true;
+          }).fold(0.0, (sum, p) {
+            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+            if (p['isCredit'] == true) {
+              return sum - amount; // Les crédits pointés réduisent
+            } else {
+              return sum + amount; // Les dépenses pointées augmentent
+            }
+          });
+        } else {
+          // Calculs globaux (code existant)
+          totalSorties = sortiesData.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+          totalDepenses = plaisirsData.fold(0.0, (sum, p) {
+            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+            if (p['isCredit'] == true) {
+              return sum - amount;
+            } else {
+              return sum + amount;
+            }
+          });
+          
+          totalSortiesPointees = sortiesData
+              .where((s) => s['isPointed'] == true)
+              .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+          
+          totalDepensesPointees = plaisirsData
+              .where((p) => p['isPointed'] == true)
+              .fold(0.0, (sum, p) {
+                final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+                if (p['isCredit'] == true) {
+                  return sum - amount;
+                } else {
+                  return sum + amount;
+                }
+              });
+        }
+        
         // Si un mois spécifique est sélectionné, filtrer automatiquement
         if (widget.selectedMonth != null) {
           _currentFilter = 'Mois';
@@ -158,8 +237,85 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
+  void _showFilterDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Filtrer les revenus'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('Tous'),
+              leading: Radio<String>(
+                value: 'Tous',
+                groupValue: _currentFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _currentFilter = value!;
+                    _selectedFilterDate = null;
+                  });
+                  Navigator.pop(context);
+                  _applyFilter();
+                },
+              ),
+            ),
+            ListTile(
+              title: const Text('Pointés'),
+              leading: Radio<String>(
+                value: 'Pointés',
+                groupValue: _currentFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _currentFilter = value!;
+                    _selectedFilterDate = null;
+                  });
+                  Navigator.pop(context);
+                  _applyFilter();
+                },
+              ),
+            ),
+            ListTile(
+              title: const Text('Non pointés'),
+              leading: Radio<String>(
+                value: 'Non pointés',
+                groupValue: _currentFilter,
+                onChanged: (value) {
+                  setState(() {
+                    _currentFilter = value!;
+                    _selectedFilterDate = null;
+                  });
+                  Navigator.pop(context);
+                  _applyFilter();
+                },
+              ),
+            ),
+            ListTile(
+              title: const Text('Par mois'),
+              leading: Radio<String>(
+                value: 'Mois',
+                groupValue: _currentFilter,
+                onChanged: (value) {
+                  Navigator.pop(context);
+                  _pickFilterDate();
+                },
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Fermer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildFinancialHeader() {
-    final soldePrevu = totalEntrees - totalSorties - totalDepenses; 
+    // Utiliser les totaux calculés dans _loadEntrees()
+    final soldePrevu = totalEntrees - totalSorties - totalDepenses;
     final soldeDebite = totalEntrees - totalSortiesPointees - totalDepensesPointees;
     
     return Container(
@@ -174,7 +330,7 @@ class _EntreesTabState extends State<EntreesTab> {
         borderRadius: BorderRadius.circular(15),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.green.withValues(alpha: 0.3),
             blurRadius: 10,
             offset: const Offset(0, 5),
           ),
@@ -182,39 +338,54 @@ class _EntreesTabState extends State<EntreesTab> {
       ),
       child: Column(
         children: [
+          // Ligne de contrôles
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Icon(Icons.trending_up, color: Colors.white, size: 24),
               const SizedBox(width: 8),
-              const Text(
-                'REVENUS',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                ),
-              ),
-              const Spacer(),
-              // Menu filtres
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.filter_list, color: Colors.white),
-                onSelected: (value) {
-                  setState(() {
-                    _currentFilter = value;
-                    if (value == 'Mois') {
-                      _pickFilterDate();
-                    } else {
-                      _selectedFilterDate = null;
-                      _applyFilter();
-                    }
-                  });
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'Tous', child: Text('Tous')),
-                  const PopupMenuItem(value: 'Pointés', child: Text('Pointés')),
-                  const PopupMenuItem(value: 'Non pointés', child: Text('Non pointés')),
-                  const PopupMenuItem(value: 'Mois', child: Text('Par mois')),
+              Row(
+                children: [
+                  if (filteredEntrees.isNotEmpty)
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _isSelectionMode = !_isSelectionMode;
+                          if (!_isSelectionMode) {
+                            _selectedIndices.clear();
+                          }
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                        ),
+                        child: Icon(
+                          _isSelectionMode ? Icons.close : Icons.checklist,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  InkWell(
+                    onTap: _showFilterDialog,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
+                      ),
+                      child: const Icon(
+                        Icons.filter_list,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
@@ -224,7 +395,7 @@ class _EntreesTabState extends State<EntreesTab> {
           
           // Total des revenus
           Text(
-            '${AmountParser.formatAmount(filteredEntrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0)))} €',
+            '${AmountParser.formatAmount(totalEntrees)} €',
             style: const TextStyle(
               color: Colors.white,
               fontSize: 28,
@@ -241,9 +412,9 @@ class _EntreesTabState extends State<EntreesTab> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     children: [
@@ -254,7 +425,7 @@ class _EntreesTabState extends State<EntreesTab> {
                       Text(
                         '${AmountParser.formatAmount(soldePrevu)} €',
                         style: TextStyle(
-                          color: soldePrevu >= 0 ? Colors.white : Colors.red.shade200,
+                          color: soldePrevu >= 0 ? Colors.white : Colors.orange.shade200,
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
@@ -268,15 +439,15 @@ class _EntreesTabState extends State<EntreesTab> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.3)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                   ),
                   child: Column(
                     children: [
                       const Text(
                         'Solde Débité',
-                        style: TextStyle(color: Colors.white70, fontSize: 12),
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
                       ),
                       Text(
                         '${AmountParser.formatAmount(soldeDebite)} €',
@@ -315,6 +486,7 @@ class _EntreesTabState extends State<EntreesTab> {
     );
     if (date != null) {
       setState(() {
+        _currentFilter = 'Mois';
         _selectedFilterDate = date;
       });
       _applyFilter();
