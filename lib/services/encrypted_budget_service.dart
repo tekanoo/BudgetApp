@@ -99,9 +99,12 @@ Future<void> togglePlaisirPointing(int index) async {
         if (plaisir['isPointed'] == true) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
-            total -= amount; // Les virements/remboursements pointés réduisent le total
+            // CORRECTION : Les virements/remboursements pointés RÉDUISENT le total des "dépenses"
+            // (car ils sont en fait des revenus qui viennent en déduction)
+            total -= amount;
           } else {
-            total += amount; // Les dépenses pointées augmentent le total
+            // Les dépenses pointées augmentent le total
+            total += amount;
           }
         }
       }
@@ -159,30 +162,33 @@ Future<void> togglePlaisirPointing(int index) async {
         }
       }
       
-      // CORRECTION : Calcul des dépenses pointées avec gestion correcte des crédits
+      // CORRECTION : Séparer les virements des dépenses pointées
       double totalDepensesPointees = 0.0;
+      double totalVirementsPointes = 0.0;
+      
       for (var plaisir in plaisirs) {
         if (plaisir['isPointed'] == true) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
-            // Les virements/remboursements pointés AUGMENTENT le solde disponible
-            totalDepensesPointees -= amount; // On soustrait car on va soustraire le total dans la formule
+            // Les virements/remboursements pointés AJOUTENT au solde
+            totalVirementsPointes += amount;
           } else {
-            // Les dépenses normales pointées DIMINUENT le solde disponible
+            // Les dépenses normales pointées DIMINUENT le solde
             totalDepensesPointees += amount;
           }
         }
       }
       
-      // Formule : Revenus pointés - Charges pointées - Dépenses pointées (avec crédits en positif)
-      final result = totalRevenusPointes - totalChargesPointees - totalDepensesPointees;
+      // Formule corrigée : Revenus pointés + Virements pointés - Charges pointées - Dépenses pointées
+      final result = totalRevenusPointes + totalVirementsPointes - totalChargesPointees - totalDepensesPointees;
       
       if (kDebugMode) {
         print('🔍 CALCUL SOLDE DÉBITÉ (CORRIGÉ):');
         print('  - Revenus pointés: $totalRevenusPointes €');
+        print('  - Virements pointés: $totalVirementsPointes €');
         print('  - Charges pointées: $totalChargesPointees €');
-        print('  - Dépenses pointées (net): $totalDepensesPointees €');
-        print('  - FORMULE: $totalRevenusPointes - $totalChargesPointees - $totalDepensesPointees = $result €');
+        print('  - Dépenses pointées: $totalDepensesPointees €');
+        print('  - FORMULE: $totalRevenusPointes + $totalVirementsPointes - $totalChargesPointees - $totalDepensesPointees = $result €');
       }
       
       return result;
