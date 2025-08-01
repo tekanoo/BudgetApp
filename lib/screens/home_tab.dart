@@ -70,7 +70,14 @@ class _HomeTabState extends State<HomeTab> {
           return date != null && 
                  date.year == widget.selectedMonth!.year &&
                  date.month == widget.selectedMonth!.month;
-        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+        }).fold(0.0, (sum, p) {
+          final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+          if (p['isCredit'] == true) {
+            return sum - amount; // Les virements réduisent le total
+          } else {
+            return sum + amount; // Les dépenses augmentent le total
+          }
+        });
         
         // Calculer les montants pointés pour ce mois
         final monthlySortiesPointees = sorties.where((s) {

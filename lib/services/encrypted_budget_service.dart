@@ -97,7 +97,12 @@ Future<void> togglePlaisirPointing(int index) async {
       
       for (var plaisir in plaisirs) {
         if (plaisir['isPointed'] == true) {
-          total += (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+          final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
+          if (plaisir['isCredit'] == true) {
+            total -= amount; // Les virements/remboursements pointés réduisent le total
+          } else {
+            total += amount; // Les dépenses pointées augmentent le total
+          }
         }
       }
       
