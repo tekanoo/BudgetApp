@@ -49,19 +49,45 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     try {
       final data = await _dataService.getPlaisirs();
       
-      // Charger aussi les totaux pour les calculs
-      final totals = await _dataService.getTotals();
-      final charges = await _dataService.getSorties();
+      // Charger TOUTES les données pour les calculs
+      final entreesData = await _dataService.getEntrees();
+      final sortiesData = await _dataService.getSorties();
       
       setState(() {
         plaisirs = data;
-        totalRevenus = totals['entrees'] ?? 0.0;
-        totalCharges = totals['sorties'] ?? 0.0;
         
-        // Calculer charges pointées
-        totalChargesPointees = charges
-            .where((s) => s['isPointed'] == true)
-            .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        // Calculer les totaux selon le mois sélectionné
+        if (widget.selectedMonth != null) {
+          // Calculs mensuels
+          totalRevenus = entreesData.where((e) {
+            final date = DateTime.tryParse(e['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month;
+          }).fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          
+          totalCharges = sortiesData.where((s) {
+            final date = DateTime.tryParse(s['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month;
+          }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+          
+          totalChargesPointees = sortiesData.where((s) {
+            final date = DateTime.tryParse(s['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month &&
+                   s['isPointed'] == true;
+          }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        } else {
+          // Calculs globaux (code existant)
+          totalRevenus = entreesData.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          totalCharges = sortiesData.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+          totalChargesPointees = sortiesData
+              .where((s) => s['isPointed'] == true)
+              .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+        }
         
         // Si un mois spécifique est sélectionné, filtrer automatiquement
         if (widget.selectedMonth != null) {
@@ -163,147 +189,40 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   }
 
   Widget _buildFinancialHeader() {
-    final soldePrevu = totalRevenus - totalPlaisirs - totalCharges;
-    final soldeDebite = totalRevenus - totalPointe - totalChargesPointees;
-    
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.purple.shade400, Colors.purple.shade600],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(15),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.purple.withOpacity(0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 5),
-          ),
-        ],
+  // Utiliser les totaux calculés dans _loadPlaisirs()
+  final soldePrevu = totalRevenus - totalPlaisirs - totalCharges;
+  final soldeDebite = totalRevenus - totalPointe - totalChargesPointees;
+  
+  return Container(
+    margin: const EdgeInsets.all(16),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Colors.purple.shade400, Colors.purple.shade600],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
       ),
-      child: Column(
-        children: [
-          // Ligne de contrôles
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const SizedBox(width: 8),
-              Row(
-                children: [
-                  if (filteredPlaisirs.isNotEmpty)
-                    InkWell(
-                      onTap: _toggleSelectionMode,
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        child: Icon(
-                          _isSelectionMode ? Icons.close : Icons.checklist,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  
-                  const SizedBox(width: 8),
-
+      borderRadius: BorderRadius.circular(15),
+      boxShadow: [
+        BoxShadow(
+          color: Colors.purple.withOpacity(0.3),
+          blurRadius: 10,
+          offset: const Offset(0, 5),
+        ),
+      ],
+    ),
+    child: Column(
+      children: [
+        // Ligne de contrôles (filtres, etc.)
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const SizedBox(width: 8),
+            Row(
+              children: [
+                if (filteredPlaisirs.isNotEmpty)
                   InkWell(
-                    onTap: _showFilterDialog,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: const Icon(
-                        Icons.filter_alt,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(width: 8),
-                  
-                  InkWell(
-                    onTap: _addPlaisir,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: const Icon(
-                        Icons.add,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-          
-          const SizedBox(height: 15),
-          
-          // Informations financières
-          Column(
-            children: [
-              const Text(
-                'Dépenses',
-                style: TextStyle(
-                  color: Colors.white70,
-                  fontSize: 16,
-                ),
-              ),
-              Text(
-                '${AmountParser.formatAmount(totalPlaisirs)} €',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              
-              const SizedBox(height: 10),
-              
-              // Soldes prévu et débité
-              Row(
-                children: [
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withOpacity(0.3)),
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Solde Prévu',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
-                          ),
-                          Text(
-                            '${AmountParser.formatAmount(soldePrevu)} €',
-                            style: TextStyle(
-                              color: soldePrevu >= 0 ? Colors.white : Colors.red.shade200,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
+                    onTap: _toggleSelectionMode,
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
@@ -311,40 +230,119 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.white.withOpacity(0.5)),
                       ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'Solde Débité',
-                            style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          ),
-                          Text(
-                            '${AmountParser.formatAmount(soldeDebite)} €',
-                            style: TextStyle(
-                              color: soldeDebite >= 0 ? Colors.green.shade200 : Colors.red.shade200,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
+                      child: Icon(
+                        _isSelectionMode ? Icons.close : Icons.checklist,
+                        color: Colors.white,
+                        size: 20,
                       ),
                     ),
                   ),
-                ],
-              ),
-              
-              const SizedBox(height: 5),
-              Text(
-                '${filteredPlaisirs.length} dépense${filteredPlaisirs.length > 1 ? 's' : ''} • ${filteredPlaisirs.where((p) => p['isPointed'] == true).length} pointée${filteredPlaisirs.where((p) => p['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontSize: 14,
+                const SizedBox(width: 8),
+                InkWell(
+                  onTap: _showFilterDialog,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                    ),
+                    child: const Icon(
+                      Icons.filter_list,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 16),
+        
+        // Total des dépenses
+        Text(
+          '${AmountParser.formatAmount(totalPlaisirs)} €',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        
+        const SizedBox(height: 10),
+        
+        // Soldes prévu et débité
+        Row(
+          children: [
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Solde Prévu',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    Text(
+                      '${AmountParser.formatAmount(soldePrevu)} €',
+                      style: TextStyle(
+                        color: soldePrevu >= 0 ? Colors.white : Colors.orange.shade200,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.white.withOpacity(0.5)),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'Solde Débité',
+                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      '${AmountParser.formatAmount(soldeDebite)} €',
+                      style: TextStyle(
+                        color: soldeDebite >= 0 ? Colors.green.shade200 : Colors.orange.shade200,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 5),
+        Text(
+          '${filteredPlaisirs.length} dépense${filteredPlaisirs.length > 1 ? 's' : ''} • ${filteredPlaisirs.where((p) => p['isPointed'] == true).length} pointée${filteredPlaisirs.where((p) => p['isPointed'] == true).length > 1 ? 's' : ''}${_currentFilter != 'Tous' ? ' • $_currentFilter' : ''}',
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 14,
           ),
-        ],
-      ),
-    );
+        ),
+      ],
+    ),
+  );
   }
 
   @override
