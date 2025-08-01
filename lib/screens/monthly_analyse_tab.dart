@@ -1,3 +1,5 @@
+// lib/screens/monthly_analyse_tab.dart - Version corrigée
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../services/encrypted_budget_service.dart';
@@ -217,7 +219,7 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
           
           const SizedBox(height: 20),
 
-          // NOUVEAU : Carte des ratios financiers
+          // NOUVEAU : Carte des ratios financiers avec méthode corrigée
           Card(
             elevation: 4,
             child: Padding(
@@ -431,6 +433,7 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
     return sections;
   }
 
+  // CORRECTION : Méthode _buildFinancialRatios corrigée
   List<Widget> _buildFinancialRatios() {
     if (totalEntrees <= 0) {
       return [
@@ -689,19 +692,31 @@ class _MonthlyAnalyseTabState extends State<MonthlyAnalyseTab> {
     int score = 0;
     
     // Score charges (30 points max)
-    if (chargesRatio <= 50) score += 30;
-    else if (chargesRatio <= 65) score += 20;
-    else if (chargesRatio <= 80) score += 10;
+    if (chargesRatio <= 50) {
+      score += 30;
+    } else if (chargesRatio <= 65) {
+      score += 20;
+    } else if (chargesRatio <= 80) {
+      score += 10;
+    }
     
     // Score dépenses (35 points max)
-    if (depensesRatio <= 20) score += 35;
-    else if (depensesRatio <= 35) score += 25;
-    else if (depensesRatio <= 50) score += 15;
+    if (depensesRatio <= 20) {
+      score += 35;
+    } else if (depensesRatio <= 35) {
+      score += 25;
+    } else if (depensesRatio <= 50) {
+      score += 15;
+    }
     
     // Score épargne (35 points max)
-    if (epargneRatio >= 20) score += 35;
-    else if (epargneRatio >= 10) score += 25;
-    else if (epargneRatio >= 0) score += 10;
+    if (epargneRatio >= 20) {
+      score += 35;
+    } else if (epargneRatio >= 10) {
+      score += 25;
+    } else if (epargneRatio >= 0) {
+      score += 10;
+    }
     
     Color scoreColor;
     String scoreLabel;
