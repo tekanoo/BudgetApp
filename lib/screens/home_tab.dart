@@ -28,7 +28,6 @@ class _HomeTabState extends State<HomeTab> {
   double _monthlyPlaisirs = 0.0;
   double _monthlySortiesPointees = 0.0;
   double _monthlyPlaisirsPointees = 0.0;
-  double _monthlyVirementsPointes = 0.0; // NOUVEAU
   List<String> _availableTags = [];
   
   @override
@@ -46,7 +45,7 @@ class _HomeTabState extends State<HomeTab> {
   Future<void> _loadMonthlyData() async {
     try {
       if (widget.selectedMonth != null) {
-        // Calculs pour le mois sélectionné
+        // Filtrer par mois sélectionné
         final entrees = await _dataService.getEntrees();
         final sorties = await _dataService.getSorties();
         final plaisirs = await _dataService.getPlaisirs();
@@ -110,63 +109,21 @@ class _HomeTabState extends State<HomeTab> {
           }
         });
         
-        // NOUVEAU : Calculer les virements pointés pour les ajouter aux revenus
-        final monthlyVirementsPointes = plaisirs.where((p) {
-          final date = DateTime.tryParse(p['date'] ?? '');
-          return date != null && 
-                 date.year == widget.selectedMonth!.year &&
-                 date.month == widget.selectedMonth!.month &&
-                 p['isPointed'] == true &&
-                 p['isCredit'] == true; // Seulement les virements
-        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-        
-        // CORRECTION : Calculer aussi les virements pour le solde prévu
-        final monthlyVirements = plaisirs.where((p) {
-          final date = DateTime.tryParse(p['date'] ?? '');
-          return date != null && 
-                 date.year == widget.selectedMonth!.year &&
-                 date.month == widget.selectedMonth!.month &&
-                 p['isCredit'] == true; // Seulement les virements
-        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
-        
         setState(() {
-          _monthlyEntrees = monthlyEntrees + monthlyVirements; // CORRECTION : Ajouter virements aux revenus pour solde prévu
+          _monthlyEntrees = monthlyEntrees;
           _monthlySorties = monthlySorties;
-          _monthlyPlaisirs = monthlyPlaisirs; // Maintenant sans les virements
+          _monthlyPlaisirs = monthlyPlaisirs;
           _monthlySortiesPointees = monthlySortiesPointees;
-          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // Maintenant sans les virements pointés
-          _monthlyVirementsPointes = monthlyVirementsPointes; // Pour le solde débité
+          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // Maintenant corrigé
         });
       } else {
-        // CORRECTION : Pour le calcul global, utiliser le service corrigé
+        // Comportement normal (toutes les données)
         final totals = await _dataService.getTotals();
         
-        // Recalculer les totaux en séparant les virements
-        final entrees = await _dataService.getEntrees();
-        final sorties = await _dataService.getSorties();
-        final plaisirs = await _dataService.getPlaisirs();
-        
-        final totalEntreesAmount = entrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
-        final totalSortiesAmount = sorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
-        
-        double totalPlaisirsAmount = 0.0;
-        double totalVirementsAmount = 0.0;
-        
-        for (var plaisir in plaisirs) {
-          final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
-          if (plaisir['isCredit'] == true) {
-            totalVirementsAmount += amount; // Les virements vont aux revenus
-          } else {
-            totalPlaisirsAmount += amount; // Les vraies dépenses
-          }
-        }
-        
         setState(() {
-          _monthlyEntrees = totalEntreesAmount + totalVirementsAmount; // Revenus + virements
-          _monthlySorties = totalSortiesAmount;
-          _monthlyPlaisirs = totalPlaisirsAmount; // Seulement les vraies dépenses
-          _monthlySortiesPointees = totals['plaisirsTotaux'] ?? 0.0; // Utiliser la valeur du service
-          _monthlyPlaisirsPointees = totals['plaisirsTotaux'] ?? 0.0; // Temporaire
+          _monthlyEntrees = totals['entrees'] ?? 0.0;
+          _monthlySorties = totals['sorties'] ?? 0.0;
+          _monthlyPlaisirs = totals['plaisirs'] ?? 0.0;
         });
       }
     } catch (e) {
@@ -355,9 +312,7 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildSummaryCards(double solde) {
-    // CORRECTION : Le solde est maintenant calculé correctement avec les virements inclus dans les revenus
-    final soldePrevu = _monthlyEntrees - _monthlySorties - _monthlyPlaisirs; // Formule correcte
-    final soldeDebiteCalcule = _monthlyEntrees + _monthlyVirementsPointes - _monthlySortiesPointees - _monthlyPlaisirsPointees;
+    final soldeDebiteCalcule = _monthlyEntrees - _monthlySortiesPointees - _monthlyPlaisirsPointees;
     
     return Column(
       children: [
@@ -367,14 +322,14 @@ class _HomeTabState extends State<HomeTab> {
             // Solde Prévu
             Expanded(
               child: Card(
-                color: soldePrevu >= 0 ? Colors.blue.shade50 : Colors.red.shade50,
+                color: solde >= 0 ? Colors.blue.shade50 : Colors.red.shade50,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
                       Icon(
-                        soldePrevu >= 0 ? Icons.trending_up : Icons.trending_down,
-                        color: soldePrevu >= 0 ? Colors.blue.shade600 : Colors.red.shade600,
+                        solde >= 0 ? Icons.trending_up : Icons.trending_down,
+                        color: solde >= 0 ? Colors.blue.shade600 : Colors.red.shade600,
                         size: 32,
                       ),
                       const SizedBox(height: 8),
@@ -383,11 +338,11 @@ class _HomeTabState extends State<HomeTab> {
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        '${AmountParser.formatAmount(soldePrevu)} €',
+                        '${AmountParser.formatAmount(solde)} €',
                         style: TextStyle(
-                          fontSize: 20,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: soldePrevu >= 0 ? Colors.blue.shade600 : Colors.red.shade600,
+                          color: solde >= 0 ? Colors.blue.shade700 : Colors.red.shade700,
                         ),
                       ),
                     ],
