@@ -930,6 +930,13 @@ class _SortiesTabState extends State<SortiesTab> {
     }
 
     return Scaffold(
+      // AJOUTER un FloatingActionButton pour toujours avoir accès au bouton d'ajout
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addSortie,
+        backgroundColor: Colors.red,
+        child: const Icon(Icons.add, color: Colors.white),
+        tooltip: 'Ajouter une charge',
+      ),
       body: Stack(
         children: [
           filteredSorties.isEmpty
@@ -960,16 +967,17 @@ class _SortiesTabState extends State<SortiesTab> {
                         style: TextStyle(color: Colors.grey),
                         textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 30),
-                      ElevatedButton.icon(
-                        onPressed: _addSortie,
-                        icon: const Icon(Icons.add),
-                        label: const Text('Ajouter une charge'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
+                      // RETIRER ce bouton car on a maintenant le FloatingActionButton
+                      // const SizedBox(height: 30),
+                      // ElevatedButton.icon(
+                      //   onPressed: _addSortie,
+                      //   icon: const Icon(Icons.add),
+                      //   label: const Text('Ajouter une charge'),
+                      //   style: ElevatedButton.styleFrom(
+                      //     backgroundColor: Colors.red,
+                      //     foregroundColor: Colors.white,
+                      //   ),
+                      // ),
                     ],
                   ),
                 )
@@ -977,6 +985,39 @@ class _SortiesTabState extends State<SortiesTab> {
                   children: [
                     // En-tête avec totaux et filtres
                     _buildFinancialHeader(),
+
+                    // Barre d'outils avec bouton sélection multiple
+                    if (filteredSorties.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          children: [
+                            TextButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _isSelectionMode = !_isSelectionMode;
+                                  if (!_isSelectionMode) {
+                                    _selectedIndices.clear();
+                                  }
+                                });
+                              },
+                              icon: Icon(_isSelectionMode ? Icons.close : Icons.checklist),
+                              label: Text(_isSelectionMode ? 'Annuler' : 'Sélection multiple'),
+                            ),
+                            const Spacer(),
+                            // AJOUTER un bouton d'ajout dans la barre d'outils aussi
+                            IconButton(
+                              onPressed: _addSortie,
+                              icon: const Icon(Icons.add),
+                              tooltip: 'Ajouter une charge',
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
 
                     // Liste des charges filtrées
                     Expanded(
@@ -991,7 +1032,7 @@ class _SortiesTabState extends State<SortiesTab> {
                           final isPointed = sortie['isPointed'] == true;
                           final isSelected = _selectedIndices.contains(index);
                           final pointedAt = sortie['pointedAt'] != null 
-                              ? DateTime.tryParse(sortie['pointedAt']) 
+                              ? DateTime.tryParse(sortie['pointedAt'] as String)
                               : null;
                           
                           return Container(
@@ -1188,24 +1229,33 @@ class _SortiesTabState extends State<SortiesTab> {
           // CORRECTION: Créer un widget simple au lieu d'utiliser PointingWidget
           if (_isSelectionMode && _selectedIndices.isNotEmpty)
             Positioned(
-              bottom: 80,
-              left: 16,
-              right: 16,
-              child: Card(
-                elevation: 8,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade700,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, -2),
+                    ),
+                  ],
+                ),
+                child: SafeArea(
                   child: Row(
                     children: [
                       Expanded(
                         child: Text(
                           '${_selectedIndices.length} charge${_selectedIndices.length > 1 ? 's' : ''} sélectionnée${_selectedIndices.length > 1 ? 's' : ''}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                       ),
                       const SizedBox(width: 16),
                       if (_isProcessingBatch)
-                        const CircularProgressIndicator(strokeWidth: 2)
+                        const CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
                       else ...[
                         ElevatedButton.icon(
                           onPressed: _batchTogglePointing,
