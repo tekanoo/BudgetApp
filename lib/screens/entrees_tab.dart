@@ -38,6 +38,10 @@ class _EntreesTabState extends State<EntreesTab> {
   double totalDepenses = 0.0;
   double totalSortiesPointees = 0.0;
   double totalDepensesPointees = 0.0;
+  
+  // AJOUTER ces variables manquantes pour les revenus
+  double totalRevenus = 0.0;
+  double totalRevenuPointe = 0.0;
 
   @override
   void initState() {
@@ -61,9 +65,24 @@ class _EntreesTabState extends State<EntreesTab> {
       setState(() {
         entrees = data;
         
-        // Calculer les totaux selon le mois sélectionné
+        // AJOUTER le calcul des totaux de revenus
         if (widget.selectedMonth != null) {
           // Calculs mensuels pour le mois sélectionné
+          totalRevenus = entrees.where((e) {
+            final date = DateTime.tryParse(e['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month;
+          }).fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          
+          totalRevenuPointe = entrees.where((e) {
+            final date = DateTime.tryParse(e['date'] ?? '');
+            return date != null && 
+                   date.year == widget.selectedMonth!.year &&
+                   date.month == widget.selectedMonth!.month &&
+                   e['isPointed'] == true;
+          }).fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          
           totalSorties = sortiesData.where((s) {
             final date = DateTime.tryParse(s['date'] ?? '');
             return date != null && 
@@ -108,7 +127,12 @@ class _EntreesTabState extends State<EntreesTab> {
             }
           });
         } else {
-          // Calculs globaux (code existant)
+          // Calculs globaux
+          totalRevenus = entrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          totalRevenuPointe = entrees
+              .where((e) => e['isPointed'] == true)
+              .fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
+          
           totalSorties = sortiesData.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
           totalDepenses = plaisirsData.fold(0.0, (sum, p) {
             final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
@@ -473,6 +497,116 @@ class _EntreesTabState extends State<EntreesTab> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard() {
+    final soldeDebite = (totalRevenus - totalSorties - totalDepenses);
+    
+    return Card(
+      elevation: 4,
+      color: Colors.green.shade700,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            // Ligne du titre avec le bouton de copie
+            Row(
+              children: [
+                const Icon(Icons.account_balance_wallet, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Résumé des revenus',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                // AJOUTER le bouton de copie (uniquement si on est dans la vue mensuelle)
+                if (widget.selectedMonth != null) ...[
+                  IconButton(
+                    onPressed: _copyRevenuesToNextMonth,
+                    icon: const Icon(Icons.content_copy, color: Colors.white),
+                    tooltip: 'Copier vers le mois suivant',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withValues(alpha: 0.2),
+                      padding: const EdgeInsets.all(8),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Reste du contenu existant
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  children: [
+                    const Text(
+                      'Total Revenus',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    Text(
+                      '${totalRevenus.toStringAsFixed(2).replaceAll('.', ',')} €',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  height: 30,
+                  width: 1,
+                  color: Colors.white30,
+                ),
+                Column(
+                  children: [
+                    const Text(
+                      'Non pointé',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    Text(
+                      '${(totalRevenus - totalRevenuPointe).toStringAsFixed(2).replaceAll('.', ',')} €',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  height: 30,
+                  width: 1,
+                  color: Colors.white30,
+                ),
+                Column(
+                  children: [
+                    const Text(
+                      'Solde',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    Text(
+                      '${soldeDebite.toStringAsFixed(2).replaceAll('.', ',')} €',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: soldeDebite >= 0 ? Colors.white : Colors.red.shade200,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -925,6 +1059,249 @@ class _EntreesTabState extends State<EntreesTab> {
     }
   }
 
+  // AJOUTER cette nouvelle méthode pour copier les revenus vers le mois suivant
+  Future<void> _copyRevenuesToNextMonth() async {
+    if (widget.selectedMonth == null) return;
+
+    // Calculer le mois suivant
+    final nextMonth = DateTime(
+      widget.selectedMonth!.month == 12 
+          ? widget.selectedMonth!.year + 1 
+          : widget.selectedMonth!.year,
+      widget.selectedMonth!.month == 12 
+          ? 1 
+          : widget.selectedMonth!.month + 1,
+    );
+
+    final currentMonthName = _getMonthName(widget.selectedMonth!.month);
+    final nextMonthName = _getMonthName(nextMonth.month);
+
+    // Vérifier s'il y a des revenus à copier pour le mois actuel
+    final currentMonthRevenus = entrees.where((revenu) {
+      final date = DateTime.tryParse(revenu['date'] ?? '');
+      return date != null && 
+             date.year == widget.selectedMonth!.year &&
+             date.month == widget.selectedMonth!.month;
+    }).toList();
+
+    if (currentMonthRevenus.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Aucun revenu trouvé pour $currentMonthName ${widget.selectedMonth!.year}'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    // Demander confirmation
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.content_copy, color: Colors.green),
+            SizedBox(width: 12),
+            Text('Copier les revenus'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Copier tous les revenus de $currentMonthName ${widget.selectedMonth!.year} vers $nextMonthName ${nextMonth.year} ?',
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            Text('💰 ${currentMonthRevenus.length} revenu(s) à copier :'),
+            const SizedBox(height: 8),
+            Container(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: currentMonthRevenus.map((revenu) {
+                    final amount = (revenu['amount'] as num?)?.toDouble() ?? 0.0;
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 2),
+                      child: Text(
+                        '• ${revenu['description']} - ${amount.toStringAsFixed(2).replaceAll('.', ',')}€',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info, color: Colors.green.shade600),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Les revenus seront copiés avec les mêmes montants et descriptions, mais adaptés aux dates du mois suivant.',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            child: const Text('Copier'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      // Afficher le dialogue de chargement
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('💰 Copie des revenus en cours...'),
+            ],
+          ),
+        ),
+      );
+
+      int copiedCount = 0;
+      int skippedCount = 0;
+      List<String> errors = [];
+
+      // Copier chaque revenu vers le mois suivant
+      for (var revenu in currentMonthRevenus) {
+        try {
+          final originalDate = DateTime.tryParse(revenu['date'] ?? '');
+          if (originalDate == null) {
+            skippedCount++;
+            continue;
+          }
+
+          // Calculer la nouvelle date dans le mois suivant
+          // Garder le même jour, mais ajuster si le mois suivant n'a pas assez de jours
+          final lastDayOfNextMonth = DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
+          final newDay = originalDate.day > lastDayOfNextMonth ? lastDayOfNextMonth : originalDate.day;
+          
+          final newDate = DateTime(nextMonth.year, nextMonth.month, newDay);
+
+          // Ajouter le nouveau revenu
+          await _dataService.addEntree(
+            amountStr: (revenu['amount'] as num).toString(),
+            description: revenu['description'] as String,
+            date: newDate,
+          );
+
+          copiedCount++;
+        } catch (e) {
+          errors.add('${revenu['description']}: $e');
+          skippedCount++;
+        }
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // Fermer le dialogue de chargement
+        
+        // Recharger les données pour voir les nouveaux revenus
+        await _loadEntrees();
+        
+        // Afficher le résultat
+        String message;
+        Color backgroundColor;
+        
+        if (copiedCount > 0 && errors.isEmpty) {
+          message = '✅ $copiedCount revenu(s) copié(s) vers $nextMonthName ${nextMonth.year}';
+          backgroundColor = Colors.green;
+        } else if (copiedCount > 0 && errors.isNotEmpty) {
+          message = '⚠️ $copiedCount copiés, $skippedCount échoués vers $nextMonthName ${nextMonth.year}';
+          backgroundColor = Colors.orange;
+        } else {
+          message = '❌ Aucun revenu copié vers $nextMonthName ${nextMonth.year}';
+          backgroundColor = Colors.red;
+        }
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: backgroundColor,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+        
+        // Afficher les erreurs détaillées si nécessaire
+        if (errors.isNotEmpty && mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('⚠️ Erreurs de copie'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${errors.length} erreur(s) :'),
+                  const SizedBox(height: 8),
+                  ...errors.map((error) => Text('• $error', style: const TextStyle(fontSize: 12))),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Fermer le dialogue de chargement
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur lors de la copie: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  String _getMonthName(int month) {
+    const monthNames = [
+      'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+      'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+    ];
+    return monthNames[month - 1];
+  }
+
   @override
   Widget build(BuildContext context) {
     if (isLoading) {
@@ -990,6 +1367,7 @@ class _EntreesTabState extends State<EntreesTab> {
                   children: [
                     // En-tête avec totaux et filtres
                     _buildFinancialHeader(),
+                    _buildSummaryCard(), // AJOUTER la carte de résumé
 
                     // Barre d'outils avec bouton sélection multiple
                     if (filteredEntrees.isNotEmpty)
