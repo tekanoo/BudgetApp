@@ -161,7 +161,7 @@ Future<void> togglePlaisirPointing(int index) async {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
             // Les virements/remboursements pointés AUGMENTENT le solde disponible
-            totalDepensesPointees -= amount; // On soustrait pour l'ajouter dans la formule finale
+            totalDepensesPointees -= amount; // On soustrait car on va soustraire le total dans la formule
           } else {
             // Les dépenses normales pointées DIMINUENT le solde disponible
             totalDepensesPointees += amount;
@@ -744,17 +744,17 @@ Future<void> togglePlaisirPointing(int index) async {
         
         // Pour le total général (solde prévu)
         if (plaisir['isCredit'] == true) {
-          totalPlaisirs -= amount; // Les crédits AUGMENTENT le solde (donc on soustrait du total dépenses)
+          totalPlaisirs -= amount; // Les crédits réduisent le total des dépenses (donc augmentent le solde)
         } else {
-          totalPlaisirs += amount; // Les dépenses DIMINUENT le solde
+          totalPlaisirs += amount; // Les dépenses augmentent le total des dépenses
         }
         
         // Pour les pointés (solde pointé)
         if (plaisir['isPointed'] == true) {
           if (plaisir['isCredit'] == true) {
-            totalPlaisirsTotaux -= amount; // Les crédits pointés AUGMENTENT le solde pointé
+            totalPlaisirsTotaux -= amount; // Les crédits pointés réduisent le total des dépenses pointées
           } else {
-            totalPlaisirsTotaux += amount; // Les dépenses pointées DIMINUENT le solde pointé
+            totalPlaisirsTotaux += amount; // Les dépenses pointées augmentent le total
           }
         }
       }
