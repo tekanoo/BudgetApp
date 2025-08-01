@@ -94,14 +94,24 @@ class _HomeTabState extends State<HomeTab> {
                  date.year == widget.selectedMonth!.year &&
                  date.month == widget.selectedMonth!.month &&
                  p['isPointed'] == true;
-        }).fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+        }).fold(0.0, (sum, p) {
+          final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+          // CORRECTION : Les virements pointés doivent AUGMENTER le solde
+          if (p['isCredit'] == true) {
+            // Les virements pointés sont des entrées d'argent, donc ils RÉDUISENT le total des "dépenses pointées"
+            return sum - amount;
+          } else {
+            // Les dépenses pointées normales AUGMENTENT le total des dépenses pointées
+            return sum + amount;
+          }
+        });
         
         setState(() {
           _monthlyEntrees = monthlyEntrees;
           _monthlySorties = monthlySorties;
           _monthlyPlaisirs = monthlyPlaisirs;
           _monthlySortiesPointees = monthlySortiesPointees;
-          _monthlyPlaisirsPointees = monthlyPlaisirsPointees;
+          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // Maintenant corrigé
         });
       } else {
         // Comportement normal (toutes les données)
