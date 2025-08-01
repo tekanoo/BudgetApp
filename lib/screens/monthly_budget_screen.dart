@@ -3,6 +3,7 @@ import 'home_tab.dart';
 import 'plaisirs_tab.dart';
 import 'entrees_tab.dart';
 import 'sorties_tab.dart';
+import 'monthly_analyse_tab.dart'; // AJOUTER cet import
 
 class MonthlyBudgetScreen extends StatefulWidget {
   final DateTime selectedMonth;
@@ -30,6 +31,7 @@ class _MonthlyBudgetScreenState extends State<MonthlyBudgetScreen> {
       PlaisirsTab(selectedMonth: widget.selectedMonth),
       EntreesTab(selectedMonth: widget.selectedMonth),
       SortiesTab(selectedMonth: widget.selectedMonth),
+      MonthlyAnalyseTab(selectedMonth: widget.selectedMonth), // AJOUTER l'onglet analyse
     ];
   }
   
@@ -45,7 +47,7 @@ class _MonthlyBudgetScreenState extends State<MonthlyBudgetScreen> {
   @override
   Widget build(BuildContext context) {
     final monthName = _getMonthName(widget.selectedMonth);
-    final tabTitles = ['Dashboard', 'Dépenses', 'Revenus', 'Charges'];
+    final tabTitles = ['Dashboard', 'Dépenses', 'Revenus', 'Charges', 'Analyse']; // AJOUTER 'Analyse'
     
     return Scaffold(
       appBar: AppBar(
@@ -103,6 +105,12 @@ class _MonthlyBudgetScreenState extends State<MonthlyBudgetScreen> {
             icon: Icon(Icons.receipt_long_outlined),
             selectedIcon: Icon(Icons.receipt_long),
             label: 'Charges',
+          ),
+          // AJOUTER la destination Analyse
+          NavigationDestination(
+            icon: Icon(Icons.analytics_outlined),
+            selectedIcon: Icon(Icons.analytics),
+            label: 'Analyse',
           ),
         ],
       ),
