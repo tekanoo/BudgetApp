@@ -378,6 +378,12 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     }
 
     return Scaffold(
+      floatingActionButton: FloatingActionButton(
+        heroTag: 'addDepenseFab',
+        onPressed: _addPlaisir,
+        backgroundColor: Colors.purple,
+        child: const Icon(Icons.add),
+      ),
       body: Stack(
         children: [
           filteredPlaisirs.isEmpty
@@ -686,17 +692,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
         );
         await _loadPlaisirs();
         
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              result['isCredit'] == true 
-                  ? '💰 Virement/Remboursement ajouté avec succès'
-                  : '🔐 Dépense ajoutée et chiffrée avec succès'
-            ),
-            backgroundColor: Colors.green,
-          ),
-        );
+  // Plus de SnackBar de confirmation pour un ajout plus rapide
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
