@@ -26,10 +26,9 @@ class _HomeTabState extends State<HomeTab> {
   double _monthlyEntrees = 0.0;
   double _monthlySorties = 0.0;
   double _monthlyPlaisirs = 0.0;
-  double _monthlySortiesPointees = 0.0;
-  double _monthlyPlaisirsPointees = 0.0;
-  double _monthlyVirementsPointes = 0.0;
-  double _monthlyEntreesPointees = 0.0; // NOUVEAU : pour les revenus normaux pointés
+  double _monthlySortiesPointees = 0.0;      // Charges pointées
+  double _monthlyPlaisirsPointees = 0.0;     // Dépenses (avec virements) pointées
+  double _monthlyEntreesPointees = 0.0;      // Revenus pointés
   List<String> _availableTags = [];
   
   @override
@@ -112,8 +111,7 @@ class _HomeTabState extends State<HomeTab> {
           _monthlySorties = monthlySorties;
           _monthlyPlaisirs = monthlyPlaisirs; // Maintenant sans les virements
           _monthlySortiesPointees = monthlySortiesPointees;
-          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // virements inclus
-          _monthlyVirementsPointes = 0.0; // obsolète dans le nouveau calcul
+          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // virements inclus dans dépenses
           _monthlyEntreesPointees = monthlyEntreesPointees; // NOUVEAU
         });
       } else {
@@ -126,17 +124,21 @@ class _HomeTabState extends State<HomeTab> {
         final totalSortiesAmount = sorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
         
   double totalPlaisirsAmount = 0.0; // inclura aussi virements
-        double totalSortiesPointees = 0.0;
-        double totalPlaisirsPointees = 0.0;
+  double totalSortiesPointees = 0.0;
+  double totalPlaisirsPointees = 0.0; // dépenses pointées (avec virements)
         
         for (var plaisir in plaisirs) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           totalPlaisirsAmount += amount; // virements inclus
         }
         
-        // Calculer les sorties pointées
-        totalSortiesPointees = sorties.where((s) => s['isPointed'] == true)
-            .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+    // Charges pointées
+    totalSortiesPointees = sorties.where((s) => s['isPointed'] == true)
+      .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
+
+    // Dépenses pointées (inclut virements puisque intégrés dans les plaisirs)
+    totalPlaisirsPointees = plaisirs.where((p) => p['isPointed'] == true)
+      .fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
         
         // NOUVEAU : Calculer les revenus normaux pointés
         double totalEntreesPointees = entrees
@@ -144,13 +146,12 @@ class _HomeTabState extends State<HomeTab> {
             .fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
         
         setState(() {
-          _monthlyEntrees = totalEntreesAmount; // virements exclus
-          _monthlySorties = totalSortiesAmount;
-          _monthlyPlaisirs = totalPlaisirsAmount; // Dépenses incluant virements
-          _monthlySortiesPointees = totalSortiesPointees;
-          _monthlyPlaisirsPointees = totalPlaisirsPointees; // Seulement les vraies dépenses pointées
-          _monthlyVirementsPointes = 0.0; // plus utilisé (remis à zéro)
-          _monthlyEntreesPointees = totalEntreesPointees; // NOUVEAU
+          _monthlyEntrees = totalEntreesAmount; // revenus uniquement
+          _monthlySorties = totalSortiesAmount;  // charges
+          _monthlyPlaisirs = totalPlaisirsAmount; // dépenses (avec virements)
+          _monthlySortiesPointees = totalSortiesPointees; // charges pointées
+          _monthlyPlaisirsPointees = totalPlaisirsPointees; // dépenses pointées (avec virements)
+          _monthlyEntreesPointees = totalEntreesPointees; // revenus pointés
         });
       }
     } catch (e) {
@@ -339,8 +340,9 @@ class _HomeTabState extends State<HomeTab> {
   }
 
   Widget _buildSummaryCards(double solde) {
-    // CORRECTION : Solde débité = Revenus pointés + Virements pointés - Charges pointées - Dépenses pointées
-    final soldeDebiteCalcule = _monthlyEntreesPointees + _monthlyVirementsPointes - _monthlySortiesPointees - _monthlyPlaisirsPointees;
+  // Solde Prévu (calculé avant) = Revenus - Charges - Dépenses
+  // Solde Débité = Revenus pointés - Charges pointées - Dépenses pointées
+  final soldeDebiteCalcule = _monthlyEntreesPointees - _monthlySortiesPointees - _monthlyPlaisirsPointees;
     
     return Column(
       children: [
