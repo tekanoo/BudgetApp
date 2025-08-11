@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'screens/auth_wrapper.dart'; // IMPORTANT: Utiliser auth_wrapper
+import 'services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,11 +22,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Gestion Budget Pro',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
-      // CORRECTION: Route par défaut vers AuthWrapper au lieu de HomeScreen
+      theme: ThemeService.lightTheme,
       home: AuthWrapper(),
       routes: {
         '/auth': (context) => AuthWrapper(),
