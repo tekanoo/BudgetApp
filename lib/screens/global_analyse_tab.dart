@@ -4,7 +4,7 @@ import '../services/encrypted_budget_service.dart';
 /// Onglet d'analyse globale remplaçant les projections.
 /// Affiche :
 /// Version simplifiée :
-/// - Total dépenses (incluant virements/crédits)
+/// - Total dépenses nettes (dépenses normales - virements/remboursements)
 /// - Moyenne mensuelle des dépenses sur les mois actifs (mois contenant au moins un revenu, charge ou dépense)
 class GlobalAnalyseTab extends StatefulWidget {
   const GlobalAnalyseTab({super.key});
@@ -54,7 +54,12 @@ class _GlobalAnalyseTabState extends State<GlobalAnalyseTab> {
       for (final p in plaisirs) {
         markActive(p['date']);
         final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
-        totalDepenses += amount; // inclut virements
+        // Calculer les dépenses comme dans l'onglet dépenses (virements soustraits)
+        if (p['isCredit'] == true) {
+          totalDepenses -= amount; // Les virements réduisent le total
+        } else {
+          totalDepenses += amount; // Les dépenses normales augmentent le total
+        }
       }
 
       final activeMonths = activeMonthKeys.length;
