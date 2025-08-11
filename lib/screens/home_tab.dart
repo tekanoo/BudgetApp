@@ -66,7 +66,7 @@ class _HomeTabState extends State<HomeTab> {
                  date.month == widget.selectedMonth!.month;
         }).fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
         
-        // Désormais les virements (isCredit) sont inclus dans les dépenses
+        // Calculer les dépenses comme dans l'onglet dépenses (virements soustraits)
         final monthlyPlaisirs = plaisirs.where((p) {
           final date = DateTime.tryParse(p['date'] ?? '');
           return date != null && 
@@ -74,7 +74,11 @@ class _HomeTabState extends State<HomeTab> {
                  date.month == widget.selectedMonth!.month;
         }).fold(0.0, (sum, p) {
           final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
-          return sum + amount; // inclut virements
+          if (p['isCredit'] == true) {
+            return sum - amount; // Les virements réduisent le total
+          } else {
+            return sum + amount; // Les dépenses normales augmentent le total
+          }
         });
         
         // Calculer les montants pointés pour ce mois
@@ -94,7 +98,11 @@ class _HomeTabState extends State<HomeTab> {
                  p['isPointed'] == true;
         }).fold(0.0, (sum, p) {
           final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
-          return sum + amount; // virements inclus
+          if (p['isCredit'] == true) {
+            return sum - amount; // Les virements pointés réduisent le total pointé
+          } else {
+            return sum + amount; // Les dépenses pointées augmentent le total pointé
+          }
         });
         
         // NOUVEAU : Calculer les revenus normaux pointés (sans virements)
@@ -109,9 +117,9 @@ class _HomeTabState extends State<HomeTab> {
         setState(() {
           _monthlyEntrees = monthlyEntrees; // virements ne sont plus ajoutés aux revenus
           _monthlySorties = monthlySorties;
-          _monthlyPlaisirs = monthlyPlaisirs; // Maintenant sans les virements
+          _monthlyPlaisirs = monthlyPlaisirs; // Dépenses nettes (virements soustraits)
           _monthlySortiesPointees = monthlySortiesPointees;
-          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // virements inclus dans dépenses
+          _monthlyPlaisirsPointees = monthlyPlaisirsPointees; // dépenses pointées nettes
           _monthlyEntreesPointees = monthlyEntreesPointees; // NOUVEAU
         });
       } else {
@@ -123,22 +131,33 @@ class _HomeTabState extends State<HomeTab> {
         final totalEntreesAmount = entrees.fold(0.0, (sum, e) => sum + ((e['amount'] as num?)?.toDouble() ?? 0.0));
         final totalSortiesAmount = sorties.fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
         
-  double totalPlaisirsAmount = 0.0; // inclura aussi virements
+  double totalPlaisirsAmount = 0.0; // dépenses nettes (virements soustraits)
   double totalSortiesPointees = 0.0;
-  double totalPlaisirsPointees = 0.0; // dépenses pointées (avec virements)
+  double totalPlaisirsPointees = 0.0; // dépenses pointées nettes
         
         for (var plaisir in plaisirs) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
-          totalPlaisirsAmount += amount; // virements inclus
+          if (plaisir['isCredit'] == true) {
+            totalPlaisirsAmount -= amount; // Les virements réduisent le total
+          } else {
+            totalPlaisirsAmount += amount; // Les dépenses normales augmentent le total
+          }
         }
         
     // Charges pointées
     totalSortiesPointees = sorties.where((s) => s['isPointed'] == true)
       .fold(0.0, (sum, s) => sum + ((s['amount'] as num?)?.toDouble() ?? 0.0));
 
-    // Dépenses pointées (inclut virements puisque intégrés dans les plaisirs)
+    // Dépenses pointées nettes (virements soustraits)
     totalPlaisirsPointees = plaisirs.where((p) => p['isPointed'] == true)
-      .fold(0.0, (sum, p) => sum + ((p['amount'] as num?)?.toDouble() ?? 0.0));
+      .fold(0.0, (sum, p) {
+        final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+        if (p['isCredit'] == true) {
+          return sum - amount; // Les virements pointés réduisent le total pointé
+        } else {
+          return sum + amount; // Les dépenses pointées augmentent le total pointé
+        }
+      });
         
         // NOUVEAU : Calculer les revenus normaux pointés
         double totalEntreesPointees = entrees
@@ -148,9 +167,9 @@ class _HomeTabState extends State<HomeTab> {
         setState(() {
           _monthlyEntrees = totalEntreesAmount; // revenus uniquement
           _monthlySorties = totalSortiesAmount;  // charges
-          _monthlyPlaisirs = totalPlaisirsAmount; // dépenses (avec virements)
+          _monthlyPlaisirs = totalPlaisirsAmount; // dépenses nettes (virements soustraits)
           _monthlySortiesPointees = totalSortiesPointees; // charges pointées
-          _monthlyPlaisirsPointees = totalPlaisirsPointees; // dépenses pointées (avec virements)
+          _monthlyPlaisirsPointees = totalPlaisirsPointees; // dépenses pointées nettes
           _monthlyEntreesPointees = totalEntreesPointees; // revenus pointés
         });
       }
