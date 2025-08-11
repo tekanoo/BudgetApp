@@ -62,23 +62,31 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   // Logo
                   Container(
-                    width: 120,
-                    height: 120,
+                    width: 140,
+                    height: 140,
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
+                      borderRadius: BorderRadius.circular(32),
                       boxShadow: [
                         BoxShadow(
                           color: Colors.black.withValues(alpha: 0.2),
-                          blurRadius: 20,
-                          offset: const Offset(0, 10),
+                          blurRadius: 24,
+                          offset: const Offset(0, 12),
                         ),
                       ],
                     ),
-                    child: Icon(
-                      Icons.account_balance_wallet,
-                      size: 60,
-                      color: Theme.of(context).colorScheme.primary,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Image.asset(
+                        'assets/logo/23651dbedf79451292da2a1b4e3e2704-free.png',
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stack) => Icon(
+                          Icons.account_balance_wallet,
+                          size: 60,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 48),
