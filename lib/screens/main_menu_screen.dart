@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
+// Import foundation supprimé (pas de logs)
 import 'package:firebase_analytics/firebase_analytics.dart';
 
 import '../services/firebase_service.dart';
@@ -8,7 +8,7 @@ import '../services/encrypted_budget_service.dart' as encrypted;
 import 'month_selector_screen.dart';
 import 'auth_wrapper.dart'; // AJOUTER cet import
 import 'tags_management_tab.dart';
-import 'projections_tab.dart';
+import 'global_analyse_tab.dart'; // Importer le nouvel onglet GlobalAnalyseTab
 
 
 class MainMenuScreen extends StatefulWidget {
@@ -29,7 +29,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   List<Widget> _mainTabs = [
     const MonthSelectorScreen(), // Premier onglet = Sélection des mois
     const TagsManagementTab(), // Onglet pour la gestion des tags
-    const ProjectionsTab(), // Onglet pour les projections
+    const GlobalAnalyseTab(), // Nouvel onglet pour l'analyse globale
   ];
 
   // SUPPRIMER cette section complètement car elle n'est plus utilisée
@@ -152,16 +152,15 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
       selectedIcon: Icon(Icons.calendar_month),
       label: 'Mois',
     ),
-    // SUPPRIMER l'onglet Analyse car il sera dans le menu
     const NavigationDestination(
       icon: Icon(Icons.label_outline),
       selectedIcon: Icon(Icons.label),
       label: 'Tags',
     ),
     const NavigationDestination(
-      icon: Icon(Icons.trending_up_outlined),
-      selectedIcon: Icon(Icons.trending_up),
-      label: 'Projections',
+      icon: Icon(Icons.analytics_outlined),
+      selectedIcon: Icon(Icons.analytics),
+      label: 'Analyse',
     ),
   ];
 
@@ -177,9 +176,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     try {
       await _dataService.initialize();
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur initialisation services: $e');
-      }
+      // Ignoré: échec d'initialisation non critique (pas de log en production)
     }
   }
 
@@ -190,9 +187,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         screenClass: 'MainMenuScreen',
       );
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur Analytics: $e');
-      }
+      // Ignoré: échec analytics non critique
     }
   }
 
@@ -203,9 +198,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           // Forcer la reconstruction pour mettre à jour l'icône
         });
         
-        if (kDebugMode) {
-          print('🔄 État auth changé: ${user?.email}');
-        }
+  // Log supprimé
       }
     });
   }
@@ -228,7 +221,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     // SUPPRIMER cette méthode car _menuOptions n'existe plus
     // ou la simplifier pour utiliser les onglets principaux
     
-    final tabNames = ['Mois', 'Tags', 'Projections'];
+    final tabNames = ['Mois', 'Tags', 'Analyse'];
     final tabName = index < tabNames.length ? tabNames[index] : 'Unknown';
     
     try {
@@ -237,9 +230,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         itemId: tabName,
       );
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur Analytics tab change: $e');
-      }
+      // Ignoré: erreur analytics tab non critique
     }
   }
 
@@ -521,7 +512,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         _mainTabs = [
           const MonthSelectorScreen(), // Onglet sélection de mois
           const TagsManagementTab(),   // Onglet gestion des tags
-          const ProjectionsTab(),      // Onglet projections
+          const GlobalAnalyseTab(),    // Onglet analyse globale
         ];
       });
 
@@ -537,13 +528,8 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         });
       }
 
-      if (kDebugMode) {
-        print('✅ Tous les onglets ont été actualisés');
-      }
     } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur actualisation onglets: $e');
-      }
+      // Ignoré: échec actualisation onglets non critique
     }
   }
 
@@ -593,16 +579,17 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
           );
         }
 
-        await _firebaseService.signOut();
+  await _firebaseService.signOut();
+  if (!mounted) return; // Sécurité: ne pas utiliser context si démonté
         
         // La navigation sera gérée automatiquement par AuthWrapper
         // Mais on peut forcer le retour à la racine pour être sûr
-        if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (_) => AuthWrapper()),
-          );
-        }
+        if (!mounted) return; // Vérification supplémentaire
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => AuthWrapper()),
+        );
       } catch (e) {
         if (mounted) {
           Navigator.pop(context); // Fermer le dialogue de chargement

@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_analytics/firebase_analytics.dart'; // AJOUT
 import 'package:google_sign_in/google_sign_in.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kIsWeb; // nécessaire pour kIsWeb uniquement
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -32,23 +32,16 @@ class FirebaseService {
   // Connexion avec Google
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      if (kDebugMode) {
-        print('🔐 Début connexion Google...');
-      }
+  // Log supprimé
 
       // Déclencher le flow d'authentification
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
-      if (googleUser == null) {
-        if (kDebugMode) {
-          print('❌ Connexion Google annulée par l\'utilisateur');
-        }
+  if (googleUser == null) {
         return null;
       }
 
-      if (kDebugMode) {
-        print('✅ Utilisateur Google sélectionné: ${googleUser.email}');
-      }
+  // Log supprimé
 
       // Obtenir les détails d'authentification
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -59,16 +52,12 @@ class FirebaseService {
         idToken: googleAuth.idToken,
       );
 
-      if (kDebugMode) {
-        print('🔑 Credentials créés, connexion à Firebase...');
-      }
+  // Log supprimé
 
       // Se connecter à Firebase
       final UserCredential userCredential = await _auth.signInWithCredential(credential);
       
-      if (kDebugMode) {
-        print('✅ Connexion Firebase réussie: ${userCredential.user?.displayName}');
-      }
+  // Log supprimé
 
       // AJOUT: Tracker l'événement de connexion
       await _analytics.logLogin(loginMethod: 'google');
@@ -82,10 +71,7 @@ class FirebaseService {
       
       return userCredential;
       
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur connexion Google: $e');
-      }
+  } catch (e) {
       rethrow;
     }
   }
@@ -100,13 +86,8 @@ class FirebaseService {
         _googleSignIn.signOut(),
         _auth.signOut(),
       ]);
-      if (kDebugMode) {
-        print('✅ Déconnexion réussie');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur déconnexion: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }
@@ -126,22 +107,15 @@ class FirebaseService {
           'createdAt': FieldValue.serverTimestamp(),
           'lastLoginAt': FieldValue.serverTimestamp(),
         });
-        if (kDebugMode) {
-          print('✅ Profil utilisateur créé');
-        }
+  // Log supprimé
       } else {
         // Mettre à jour la dernière connexion
         await userDoc.update({
           'lastLoginAt': FieldValue.serverTimestamp(),
         });
-        if (kDebugMode) {
-          print('✅ Profil utilisateur mis à jour');
-        }
+  // Log supprimé
       }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur création profil: $e');
-      }
+  } catch (e) {
       // Ne pas faire échouer la connexion pour une erreur de profil
     }
   }
@@ -166,13 +140,8 @@ class FirebaseService {
         'data': entrees,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      if (kDebugMode) {
-        print('✅ Entrées sauvegardées (${entrees.length} items)');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur sauvegarde entrées: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }
@@ -188,10 +157,7 @@ class FirebaseService {
         return List<Map<String, dynamic>>.from(data['data'] ?? []);
       }
       return [];
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chargement entrées: $e');
-      }
+  } catch (e) {
       return [];
     }
   }
@@ -205,13 +171,8 @@ class FirebaseService {
         'data': sorties,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      if (kDebugMode) {
-        print('✅ Sorties sauvegardées (${sorties.length} items)');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur sauvegarde sorties: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }
@@ -227,10 +188,7 @@ class FirebaseService {
         return List<Map<String, dynamic>>.from(data['data'] ?? []);
       }
       return [];
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chargement sorties: $e');
-      }
+  } catch (e) {
       return [];
     }
   }
@@ -244,13 +202,8 @@ class FirebaseService {
         'data': plaisirs,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      if (kDebugMode) {
-        print('✅ Plaisirs sauvegardés (${plaisirs.length} items)');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur sauvegarde plaisirs: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }
@@ -266,10 +219,7 @@ class FirebaseService {
         return List<Map<String, dynamic>>.from(data['data'] ?? []);
       }
       return [];
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chargement plaisirs: $e');
-      }
+  } catch (e) {
       return [];
     }
   }
@@ -283,13 +233,8 @@ class FirebaseService {
         'bankBalance': balance,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      if (kDebugMode) {
-        print('✅ Solde bancaire sauvegardé: $balance €');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur sauvegarde solde: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }
@@ -305,10 +250,7 @@ class FirebaseService {
         return (data['bankBalance'] ?? 0.0).toDouble();
       }
       return 0.0;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chargement solde: $e');
-      }
+  } catch (e) {
       return 0.0;
     }
   }
@@ -322,13 +264,8 @@ class FirebaseService {
         'availableTags': tags,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      if (kDebugMode) {
-        print('✅ Tags sauvegardés (${tags.length} tags)');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur sauvegarde tags: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }
@@ -344,10 +281,7 @@ class FirebaseService {
         return List<String>.from(data['availableTags'] ?? []);
       }
       return [];
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chargement tags: $e');
-      }
+  } catch (e) {
       return [];
     }
   }
@@ -378,13 +312,8 @@ class FirebaseService {
       // Exécuter la suppression en lot
       await batch.commit();
       
-      if (kDebugMode) {
-        print('✅ Toutes les données utilisateur supprimées');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur suppression données: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }
@@ -410,13 +339,8 @@ class FirebaseService {
       // Supprimer le document principal de l'utilisateur (optionnel)
       // await _firestore.collection('users').doc(user.uid).delete();
       
-      if (kDebugMode) {
-        print('✅ Données utilisateur supprimées de Firebase');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur suppression Firebase: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }

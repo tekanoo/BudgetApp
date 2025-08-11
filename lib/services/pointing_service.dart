@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+// Import foundation supprimé (pas de logs)
 import 'encrypted_budget_service.dart';
 
 class PointingService {
@@ -18,15 +18,10 @@ class PointingService {
       
       final newState = plaisirs[index]['isPointed'] == true;
       
-      if (kDebugMode) {
-        debugPrint('✅ Dépense ${newState ? 'pointée' : 'dépointée'}');
-      }
+  // Log supprimé
 
       return newState;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Erreur pointage dépense: $e');
-      }
+  } catch (e) {
       rethrow;
     }
   }
@@ -43,15 +38,10 @@ class PointingService {
       
       final newState = sorties[index]['isPointed'] == true;
 
-      if (kDebugMode) {
-        debugPrint('✅ Charge ${newState ? 'pointée' : 'dépointée'}');
-      }
+  // Log supprimé
 
       return newState;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Erreur pointage charge: $e');
-      }
+  } catch (e) {
       rethrow;
     }
   }
@@ -66,15 +56,10 @@ class PointingService {
       
       final newState = entrees[index]['isPointed'] == true;
 
-      if (kDebugMode) {
-        debugPrint('✅ Revenu ${newState ? 'pointé' : 'dépointé'}');
-      }
+  // Log supprimé
 
       return newState;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Erreur pointage revenu: $e');
-      }
+  } catch (e) {
       rethrow;
     }
   }
@@ -101,9 +86,7 @@ class PointingService {
       }
     }
 
-    if (kDebugMode && errors.isNotEmpty) {
-      debugPrint('❌ Erreurs traitement lot: ${errors.join(', ')}');
-    }
+  // Logs supprimés
 
     return {
       'pointed': pointed,
@@ -134,9 +117,7 @@ class PointingService {
       }
     }
 
-    if (kDebugMode && errors.isNotEmpty) {
-      debugPrint('❌ Erreurs traitement lot: ${errors.join(', ')}');
-    }
+  // Logs supprimés
 
     return {
       'pointed': pointed,
@@ -166,9 +147,7 @@ class PointingService {
       }
     }
 
-    if (kDebugMode && errors.isNotEmpty) {
-      debugPrint('❌ Erreurs traitement lot revenus: ${errors.join(', ')}');
-    }
+  // Logs supprimés
 
     return {
       'pointed': pointed,
@@ -226,10 +205,7 @@ class PointingService {
         },
         'totalPointedAmount': montantEntreesPointees + montantPlaisirsPoinetes + montantSortiesPointees,
       };
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('❌ Erreur statistiques pointage: $e');
-      }
+  } catch (e) {
       return {
         'entrees': {'total': 0, 'pointed': 0, 'percentage': 0, 'amount': 0.0},
         'plaisirs': {'total': 0, 'pointed': 0, 'percentage': 0, 'amount': 0.0},

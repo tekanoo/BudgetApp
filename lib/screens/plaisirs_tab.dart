@@ -220,7 +220,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
       borderRadius: BorderRadius.circular(15),
       boxShadow: [
         BoxShadow(
-          color: Colors.purple.withOpacity(0.3),
+          color: Colors.purple.withValues(alpha: 0.3),
           blurRadius: 10,
           offset: const Offset(0, 5),
         ),
@@ -241,9 +241,9 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.white.withOpacity(0.5)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                       ),
                       child: Icon(
                         _isSelectionMode ? Icons.close : Icons.checklist,
@@ -258,9 +258,9 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                     ),
                     child: const Icon(
                       Icons.filter_list,
@@ -295,9 +295,9 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.3)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   children: [
@@ -322,9 +322,9 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
               child: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.white.withOpacity(0.5)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                 ),
                 child: Column(
                   children: [

@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as encrypt;
-import 'package:flutter/foundation.dart';
+// Suppression des logs debug : import foundation retiré
 
 class FinancialDataEncryption {
   static final FinancialDataEncryption _instance = FinancialDataEncryption._internal();
@@ -27,9 +28,7 @@ class FinancialDataEncryption {
     
     _encrypter = encrypt.Encrypter(encrypt.AES(key));
     
-    if (kDebugMode) {
-      print('🔐 Chiffrement initialisé pour l\'utilisateur');
-    }
+  // Log supprimé (mode debug)
   }
 
   /// Normalise un montant pour supporter les virgules
@@ -53,10 +52,7 @@ class FinancialDataEncryption {
       final String amountStr = amount.toStringAsFixed(2);
       final encrypt.Encrypted encrypted = _encrypter.encrypt(amountStr, iv: _iv);
       return encrypted.base64;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chiffrement: $e');
-      }
+  } catch (e) {
       // En cas d'erreur, retourne une valeur par défaut chiffrée
       return _encrypter.encrypt('0.00', iv: _iv).base64;
     }
@@ -74,10 +70,7 @@ class FinancialDataEncryption {
       final encrypt.Encrypted encrypted = encrypt.Encrypted.fromBase64(encryptedAmount);
       final String decryptedStr = _encrypter.decrypt(encrypted, iv: _iv);
       return _normalizeAmount(decryptedStr);
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur déchiffrement: $e');
-      }
+  } catch (e) {
       return 0.0;
     }
   }
@@ -88,10 +81,7 @@ class FinancialDataEncryption {
       if (description.isEmpty) return '';
       final encrypt.Encrypted encrypted = _encrypter.encrypt(description, iv: _iv);
       return encrypted.base64;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chiffrement description: $e');
-      }
+  } catch (e) {
       return '';
     }
   }
@@ -102,10 +92,7 @@ class FinancialDataEncryption {
       if (encryptedDescription.isEmpty) return '';
       final encrypt.Encrypted encrypted = encrypt.Encrypted.fromBase64(encryptedDescription);
       return _encrypter.decrypt(encrypted, iv: _iv);
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur déchiffrement description: $e');
-      }
+  } catch (e) {
       return 'Description indisponible';
     }
   }

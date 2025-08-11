@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+// Import foundation retiré (suppression debug)
 import 'package:shared_preferences/shared_preferences.dart';
 
 class StorageService {
@@ -34,14 +34,9 @@ class StorageService {
       final success = await prefs.setString(_storageKey, jsonEncode(data));
       await prefs.setString(_lastUpdateKey, DateTime.now().toIso8601String());
 
-      if (kDebugMode) {
-        print('✅ Données sauvegardées localement');
-      }
+  // Log supprimé
       return success;
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur sauvegarde: $e');
-      }
+  } catch (e) {
       return false;
     }
   }
@@ -63,10 +58,7 @@ class StorageService {
         'entrees': List<Map<String, dynamic>>.from(data['entrees'] ?? []),
         'sorties': List<Map<String, dynamic>>.from(data['sorties'] ?? []),
       };
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur chargement: $e');
-      }
+  } catch (e) {
       return _getEmptyData();
     }
   }
@@ -96,13 +88,8 @@ class StorageService {
       await prefs.remove(_storageKey);
       await prefs.remove(_lastUpdateKey);
       
-      if (kDebugMode) {
-        print('✅ Données locales supprimées');
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        print('❌ Erreur suppression locale: $e');
-      }
+  // Log supprimé
+  } catch (e) {
       rethrow;
     }
   }

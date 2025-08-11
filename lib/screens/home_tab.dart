@@ -83,12 +83,9 @@ class _HomeTabState extends State<HomeTab> {
                  date.month == widget.selectedMonth!.month;
         }).fold(0.0, (sum, p) {
           final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
-          // CORRECTION : Exclure les virements du calcul des dépenses
           if (p['isCredit'] == true) {
-            // Les virements ne sont PAS des dépenses, donc on ne les compte pas
-            return sum;
+            return sum; // exclure virements
           } else {
-            // Seules les vraies dépenses sont comptées
             return sum + amount;
           }
         });
@@ -166,17 +163,9 @@ class _HomeTabState extends State<HomeTab> {
         for (var plaisir in plaisirs) {
           final amount = (plaisir['amount'] as num?)?.toDouble() ?? 0.0;
           if (plaisir['isCredit'] == true) {
-            totalVirementsAmount += amount; // Les virements vont aux revenus
-            // Pour les virements pointés
-            if (plaisir['isPointed'] == true) {
-              totalVirementsPointes += amount;
-            }
+            totalVirementsAmount += amount;
           } else {
-            totalPlaisirsAmount += amount; // Les vraies dépenses
-            // Pour les dépenses pointées
-            if (plaisir['isPointed'] == true) {
-              totalPlaisirsPointees += amount; // Seulement les vraies dépenses pointées
-            }
+            totalPlaisirsAmount += amount;
           }
         }
         

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+// Import foundation retiré (suppression logs)
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../utils/amount_parser.dart';
@@ -231,7 +232,7 @@ class _SortiesTabState extends State<SortiesTab> {
       
       setState(() {});
     } catch (e) {
-      print('Erreur lors du recalcul des dépenses filtrées: $e');
+      // Logs supprimés
     }
   }
 
@@ -292,15 +293,14 @@ class _SortiesTabState extends State<SortiesTab> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null && mounted) {
+                  if (!mounted) return; // mounted check après l'attente
+                  if (date != null) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = date;
                     });
                     _applyFilter();
-                    if (mounted) {
-                      Navigator.pop(context);
-                    }
+                    Navigator.pop(context);
                   }
                 },
               ),
@@ -321,15 +321,14 @@ class _SortiesTabState extends State<SortiesTab> {
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null && mounted) {
+                  if (!mounted) return; // mounted check après l'attente
+                  if (date != null) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = DateTime(date.year);
                     });
                     _applyFilter();
-                    if (mounted) {
-                      Navigator.pop(context);
-                    }
+                    Navigator.pop(context);
                   }
                 },
               ),
@@ -723,9 +722,6 @@ class _SortiesTabState extends State<SortiesTab> {
   }
 
   Widget _buildFinancialHeader() {
-    // CORRECTION : Calcul correct du solde avec prise en compte des crédits dans les dépenses
-    final soldePrevu = totalRevenus - totalSorties - totalDepenses;
-    
     // Pour le solde débité, on utilise les charges pointées ET les dépenses pointées
     final soldeDebite = totalRevenus - totalPointe - totalDepensesPointees;
     
@@ -741,7 +737,7 @@ class _SortiesTabState extends State<SortiesTab> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withOpacity(0.3),
+            color: Colors.red.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -770,9 +766,9 @@ class _SortiesTabState extends State<SortiesTab> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                     ),
                     child: const Icon(
                       Icons.content_copy,
@@ -794,9 +790,9 @@ class _SortiesTabState extends State<SortiesTab> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                     ),
                     child: const Icon(
                       Icons.close,
@@ -814,9 +810,9 @@ class _SortiesTabState extends State<SortiesTab> {
                   child: Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.5)),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                     ),
                     child: Icon(
                       _isSelectionMode ? Icons.close : Icons.checklist,
@@ -831,9 +827,9 @@ class _SortiesTabState extends State<SortiesTab> {
                 child: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.white.withOpacity(0.5)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
                   ),
                   child: const Icon(
                     Icons.filter_list,
@@ -1309,7 +1305,7 @@ class _SortiesTabState extends State<SortiesTab> {
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.grey.withOpacity(0.1),
+                                  color: Colors.grey.withValues(alpha: 0.1),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 ),
@@ -1494,7 +1490,7 @@ class _SortiesTabState extends State<SortiesTab> {
                   color: Colors.blue.shade700,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withValues(alpha: 0.1),
                       blurRadius: 4,
                       offset: const Offset(0, -2),
                     ),
