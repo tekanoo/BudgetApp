@@ -14,6 +14,10 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
   bool isLoading = true;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  // Mode sélection multiple
+  bool _isSelectionMode = false;
+  final Set<String> _selectedTags = {};
+  bool _isBulkDeleting = false;
 
   @override
   void initState() {
@@ -39,6 +43,166 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
       return tags;
     }
     return tags.where((tag) => tag.toLowerCase().contains(_searchQuery)).toList();
+  }
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _isSelectionMode = !_isSelectionMode;
+      if (!_isSelectionMode) {
+        _selectedTags.clear();
+      }
+    });
+  }
+
+  void _toggleTagSelection(String tag) {
+    if (!_isSelectionMode) return;
+    setState(() {
+      if (_selectedTags.contains(tag)) {
+        _selectedTags.remove(tag);
+      } else {
+        _selectedTags.add(tag);
+      }
+    });
+  }
+
+  void _selectAllFiltered() {
+    setState(() {
+      final current = filteredTags;
+      final allSelected = current.every(_selectedTags.contains);
+      if (allSelected) {
+        // Tout désélectionner
+        for (final t in current) {
+          _selectedTags.remove(t);
+        }
+      } else {
+        // Tout sélectionner
+        _selectedTags.addAll(current);
+      }
+    });
+  }
+
+  Future<void> _deleteSelectedTags() async {
+    if (_selectedTags.isEmpty) return;
+    setState(() { _isBulkDeleting = true; });
+    try {
+      // Compter les usages pour chaque tag sélectionné
+      final Map<String, int> usage = {};
+      for (final tag in _selectedTags) {
+        usage[tag] = await _countTagUsage(tag);
+      }
+
+      if (!mounted) return;
+      final totalUpdates = usage.values.fold<int>(0, (a,b)=>a+b);
+
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.delete_forever, color: Colors.red),
+                const SizedBox(width: 8),
+                Text('Supprimer ${_selectedTags.length} catégories'),
+              ],
+            ),
+            content: SizedBox(
+              width: 400,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (totalUpdates > 0)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning, color: Colors.orange.shade700, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '$totalUpdates transaction${totalUpdates>1?'s':''} seront mises à jour vers "Sans catégorie".',
+                              style: TextStyle(fontSize: 12, color: Colors.orange.shade800),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 160,
+                    child: Scrollbar(
+                      child: ListView(
+                        children: usage.entries.map((e) => ListTile(
+                          dense: true,
+                          leading: CircleAvatar(
+                            radius: 14,
+                            backgroundColor: Colors.indigo.shade100,
+                            child: Text(e.key.isNotEmpty?e.key[0].toUpperCase():'?'),
+                          ),
+                          title: Text(e.key),
+                          trailing: Text(
+                            e.value>0 ? '${e.value}×' : '0',
+                            style: TextStyle(color: e.value>0? Colors.orange.shade700: Colors.grey),
+                          ),
+                        )).toList(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: ()=>Navigator.pop(context,false), child: const Text('Annuler')),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                onPressed: ()=>Navigator.pop(context,true),
+                child: Text('Supprimer (${_selectedTags.length})'),
+              ),
+            ],
+          );
+        }
+      );
+
+      if (confirm == true) {
+        // Construire nouvelle liste de tags
+        final updated = [...tags]..removeWhere((t) => _selectedTags.contains(t));
+        await _dataService.saveTags(updated);
+
+        // Mettre à jour les transactions pour chaque tag utilisé
+        for (final entry in usage.entries) {
+          if (entry.value > 0) {
+            await _updateTransactionsWithNewTag(entry.key, 'Sans catégorie');
+          }
+        }
+        await _loadTags();
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🗑️ ${_selectedTags.length} catégorie${_selectedTags.length>1?'s':''} supprimée${_selectedTags.length>1?'s':''}'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() {
+          _isSelectionMode = false;
+          _selectedTags.clear();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur suppression multiple: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() { _isBulkDeleting = false; });
+      }
+    }
   }
 
   Future<void> _loadTags() async {
@@ -486,6 +650,28 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
                         ],
                       ),
                     ),
+                    if (_isSelectionMode) ...[
+                      IconButton(
+                        onPressed: _selectAllFiltered,
+                        icon: Icon(
+                          _selectedTags.length == filteredTags.length && filteredTags.isNotEmpty
+                              ? Icons.select_all
+                              : Icons.done_all,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                        tooltip: 'Tout sélectionner / désélectionner',
+                      ),
+                    ],
+                    IconButton(
+                      onPressed: _toggleSelectionMode,
+                      icon: Icon(
+                        _isSelectionMode ? Icons.close : Icons.checklist,
+                        color: Colors.white,
+                        size: 26,
+                      ),
+                      tooltip: _isSelectionMode ? 'Quitter la sélection multiple' : 'Sélection multiple',
+                    ),
                     IconButton(
                       onPressed: _addTag,
                       icon: const Icon(
@@ -522,6 +708,37 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
                   ),
                   style: const TextStyle(color: Colors.white),
                 ),
+                if (_isSelectionMode) ...[
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          _selectedTags.isEmpty
+                              ? 'Touchez pour sélectionner des catégories'
+                              : '${_selectedTags.length} sélectionnée${_selectedTags.length>1?'s':''}',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
+                        ),
+                      ),
+                      if (_selectedTags.isNotEmpty)
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red.shade600,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                          ),
+                          onPressed: _isBulkDeleting ? null : _deleteSelectedTags,
+                          icon: _isBulkDeleting
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                )
+                              : const Icon(Icons.delete_forever),
+                          label: Text(_isBulkDeleting ? 'Suppression...' : 'Supprimer'),
+                        ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
@@ -579,16 +796,21 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
                         return Card(
                           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                           child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: Colors.indigo.shade100,
-                              child: Text(
-                                tag.isNotEmpty ? tag[0].toUpperCase() : '?',
-                                style: TextStyle(
-                                  color: Colors.indigo.shade700,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                            leading: _isSelectionMode
+                                ? Checkbox(
+                                    value: _selectedTags.contains(tag),
+                                    onChanged: (_) => _toggleTagSelection(tag),
+                                  )
+                                : CircleAvatar(
+                                    backgroundColor: Colors.indigo.shade100,
+                                    child: Text(
+                                      tag.isNotEmpty ? tag[0].toUpperCase() : '?',
+                                      style: TextStyle(
+                                        color: Colors.indigo.shade700,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
                             title: Text(
                               tag,
                               style: const TextStyle(
@@ -614,19 +836,41 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit, color: Colors.blue),
-                                  onPressed: () => _editTag(actualIndex),
-                                  tooltip: 'Modifier',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _deleteTag(actualIndex),
-                                  tooltip: 'Supprimer',
-                                ),
+                                if (!_isSelectionMode) ...[
+                                  IconButton(
+                                    icon: const Icon(Icons.edit, color: Colors.blue),
+                                    onPressed: () => _editTag(actualIndex),
+                                    tooltip: 'Modifier',
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.delete, color: Colors.red),
+                                    onPressed: () => _deleteTag(actualIndex),
+                                    tooltip: 'Supprimer',
+                                  ),
+                                ] else ...[
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    _selectedTags.contains(tag)
+                                        ? Icons.check_circle
+                                        : Icons.radio_button_unchecked,
+                                    color: _selectedTags.contains(tag) ? Colors.indigo : Colors.grey,
+                                  ),
+                                ],
                               ],
                             ),
-                            onTap: () => _editTag(actualIndex),
+                            onTap: () {
+                              if (_isSelectionMode) {
+                                _toggleTagSelection(tag);
+                              } else {
+                                _editTag(actualIndex);
+                              }
+                            },
+                            onLongPress: () {
+                              if (!_isSelectionMode) {
+                                _toggleSelectionMode();
+                                _toggleTagSelection(tag);
+                              }
+                            },
                           ),
                         );
                       },

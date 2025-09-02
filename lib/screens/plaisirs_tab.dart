@@ -941,6 +941,13 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     DateTime? selectedDate = date ?? (widget.selectedMonth ?? DateTime.now());
     bool isCreditValue = isCredit ?? false; // Valeur locale pour la case à cocher
 
+    // Charger la liste des tags existants pour l'autocomplétion
+    List<String> existingTags = [];
+    try {
+      existingTags = await _dataService.getTags();
+      existingTags.sort((a,b)=>a.toLowerCase().compareTo(b.toLowerCase()));
+    } catch (_) {}
+
     return await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -959,14 +966,47 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(
-                  controller: tagController,
-                  decoration: const InputDecoration(
-                    labelText: 'Catégorie',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.category),
-                    helperText: 'Restaurant, Courses, Transport...',
-                  ),
+                // Autocomplétion des catégories
+                RawAutocomplete<String>(
+                  textEditingController: tagController,
+                  optionsBuilder: (TextEditingValue value) {
+                    if (value.text.trim().isEmpty) return const Iterable<String>.empty();
+                    final lower = value.text.toLowerCase();
+                    return existingTags.where((t) => t.toLowerCase().contains(lower));
+                  },
+                  fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                    return TextField(
+                      controller: controller,
+                      focusNode: focusNode,
+                      decoration: const InputDecoration(
+                        labelText: 'Catégorie',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.category),
+                        helperText: 'Restaurant, Courses, Transport...',
+                      ),
+                      onSubmitted: (_) => onFieldSubmitted(),
+                    );
+                  },
+                  optionsViewBuilder: (context, onSelected, options) {
+                    return Align(
+                      alignment: Alignment.topLeft,
+                      child: Material(
+                        elevation: 4,
+                        borderRadius: BorderRadius.circular(8),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxHeight: 200, maxWidth: 400),
+                          child: ListView(
+                            padding: EdgeInsets.zero,
+                            children: options.map((opt) => ListTile(
+                              dense: true,
+                              title: Text(opt),
+                              onTap: () => onSelected(opt),
+                            )).toList(),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -1078,16 +1118,15 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             ),
             FilledButton(
               onPressed: () {
-                if (tagController.text.trim().isNotEmpty &&
-                    montantController.text.trim().isNotEmpty &&
-                    selectedDate != null) {
-                  Navigator.pop(context, {
-                    'tag': tagController.text.trim(),
-                    'amount': AmountParser.parseAmount(montantController.text),
-                    'date': selectedDate,
-                    'isCredit': isCreditValue, // Retourner la valeur de la case à cocher
-                  });
-                }
+                final tagValue = tagController.text.trim();
+                final montantValue = montantController.text.trim();
+                if (montantValue.isEmpty) return; // montant requis
+                Navigator.pop(context, {
+                  'tag': tagValue.isEmpty ? 'Sans catégorie' : tagValue,
+                  'amount': montantValue,
+                  'date': selectedDate,
+                  'isCredit': isCreditValue,
+                });
               },
               child: Text(isEdit ? 'Modifier' : 'Ajouter'),
             ),
