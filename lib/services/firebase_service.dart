@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_analytics/firebase_analytics.dart'; // AJOUT
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:flutter/foundation.dart' show kIsWeb; // nécessaire pour kIsWeb uniquement
+import 'data_update_bus.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -140,6 +141,7 @@ class FirebaseService {
         'data': entrees,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+  DataUpdateBus.emit('entrees');
   // Log supprimé
   } catch (e) {
       rethrow;
@@ -171,6 +173,7 @@ class FirebaseService {
         'data': sorties,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+  DataUpdateBus.emit('sorties');
   // Log supprimé
   } catch (e) {
       rethrow;
@@ -202,6 +205,7 @@ class FirebaseService {
         'data': plaisirs,
         'updatedAt': FieldValue.serverTimestamp(),
       });
+  DataUpdateBus.emit('plaisirs');
   // Log supprimé
   } catch (e) {
       rethrow;
@@ -233,6 +237,7 @@ class FirebaseService {
         'bankBalance': balance,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+  DataUpdateBus.emit('settings');
   // Log supprimé
   } catch (e) {
       rethrow;
@@ -264,6 +269,7 @@ class FirebaseService {
         'availableTags': tags,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+  DataUpdateBus.emit('tags');
   // Log supprimé
   } catch (e) {
       rethrow;

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'firebase_service.dart';
 import 'encryption_service.dart';
+import 'data_update_bus.dart';
 
 class EncryptedBudgetDataService {
   static final EncryptedBudgetDataService _instance = EncryptedBudgetDataService._internal();
@@ -76,6 +77,7 @@ Future<void> togglePlaisirPointing(int index) async {
       
       // Sauvegarder
       await _firebaseService.savePlaisirs(plaisirs);
+  DataUpdateBus.emit('plaisirs');
       
       if (kDebugMode) {
         print('✅ Dépense ${currentlyPointed ? 'dépointée' : 'pointée'}');
@@ -308,6 +310,7 @@ Future<void> togglePlaisirPointing(int index) async {
       entrees.add(encryptedEntree);
       
       await _firebaseService.saveEntrees(entrees);
+  DataUpdateBus.emit('entrees');
       
       if (kDebugMode) {
         print('✅ Entrée chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
@@ -345,6 +348,7 @@ Future<void> togglePlaisirPointing(int index) async {
         
         entrees[index] = _encryption.encryptTransaction(updatedEntree);
         await _firebaseService.saveEntrees(entrees);
+    DataUpdateBus.emit('entrees');
         
         if (kDebugMode) {
           print('✅ Entrée mise à jour');
@@ -365,6 +369,7 @@ Future<void> togglePlaisirPointing(int index) async {
       if (index >= 0 && index < entrees.length) {
         entrees.removeAt(index);
         await _firebaseService.saveEntrees(entrees);
+    DataUpdateBus.emit('entrees');
         
         if (kDebugMode) {
           print('✅ Entrée chiffrée supprimée');
@@ -425,6 +430,7 @@ Future<void> togglePlaisirPointing(int index) async {
       sorties.add(encryptedSortie);
       
       await _firebaseService.saveSorties(sorties);
+  DataUpdateBus.emit('sorties');
       
       if (kDebugMode) {
         print('✅ Sortie chiffrée ajoutée: [MONTANT_CHIFFRÉ] - $description');
@@ -464,6 +470,7 @@ Future<void> togglePlaisirPointing(int index) async {
         
         sorties[index] = _encryption.encryptTransaction(updatedSortie);
         await _firebaseService.saveSorties(sorties);
+    DataUpdateBus.emit('sorties');
         
         if (kDebugMode) {
           print('✅ Sortie mise à jour');
@@ -484,6 +491,7 @@ Future<void> togglePlaisirPointing(int index) async {
       if (index >= 0 && index < sorties.length) {
         sorties.removeAt(index);
         await _firebaseService.saveSorties(sorties);
+    DataUpdateBus.emit('sorties');
         
         if (kDebugMode) {
           print('✅ Sortie chiffrée supprimée');
@@ -545,6 +553,7 @@ Future<void> togglePlaisirPointing(int index) async {
       plaisirs.add(encryptedPlaisir);
       
       await _firebaseService.savePlaisirs(plaisirs);
+  DataUpdateBus.emit('plaisirs');
       
       // Sauvegarder le tag s'il est nouveau (en clair pour l'autocomplétion)
       if (tag != null && tag.isNotEmpty) {
@@ -600,6 +609,7 @@ Future<void> togglePlaisirPointing(int index) async {
         // Chiffrer et sauvegarder
         plaisirs[index] = _encryption.encryptTransaction(updatedPlaisir);
         await _firebaseService.savePlaisirs(plaisirs);
+    DataUpdateBus.emit('plaisirs');
         
         // Sauvegarder le tag s'il est nouveau
         if (tag.isNotEmpty) {
@@ -625,6 +635,7 @@ Future<void> togglePlaisirPointing(int index) async {
       if (index >= 0 && index < plaisirs.length) {
         plaisirs.removeAt(index);
         await _firebaseService.savePlaisirs(plaisirs);
+    DataUpdateBus.emit('plaisirs');
         
         if (kDebugMode) {
           print('✅ Plaisir chiffré supprimé');
@@ -718,6 +729,7 @@ Future<void> togglePlaisirPointing(int index) async {
   Future<void> saveTags(List<String> tags) async {
     try {
       await _firebaseService.saveTags(tags);
+  DataUpdateBus.emit('tags');
       if (kDebugMode) {
         print('✅ Tags sauvegardés (${tags.length} tags)');
       }

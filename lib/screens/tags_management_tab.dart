@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/encrypted_budget_service.dart';
+import '../services/data_update_bus.dart';
 
 class TagsManagementTab extends StatefulWidget {
   const TagsManagementTab({super.key});
@@ -24,6 +25,11 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
     super.initState();
     _loadTags();
     _searchController.addListener(_onSearchChanged);
+    DataUpdateBus.stream.where((e) => e == 'tags' || e == 'all').listen((_) {
+      if (mounted && !isLoading) {
+        _loadTags();
+      }
+    });
   }
 
   @override

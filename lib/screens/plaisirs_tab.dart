@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../utils/amount_parser.dart';
+import '../services/data_update_bus.dart';
 
 class PlaisirsTab extends StatefulWidget {
   final DateTime? selectedMonth;
@@ -39,6 +40,11 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   void initState() {
     super.initState();
     _loadPlaisirs();
+    DataUpdateBus.stream.where((e) => e == 'plaisirs' || e == 'entrees' || e == 'sorties' || e == 'tags' || e == 'all').listen((_) {
+      if (mounted && !isLoading) {
+        _loadPlaisirs();
+      }
+    });
   }
 
   Future<void> _loadPlaisirs() async {

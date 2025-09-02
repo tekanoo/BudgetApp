@@ -168,8 +168,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   void initState() {
     super.initState();
     _initializeServices();
-    _logScreenView();
-    _checkAuthState();
+  _logScreenView();
   }
 
   Future<void> _initializeServices() async {
@@ -191,17 +190,7 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
     }
   }
 
-  void _checkAuthState() {
-    _firebaseService.authStateChanges.listen((user) {
-      if (mounted) {
-        setState(() {
-          // Forcer la reconstruction pour mettre à jour l'icône
-        });
-        
-  // Log supprimé
-      }
-    });
-  }
+  // Suppression du listener auth redondant (AuthWrapper gère déjà les rebuilds)
 
   void _onItemTapped(int index) {
     if (index < _mainTabs.length) {
