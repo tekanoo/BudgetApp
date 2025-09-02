@@ -387,9 +387,10 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
   }
 
   void _deleteAllData() async {
+    final ctx = context;
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: ctx,
+      builder: (dialogCtx) => AlertDialog(
         title: const Row(
           children: [
             Icon(Icons.warning, color: Colors.red),
@@ -431,11 +432,11 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogCtx, false),
             child: const Text('Annuler'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('SUPPRIMER TOUT'),
           ),
@@ -445,12 +446,16 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
 
     if (confirmed == true) {
       try {
+        // Capturer context et navigator avant les awaits
+        final messenger = ScaffoldMessenger.of(ctx);
+        final navContext = ctx;
+        
         // Afficher le dialogue de chargement
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => const AlertDialog(
+        if (!mounted) return;
+        showDialog(
+          context: navContext,
+          barrierDismissible: false,
+          builder: (loadingCtx) => const AlertDialog(
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -460,35 +465,29 @@ class _MainMenuScreenState extends State<MainMenuScreen> {
                 ],
               ),
             ),
-          );
-        }
+        );
 
         await _dataService.deleteAllUserData();
 
-        if (mounted) {
-          Navigator.pop(context); // Fermer le dialogue de chargement
-          
-          // AJOUT: Actualiser tous les onglets après suppression
-          await _refreshAllTabs();
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Toutes les données ont été supprimées et actualisées'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        if (!mounted) return;
+        Navigator.pop(navContext); // Fermer le dialogue de chargement
+        await _refreshAllTabs();
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('✅ Toutes les données ont été supprimées et actualisées'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } catch (e) {
-        if (mounted) {
-          Navigator.pop(context); // Fermer le dialogue de chargement
-          
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('❌ Erreur: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        if (!mounted) return;
+        final messenger = ScaffoldMessenger.of(ctx);
+        Navigator.pop(ctx); // Fermer le dialogue de chargement si ouvert
+        messenger.showSnackBar(
+          SnackBar(
+            content: Text('❌ Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }

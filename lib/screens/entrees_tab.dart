@@ -641,8 +641,8 @@ class _EntreesTabState extends State<EntreesTab> {
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (builderCtx, setState) => AlertDialog(
           title: Row(
             children: [
               Icon(
@@ -681,7 +681,7 @@ class _EntreesTabState extends State<EntreesTab> {
                 InkWell(
                   onTap: () async {
                     final picked = await showDatePicker(
-                      context: context,
+                      context: builderCtx,
                       initialDate: selectedDate ?? DateTime.now(),
                       firstDate: DateTime(2020),
                       lastDate: DateTime(2030),
@@ -715,7 +715,7 @@ class _EntreesTabState extends State<EntreesTab> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogCtx),
               child: const Text('Annuler'),
             ),
             FilledButton(
@@ -723,7 +723,7 @@ class _EntreesTabState extends State<EntreesTab> {
                 if (descriptionController.text.trim().isNotEmpty &&
                     montantController.text.trim().isNotEmpty &&
                     selectedDate != null) {
-                  Navigator.pop(context, {
+                  Navigator.pop(dialogCtx, {
                     'description': descriptionController.text.trim(),
                     'amount': AmountParser.parseAmount(montantController.text),
                     'date': selectedDate,
@@ -740,48 +740,45 @@ class _EntreesTabState extends State<EntreesTab> {
   }
 
   Future<void> _addEntree() async {
+    final parentCtx = context;
     final result = await _showEntreeDialog();
-    if (result != null) {
-      try {
-        await _dataService.addEntree(
-          amountStr: result['amount'].toString(),
-          description: result['description'],
-          date: result['date'],
-        );
-        await _loadEntrees();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Revenu ajouté'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-      }
+    if (result == null) return;
+    try {
+      await _dataService.addEntree(
+        amountStr: result['amount'].toString(),
+        description: result['description'],
+        date: result['date'],
+      );
+      await _loadEntrees();
+      if (!mounted) return;
+      ScaffoldMessenger.of(parentCtx).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Revenu ajouté'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(parentCtx).showSnackBar(
+        SnackBar(
+          content: Text('Erreur: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<void> _editEntree(int displayIndex) async {
-    // CORRECTION : Utiliser filteredEntrees au lieu de entrees
-    final entree = filteredEntrees[displayIndex];
+  final parentCtx = context; // capture avant await
+  // Utiliser filteredEntrees au lieu de entrees
+  final entree = filteredEntrees[displayIndex];
     final entreeId = entree['id'] ?? '';
     
-    final originalEntrees = await _dataService.getEntrees();
+  final originalEntrees = await _dataService.getEntrees();
     final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
     
     if (realIndex == -1) return;
-    
-    final result = await _showEntreeDialog(
+  final result = await _showEntreeDialog(
       description: entree['description'],
       amount: (entree['amount'] as num?)?.toDouble(),
       date: DateTime.tryParse(entree['date'] ?? ''),
@@ -797,35 +794,33 @@ class _EntreesTabState extends State<EntreesTab> {
           date: result['date'],
         );
         await _loadEntrees();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Revenu modifié'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(parentCtx).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Revenu modifié'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Erreur: $e'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(parentCtx).showSnackBar(
+          SnackBar(
+            content: Text('Erreur: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     }
   }
 
   Future<void> _deleteEntree(int displayIndex) async {
-    // CORRECTION : Utiliser filteredEntrees et trouver le vrai index
-    final entree = filteredEntrees[displayIndex];
+  final parentCtx = context; // capture avant await
+  // Utiliser filteredEntrees et trouver le vrai index
+  final entree = filteredEntrees[displayIndex];
     final entreeId = entree['id'] ?? '';
     
     // Trouver l'index réel dans la liste complète
-    final originalEntrees = await _dataService.getEntrees();
+  final originalEntrees = await _dataService.getEntrees();
     final realIndex = originalEntrees.indexWhere((e) => e['id'] == entreeId);
     
     if (realIndex == -1) {
@@ -841,8 +836,8 @@ class _EntreesTabState extends State<EntreesTab> {
     }
 
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: parentCtx,
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Supprimer'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -879,11 +874,11 @@ class _EntreesTabState extends State<EntreesTab> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dialogCtx, false),
             child: const Text('Annuler'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             child: const Text('Supprimer'),
           ),
@@ -891,34 +886,32 @@ class _EntreesTabState extends State<EntreesTab> {
       ),
     );
 
-    if (confirmed == true) {
-      try {
-        await _dataService.deleteEntree(realIndex);
-        await _loadEntrees();
-        
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('✅ Revenu "${entree['description']}" supprimé'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur lors de la suppression: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    if (confirmed != true) return;
+    try {
+      await _dataService.deleteEntree(realIndex);
+      await _loadEntrees();
+      if (!mounted) return;
+      ScaffoldMessenger.of(parentCtx).showSnackBar(
+        SnackBar(
+          content: Text('✅ Revenu "${entree['description']}" supprimé'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(parentCtx).showSnackBar(
+        SnackBar(
+          content: Text('Erreur lors de la suppression: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   Future<void> _togglePointing(int displayIndex) async {
-    if (!mounted) return;
-    
-    try {
+  if (!mounted) return;
+  final parentCtx = context;
+  try {
       final entreeToToggle = filteredEntrees[displayIndex];
       final entreeId = entreeToToggle['id'] ?? '';
       
@@ -930,11 +923,10 @@ class _EntreesTabState extends State<EntreesTab> {
       }
       
       await _dataService.toggleEntreePointing(realIndex);
-      await _loadEntrees();
-      
-      if (!mounted) return;
-      final isPointed = entreeToToggle['isPointed'] == true;
-      ScaffoldMessenger.of(context).showSnackBar(
+  await _loadEntrees();
+  if (!mounted) return;
+  final isPointed = entreeToToggle['isPointed'] == true;
+  ScaffoldMessenger.of(parentCtx).showSnackBar(
         SnackBar(
           content: Text(
             !isPointed 
@@ -946,8 +938,8 @@ class _EntreesTabState extends State<EntreesTab> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+  if (!mounted) return;
+  ScaffoldMessenger.of(parentCtx).showSnackBar(
         SnackBar(
           content: Text('Erreur lors du pointage: $e'),
           backgroundColor: Colors.red,
@@ -1116,32 +1108,25 @@ class _EntreesTabState extends State<EntreesTab> {
   Future<void> _copyRevenuesToNextMonth() async {
     if (widget.selectedMonth == null) return;
 
-    // Calculer le mois suivant
+    final parentCtx = context; // capture
+    final currentMonth = widget.selectedMonth!;
     final nextMonth = DateTime(
-      widget.selectedMonth!.month == 12 
-          ? widget.selectedMonth!.year + 1 
-          : widget.selectedMonth!.year,
-      widget.selectedMonth!.month == 12 
-          ? 1 
-          : widget.selectedMonth!.month + 1,
+      currentMonth.month == 12 ? currentMonth.year + 1 : currentMonth.year,
+      currentMonth.month == 12 ? 1 : currentMonth.month + 1,
     );
-
-    final currentMonthName = _getMonthName(widget.selectedMonth!.month);
+    final currentMonthName = _getMonthName(currentMonth.month);
     final nextMonthName = _getMonthName(nextMonth.month);
 
-    // Vérifier s'il y a des revenus à copier pour le mois actuel
-    final currentMonthRevenus = entrees.where((revenu) {
-      final date = DateTime.tryParse(revenu['date'] ?? '');
-      return date != null && 
-             date.year == widget.selectedMonth!.year &&
-             date.month == widget.selectedMonth!.month;
+    final currentMonthRevenus = entrees.where((r) {
+      final d = DateTime.tryParse(r['date'] ?? '');
+      return d != null && d.year == currentMonth.year && d.month == currentMonth.month;
     }).toList();
 
     if (currentMonthRevenus.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(parentCtx).showSnackBar(
           SnackBar(
-            content: Text('❌ Aucun revenu trouvé pour $currentMonthName ${widget.selectedMonth!.year}'),
+            content: Text('❌ Aucun revenu trouvé pour $currentMonthName ${currentMonth.year}'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -1149,19 +1134,15 @@ class _EntreesTabState extends State<EntreesTab> {
       return;
     }
 
-    // Vérifier s'il existe déjà des revenus pour le mois suivant
-    final existingNextMonthRevenus = entrees.where((revenu) {
-      final date = DateTime.tryParse(revenu['date'] ?? '');
-      return date != null && 
-             date.year == nextMonth.year &&
-             date.month == nextMonth.month;
+    final existingNextMonthRevenus = entrees.where((r) {
+      final d = DateTime.tryParse(r['date'] ?? '');
+      return d != null && d.year == nextMonth.year && d.month == nextMonth.month;
     }).toList();
 
-    // Demander confirmation
     if (!mounted) return;
     final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
+      context: parentCtx,
+      builder: (dCtx) => AlertDialog(
         title: const Row(
           children: [
             Icon(Icons.content_copy, color: Colors.green),
@@ -1169,218 +1150,181 @@ class _EntreesTabState extends State<EntreesTab> {
             Text('Copier les revenus'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Copier tous les revenus de $currentMonthName ${widget.selectedMonth!.year} vers $nextMonthName ${nextMonth.year} ?',
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 16),
-            Text('💰 ${currentMonthRevenus.length} revenu(s) à copier :'),
-            const SizedBox(height: 8),
-            Container(
-              constraints: const BoxConstraints(maxHeight: 200),
-              child: SingleChildScrollView(
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Copier tous les revenus de $currentMonthName ${currentMonth.year} vers $nextMonthName ${nextMonth.year} ?',
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 16),
+              Text('💰 ${currentMonthRevenus.length} revenu(s) à copier :'),
+              const SizedBox(height: 8),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 200),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: currentMonthRevenus.map((revenu) {
                     final amount = (revenu['amount'] as num?)?.toDouble() ?? 0.0;
                     return Padding(
                       padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Text(
-                        '• ${revenu['description']} - ${amount.toStringAsFixed(2).replaceAll('.', ',')}€',
-                        style: const TextStyle(fontSize: 12),
-                      ),
+                      child: Text('• ${revenu['description']} - ${amount.toStringAsFixed(2).replaceAll('.', ',')}€', style: const TextStyle(fontSize: 12)),
                     );
                   }).toList(),
                 ),
               ),
-            ),
-            if (existingNextMonthRevenus.isNotEmpty) ...[
+              if (existingNextMonthRevenus.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning, color: Colors.orange.shade600),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Attention : ${existingNextMonthRevenus.length} revenu(s) existe(nt) déjà pour $nextMonthName ${nextMonth.year}. Les nouveaux revenus seront ajoutés.',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: Colors.green.shade50,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: Colors.green.shade200),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.warning, color: Colors.orange.shade600),
+                    Icon(Icons.info, color: Colors.green.shade600),
                     const SizedBox(width: 8),
-                    Expanded(
+                    const Expanded(
                       child: Text(
-                        'Attention : ${existingNextMonthRevenus.length} revenu(s) existe(nt) déjà pour $nextMonthName ${nextMonth.year}. Les nouveaux revenus seront ajoutés.',
-                        style: const TextStyle(fontSize: 12),
+                        'Les revenus seront copiés comme nouveaux éléments indépendants. Modifier ou supprimer l\'un n\'affectera pas l\'autre.',
+                        style: TextStyle(fontSize: 12),
                       ),
                     ),
                   ],
                 ),
               ),
             ],
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.green.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.info, color: Colors.green.shade600),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      'Les revenus seront copiés comme nouveaux éléments indépendants. Modifier ou supprimer l\'un n\'affectera pas l\'autre.',
-                      style: TextStyle(fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
+            onPressed: () => Navigator.pop(dCtx, false),
             child: const Text('Annuler'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dCtx, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.green),
             child: const Text('Copier'),
           ),
         ],
       ),
     );
-
     if (confirmed != true || !mounted) return;
 
-    try {
-      // Afficher le dialogue de chargement
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text('💰 Copie des revenus en cours...'),
-            ],
-          ),
+    // Progress dialog
+    showDialog(
+      context: parentCtx,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('💰 Copie des revenus en cours...'),
+          ],
         ),
-      );
+      ),
+    );
 
-      int copiedCount = 0;
-      int skippedCount = 0;
-      List<String> errors = [];
+    int copiedCount = 0;
+    int skippedCount = 0;
+    final errors = <String>[];
 
-      // Copier chaque revenu vers le mois suivant en créant de NOUVEAUX éléments
-      for (var revenu in currentMonthRevenus) {
-        try {
-          final originalDate = DateTime.tryParse(revenu['date'] ?? '');
-          if (originalDate == null) {
-            skippedCount++;
-            continue;
-          }
-
-          // Calculer la nouvelle date dans le mois suivant
-          // Garder le même jour, mais ajuster si le mois suivant n'a pas assez de jours
-          final lastDayOfNextMonth = DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
-          final newDay = originalDate.day > lastDayOfNextMonth ? lastDayOfNextMonth : originalDate.day;
-          
-          final newDate = DateTime(nextMonth.year, nextMonth.month, newDay);
-
-          // IMPORTANT : Créer un NOUVEAU revenu complètement indépendant
-          // Ne pas copier l'ID, les dates de pointage, etc.
-          await _dataService.addEntree(
-            amountStr: (revenu['amount'] as num).toString(),
+    for (final revenu in currentMonthRevenus) {
+      final originalDate = DateTime.tryParse(revenu['date'] ?? '');
+      if (originalDate == null) {
+        skippedCount++;
+        continue;
+      }
+      final lastDayOfNextMonth = DateTime(nextMonth.year, nextMonth.month + 1, 0).day;
+      final newDay = originalDate.day > lastDayOfNextMonth ? lastDayOfNextMonth : originalDate.day;
+      final newDate = DateTime(nextMonth.year, nextMonth.month, newDay);
+      try {
+        await _dataService.addEntree(
+          amountStr: (revenu['amount'] as num).toString(),
             description: revenu['description'] as String,
             date: newDate,
-            // Note : Le service addEntree va automatiquement :
-            // - Générer un nouvel ID unique
-            // - Définir isPointed à false par défaut
-            // - Créer une nouvelle date de création
-            // - Ne pas copier les métadonnées de pointage
-          );
-
-          copiedCount++;
-        } catch (e) {
-          errors.add('${revenu['description']}: $e');
-          skippedCount++;
-        }
-      }
-
-      if (mounted) {
-        Navigator.pop(context); // Fermer le dialogue de chargement
-        
-        // Recharger les données pour voir les nouveaux revenus
-        await _loadEntrees();
-        
-        // Afficher le résultat
-        String message;
-        Color backgroundColor;
-        
-        if (copiedCount > 0 && errors.isEmpty) {
-          message = '✅ $copiedCount revenu(s) copié(s) vers $nextMonthName ${nextMonth.year}';
-          backgroundColor = Colors.green;
-        } else if (copiedCount > 0 && errors.isNotEmpty) {
-          message = '⚠️ $copiedCount copiés, $skippedCount échoués vers $nextMonthName ${nextMonth.year}';
-          backgroundColor = Colors.orange;
-        } else {
-          message = '❌ Aucun revenu copié vers $nextMonthName ${nextMonth.year}';
-          backgroundColor = Colors.red;
-        }
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: backgroundColor,
-            duration: const Duration(seconds: 4),
-          ),
         );
-        
-        // Afficher les erreurs détaillées si nécessaire
-        if (errors.isNotEmpty && mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('⚠️ Erreurs de copie'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('${errors.length} erreur(s) :'),
-                  const SizedBox(height: 8),
-                  ...errors.map((error) => Text('• $error', style: const TextStyle(fontSize: 12))),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
+        copiedCount++;
+      } catch (e) {
+        errors.add('${revenu['description']}: $e');
+        skippedCount++;
+      }
+    }
+
+    if (!mounted) return; // still open dialog
+    Navigator.of(parentCtx).pop(); // close progress
+    await _loadEntrees();
+    if (!mounted) return;
+
+    String message;
+    Color bg;
+    if (copiedCount > 0 && errors.isEmpty) {
+      message = '✅ $copiedCount revenu(s) copié(s) vers $nextMonthName ${nextMonth.year}';
+      bg = Colors.green;
+    } else if (copiedCount > 0 && errors.isNotEmpty) {
+      message = '⚠️ $copiedCount copiés, $skippedCount échoués vers $nextMonthName ${nextMonth.year}';
+      bg = Colors.orange;
+    } else {
+      message = '❌ Aucun revenu copié vers $nextMonthName ${nextMonth.year}';
+      bg = Colors.red;
+    }
+    ScaffoldMessenger.of(parentCtx).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: bg,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+    if (errors.isNotEmpty && mounted) {
+      showDialog(
+        context: parentCtx,
+        builder: (_) => AlertDialog(
+          title: const Text('⚠️ Erreurs de copie'),
+          content: SizedBox(
+            width: 400,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${errors.length} erreur(s) :'),
+                const SizedBox(height: 8),
+                ...errors.map((e) => Text('• $e', style: const TextStyle(fontSize: 12))),
               ],
             ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        Navigator.pop(context); // Fermer le dialogue de chargement
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('❌ Erreur lors de la copie: $e'),
-            backgroundColor: Colors.red,
           ),
-        );
-      }
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(parentCtx), child: const Text('OK')),
+          ],
+        ),
+      );
     }
   }
 

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import '../services/encrypted_budget_service.dart';
 import '../utils/amount_parser.dart';
 import '../services/data_update_bus.dart';
+import 'dart:async';
 
 class PlaisirsTab extends StatefulWidget {
   final DateTime? selectedMonth;
@@ -35,16 +36,24 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
   bool _isSelectionMode = false;
   Set<int> _selectedIndices = {};
   bool _isProcessingBatch = false;
+  StreamSubscription<String>? _busSub;
 
   @override
   void initState() {
     super.initState();
     _loadPlaisirs();
-    DataUpdateBus.stream.where((e) => e == 'plaisirs' || e == 'entrees' || e == 'sorties' || e == 'tags' || e == 'all').listen((_) {
-      if (mounted && !isLoading) {
+    _busSub = DataUpdateBus.stream.where((e) => e == 'plaisirs' || e == 'entrees' || e == 'sorties' || e == 'tags' || e == 'all').listen((_) {
+      if (!mounted) return;
+      if (!isLoading) {
         _loadPlaisirs();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _busSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadPlaisirs() async {
@@ -865,21 +874,21 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 value: 'Mois',
                 groupValue: _currentFilter,
                 onChanged: (value) async {
+                  final navigator = Navigator.of(context);
                   final date = await showDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null && mounted) {
+                  if (!mounted) return;
+                  if (date != null) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = date;
                     });
                     _applyFilter();
-                    if (mounted) {
-                      Navigator.pop(context);
-                    }
+                    navigator.pop();
                   }
                 },
               ),
@@ -894,21 +903,21 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 value: 'Année',
                 groupValue: _currentFilter,
                 onChanged: (value) async {
+                  final navigator = Navigator.of(context);
                   final date = await showDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (date != null && mounted) {
+                  if (!mounted) return;
+                  if (date != null) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = DateTime(date.year);
                     });
                     _applyFilter();
-                    if (mounted) {
-                      Navigator.pop(context);
-                    }
+                    navigator.pop();
                   }
                 },
               ),
@@ -956,8 +965,8 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
 
     return await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (builderCtx, setState) => AlertDialog(
           title: Row(
             children: [
               Icon(
@@ -1097,12 +1106,14 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                       const Spacer(),
                       TextButton(
                         onPressed: () async {
+                          final parentCtx = context;
                           final picked = await showDatePicker(
-                            context: context,
+                            context: parentCtx,
                             initialDate: selectedDate ?? DateTime.now(),
                             firstDate: DateTime(2020),
                             lastDate: DateTime(2030),
                           );
+                          if (!mounted) return;
                           if (picked != null) {
                             setState(() {
                               selectedDate = picked;

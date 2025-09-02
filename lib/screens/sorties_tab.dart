@@ -287,20 +287,21 @@ class _SortiesTabState extends State<SortiesTab> {
                 value: 'Mois',
                 groupValue: _currentFilter,
                 onChanged: (value) async {
+                  final navigator = Navigator.of(context);
                   final date = await showDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (!mounted) return; // mounted check après l'attente
+                  if (!mounted) return;
                   if (date != null) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = date;
                     });
                     _applyFilter();
-                    Navigator.pop(context);
+                    navigator.pop();
                   }
                 },
               ),
@@ -315,20 +316,21 @@ class _SortiesTabState extends State<SortiesTab> {
                 value: 'Année',
                 groupValue: _currentFilter,
                 onChanged: (value) async {
+                  final navigator = Navigator.of(context);
                   final date = await showDatePicker(
                     context: context,
                     initialDate: DateTime.now(),
                     firstDate: DateTime(2020),
                     lastDate: DateTime(2030),
                   );
-                  if (!mounted) return; // mounted check après l'attente
+                  if (!mounted) return;
                   if (date != null) {
                     setState(() {
                       _currentFilter = value!;
                       _selectedFilterDate = DateTime(date.year);
                     });
                     _applyFilter();
-                    Navigator.pop(context);
+                    navigator.pop();
                   }
                 },
               ),
@@ -1119,7 +1121,9 @@ class _SortiesTabState extends State<SortiesTab> {
       }
 
       if (mounted) {
-        Navigator.pop(context); // Fermer le dialogue de chargement
+        final messenger = ScaffoldMessenger.of(context);
+        final navigator = Navigator.of(context);
+        navigator.pop(); // Fermer le dialogue de chargement
         
         // Recharger les données pour voir les nouvelles charges
         await _loadSorties();
@@ -1139,7 +1143,7 @@ class _SortiesTabState extends State<SortiesTab> {
           backgroundColor = Colors.red;
         }
         
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(message),
             backgroundColor: backgroundColor,

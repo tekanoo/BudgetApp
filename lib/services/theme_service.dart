@@ -65,51 +65,31 @@ class ThemeService extends ChangeNotifier {
     const accentBlueSoft = Color(0xFFB3DAFF);   // Conteneur clair
     const error = Color(0xFFD32F2F);            // Rouge standard Material
 
-    final colorScheme = ColorScheme(
+    final baseScheme = ColorScheme.fromSeed(
+      seedColor: primary,
       brightness: Brightness.light,
+    );
+    final colorScheme = baseScheme.copyWith(
       primary: primary,
-      onPrimary: Colors.white,
       primaryContainer: primaryLight,
-      onPrimaryContainer: Colors.white,
       secondary: accentBlue,
-      onSecondary: Colors.white,
       secondaryContainer: accentBlueSoft,
-      onSecondaryContainer: const Color(0xFF06213D),
-      tertiary: primaryDeep,
-      onTertiary: Colors.white,
-      tertiaryContainer: const Color(0xFF6633AA),
-      onTertiaryContainer: Colors.white,
       error: error,
-      onError: Colors.white,
-      errorContainer: const Color(0xFFFFE5E5),
-      onErrorContainer: error,
-      background: primaryUltraLight,
-      onBackground: const Color(0xFF201A2A),
       surface: Colors.white,
-      onSurface: const Color(0xFF2C2540),
-      surfaceVariant: const Color(0xFFE3EEF9),
-      onSurfaceVariant: const Color(0xFF385270),
-      outline: const Color(0xFF98B3CC),
-      outlineVariant: const Color(0xFFC9D9E6),
-      shadow: Colors.black.withValues(alpha: 0.25),
-      scrim: Colors.black.withValues(alpha: 0.5),
-      inverseSurface: const Color(0xFF362B4D),
-      onInverseSurface: Colors.white,
-      inversePrimary: const Color(0xFFE3D5FF),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: colorScheme.background,
+  scaffoldBackgroundColor: primaryUltraLight,
   appBarTheme: AppBarTheme(
         centerTitle: true,
         elevation: 0,
         backgroundColor: colorScheme.primary,
         foregroundColor: colorScheme.onPrimary,
       ),
-  cardTheme: CardThemeData(
+      cardTheme: CardThemeData(
         elevation: 3,
         margin: const EdgeInsets.all(8),
         color: colorScheme.surface,
@@ -122,7 +102,7 @@ class ThemeService extends ChangeNotifier {
           borderRadius: BorderRadius.circular(14),
         ),
         filled: true,
-        fillColor: colorScheme.surfaceVariant.withValues(alpha: 0.35),
+  fillColor: colorScheme.surface.withValues(alpha: 0.08),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: colorScheme.primary, width: 2),
@@ -208,46 +188,21 @@ class ThemeService extends ChangeNotifier {
     const accent = Color(0xFF1565C0);         // Accent actif
     const accentContainer = Color(0xFF0D47A1);
     const surface = Color(0xFF121821);        // Anthracite bleuté
-    const surfaceVariant = Color(0xFF1F2933);
 
-    final colorScheme = ColorScheme(
-      brightness: Brightness.dark,
+    final baseDark = ColorScheme.fromSeed(seedColor: primary, brightness: Brightness.dark);
+    final colorScheme = baseDark.copyWith(
       primary: primary,
-      onPrimary: Colors.black,
       primaryContainer: primaryDeep,
-      onPrimaryContainer: Colors.white,
       secondary: accent,
-      onSecondary: Colors.white,
       secondaryContainer: accentContainer,
-      onSecondaryContainer: Colors.white,
-      tertiary: primaryDeep,
-      onTertiary: Colors.white,
-      tertiaryContainer: const Color(0xFF103A70),
-      onTertiaryContainer: Colors.white,
-      error: const Color(0xFFFF7474),
-      onError: Colors.black,
-      errorContainer: const Color(0xFF3B0D0D),
-      onErrorContainer: const Color(0xFFFFB3B3),
-      background: const Color(0xFF0D1218),
-      onBackground: Colors.white,
       surface: surface,
-      onSurface: Colors.white,
-      surfaceVariant: surfaceVariant,
-      onSurfaceVariant: const Color(0xFFC7B6E2),
-      outline: const Color(0xFF3E5367),
-      outlineVariant: const Color(0xFF2C3C4B),
-      shadow: Colors.black,
-      scrim: Colors.black,
-      inverseSurface: const Color(0xFFE3EEF9),
-      onInverseSurface: const Color(0xFF142536),
-      inversePrimary: const Color(0xFF1565C0),
     );
 
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: colorScheme.background,
+  scaffoldBackgroundColor: const Color(0xFF0D1218),
       appBarTheme: AppBarTheme(
         backgroundColor: colorScheme.primaryContainer,
         foregroundColor: colorScheme.onPrimaryContainer,
@@ -262,7 +217,7 @@ class ThemeService extends ChangeNotifier {
       inputDecorationTheme: InputDecorationTheme(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
         filled: true,
-        fillColor: colorScheme.surfaceVariant.withValues(alpha: 0.5),
+  fillColor: colorScheme.surface.withValues(alpha: 0.3),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide(color: colorScheme.primary, width: 2),

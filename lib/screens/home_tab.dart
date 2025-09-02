@@ -642,50 +642,42 @@ class _HomeTabState extends State<HomeTab> {
               ),
               ElevatedButton(
                 onPressed: _isLoading ? null : () async {
-                  if (_amountController.text.trim().isNotEmpty && 
-                      _tagController.text.trim().isNotEmpty) {
-                    setState(() {
-                      _isLoading = true;
-                    });
-
-                    try {
-                      await _dataService.addPlaisir(
-                        amountStr: _amountController.text,
-                        tag: _tagController.text.trim(),
-                        date: _selectedDate ?? DateTime.now(),
-                        isCredit: isCredit, // Passer la valeur de la case à cocher
-                      );
-
-                      if (mounted) {
-                        Navigator.of(context).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isCredit 
-                                  ? '💰 Virement/Remboursement ajouté avec succès'
-                                  : '✅ Dépense ajoutée avec succès'
-                            ),
-                            backgroundColor: Colors.green,
-                          ),
-                        );
-                        _clearFields();
-                        await _loadMonthlyData();
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Erreur: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      }
-                    } finally {
-                      if (mounted) {
-                        setState(() {
-                          _isLoading = false;
-                        });
-                      }
+                  if (_amountController.text.trim().isEmpty || _tagController.text.trim().isEmpty) return;
+                  final navigator = Navigator.of(context); // capture avant await
+                  final messenger = ScaffoldMessenger.of(context);
+                  setState(() { _isLoading = true; });
+                  try {
+                    await _dataService.addPlaisir(
+                      amountStr: _amountController.text,
+                      tag: _tagController.text.trim(),
+                      date: _selectedDate ?? DateTime.now(),
+                      isCredit: isCredit,
+                    );
+                    if (!mounted) return;
+                    navigator.pop();
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          isCredit
+                              ? '💰 Virement/Remboursement ajouté avec succès'
+                              : '✅ Dépense ajoutée avec succès'
+                        ),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    _clearFields();
+                    await _loadMonthlyData();
+                  } catch (e) {
+                    if (!mounted) return;
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Erreur: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  } finally {
+                    if (mounted) {
+                      setState(() { _isLoading = false; });
                     }
                   }
                 },

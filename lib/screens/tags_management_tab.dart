@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/encrypted_budget_service.dart';
 import '../services/data_update_bus.dart';
+import 'dart:async';
 
 class TagsManagementTab extends StatefulWidget {
   const TagsManagementTab({super.key});
@@ -19,14 +20,16 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
   bool _isSelectionMode = false;
   final Set<String> _selectedTags = {};
   bool _isBulkDeleting = false;
+  StreamSubscription<String>? _busSub;
 
   @override
   void initState() {
     super.initState();
     _loadTags();
     _searchController.addListener(_onSearchChanged);
-    DataUpdateBus.stream.where((e) => e == 'tags' || e == 'all').listen((_) {
-      if (mounted && !isLoading) {
+    _busSub = DataUpdateBus.stream.where((e) => e == 'tags' || e == 'all').listen((_) {
+      if (!mounted) return;
+      if (!isLoading) {
         _loadTags();
       }
     });
@@ -35,6 +38,7 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
   @override
   void dispose() {
     _searchController.dispose();
+  _busSub?.cancel();
     super.dispose();
   }
 
