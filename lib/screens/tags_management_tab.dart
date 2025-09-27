@@ -487,6 +487,7 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
             TextField(
               controller: controller,
               autofocus: true,
+              keyboardType: TextInputType.text,
               decoration: const InputDecoration(
                 labelText: 'Nom de la catégorie',
                 border: OutlineInputBorder(),
@@ -494,8 +495,8 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
                 helperText: 'Restaurant, Shopping, Loisirs...',
               ),
               onSubmitted: (value) {
-                if (value.trim().isNotEmpty) {
-                  Navigator.pop(context, value.trim());
+                if (value.isNotEmpty) {
+                  Navigator.pop(context, value);
                 }
               },
             ),
@@ -532,7 +533,7 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
           ),
           FilledButton(
             onPressed: () {
-              final value = controller.text.trim();
+              final value = controller.text;
               if (value.isNotEmpty) {
                 Navigator.pop(context, value);
               }
@@ -697,6 +698,7 @@ class _TagsManagementTabState extends State<TagsManagementTab> {
                 // Barre de recherche
                 TextField(
                   controller: _searchController,
+                  keyboardType: TextInputType.text,
                   decoration: InputDecoration(
                     hintText: 'Rechercher une catégorie...',
                     hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.7)),

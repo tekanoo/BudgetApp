@@ -166,6 +166,8 @@ class _EntreesTabState extends State<EntreesTab> {
           _applyFilter();
         } else {
           filteredEntrees = List.from(entrees);
+          // Appliquer le tri par défaut
+          _sortFilteredList();
           _calculateTotals();
         }
         isLoading = false;
@@ -240,6 +242,9 @@ class _EntreesTabState extends State<EntreesTab> {
         filteredEntrees = List.from(entrees);
       }
       
+      // Appliquer le tri
+      _sortFilteredList();
+      
       // Recalculer le total des entrées filtrées
       totalEntrees = filteredEntrees.fold(0.0, 
         (sum, entree) => sum + ((entree['amount'] as num?)?.toDouble() ?? 0.0));
@@ -259,6 +264,26 @@ class _EntreesTabState extends State<EntreesTab> {
         totalEntrees = filteredTotal;
       });
     }
+  }
+
+  void _sortFilteredList() {
+    filteredEntrees.sort((a, b) {
+      final aPointed = a['isPointed'] == true;
+      final bPointed = b['isPointed'] == true;
+      
+      if (aPointed == bPointed) {
+        // Si même statut de pointage, trier par date décroissante (plus récent en premier)
+        final aDate = DateTime.tryParse(a['date'] ?? '');
+        final bDate = DateTime.tryParse(b['date'] ?? '');
+        if (aDate != null && bDate != null) {
+          return bDate.compareTo(aDate);
+        }
+        return 0;
+      }
+      
+      // Non pointés (false) en premier, pointés (true) en dernier
+      return aPointed ? 1 : -1;
+    });
   }
 
   void _showFilterDialog() {
@@ -659,6 +684,7 @@ class _EntreesTabState extends State<EntreesTab> {
               children: [
                 TextField(
                   controller: descriptionController,
+                  keyboardType: TextInputType.text,
                   decoration: const InputDecoration(
                     labelText: 'Description',
                     border: OutlineInputBorder(),
@@ -924,6 +950,8 @@ class _EntreesTabState extends State<EntreesTab> {
       
       await _dataService.toggleEntreePointing(realIndex);
   await _loadEntrees();
+      // Réappliquer le tri après le rechargement
+      _sortFilteredList();
   if (!mounted) return;
   final isPointed = entreeToToggle['isPointed'] == true;
   ScaffoldMessenger.of(parentCtx).showSnackBar(

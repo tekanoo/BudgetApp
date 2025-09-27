@@ -129,6 +129,8 @@ class _SortiesTabState extends State<SortiesTab> {
           _applyFilter();
         } else {
           filteredSorties = List.from(sorties);
+          // Appliquer le tri par défaut
+          _sortFilteredList();
           _calculateTotals();
         }
         isLoading = false;
@@ -169,6 +171,28 @@ class _SortiesTabState extends State<SortiesTab> {
       
       _calculateTotals();
     }
+    
+    _sortFilteredList();
+  }
+
+  void _sortFilteredList() {
+    filteredSorties.sort((a, b) {
+      final aPointed = a['isPointed'] == true;
+      final bPointed = b['isPointed'] == true;
+      
+      if (aPointed == bPointed) {
+        // Si même statut de pointage, trier par date décroissante (plus récent en premier)
+        final aDate = DateTime.tryParse(a['date'] ?? '');
+        final bDate = DateTime.tryParse(b['date'] ?? '');
+        if (aDate != null && bDate != null) {
+          return bDate.compareTo(aDate);
+        }
+        return 0;
+      }
+      
+      // Non pointés (false) en premier, pointés (true) en dernier
+      return aPointed ? 1 : -1;
+    });
   }
 
   void _calculateTotals() {
@@ -371,6 +395,8 @@ class _SortiesTabState extends State<SortiesTab> {
       
       await _dataService.toggleSortiePointing(realIndex);
       await _loadSorties();
+      // Réappliquer le tri après le rechargement
+      _sortFilteredList();
       
       if (!mounted) return;
       final isPointed = sortieToToggle['isPointed'] == true;
@@ -643,6 +669,7 @@ class _SortiesTabState extends State<SortiesTab> {
               children: [
                 TextField(
                   controller: descriptionController,
+                  keyboardType: TextInputType.text,
                   decoration: const InputDecoration(
                     labelText: 'Description',
                     border: OutlineInputBorder(),

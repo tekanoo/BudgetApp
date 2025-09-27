@@ -642,14 +642,14 @@ class _HomeTabState extends State<HomeTab> {
               ),
               ElevatedButton(
                 onPressed: _isLoading ? null : () async {
-                  if (_amountController.text.trim().isEmpty || _tagController.text.trim().isEmpty) return;
+                  if (_amountController.text.trim().isEmpty || _tagController.text.isEmpty) return;
                   final navigator = Navigator.of(context); // capture avant await
                   final messenger = ScaffoldMessenger.of(context);
                   setState(() { _isLoading = true; });
                   try {
                     await _dataService.addPlaisir(
                       amountStr: _amountController.text,
-                      tag: _tagController.text.trim(),
+                      tag: _tagController.text,
                       date: _selectedDate ?? DateTime.now(),
                       isCredit: isCredit,
                     );

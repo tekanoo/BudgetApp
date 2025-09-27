@@ -111,6 +111,8 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
           _applyFilter();
         } else {
           filteredPlaisirs = List.from(plaisirs);
+          // Appliquer le tri par défaut
+          _sortFilteredList();
           _calculateTotals();
         }
         isLoading = false;
@@ -158,6 +160,26 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
     });
   }
 
+  void _sortFilteredList() {
+    filteredPlaisirs.sort((a, b) {
+      final aPointed = a['isPointed'] == true;
+      final bPointed = b['isPointed'] == true;
+      
+      if (aPointed == bPointed) {
+        // Si même statut de pointage, trier par date décroissante (plus récent en premier)
+        final aDate = DateTime.tryParse(a['date'] ?? '');
+        final bDate = DateTime.tryParse(b['date'] ?? '');
+        if (aDate != null && bDate != null) {
+          return bDate.compareTo(aDate);
+        }
+        return 0;
+      }
+      
+      // Non pointés (false) en premier, pointés (true) en dernier
+      return aPointed ? 1 : -1;
+    });
+  }
+
   void _applyFilter() {
     if (_currentFilter == 'Tous' || _selectedFilterDate == null) {
       filteredPlaisirs = List.from(plaisirs);
@@ -176,6 +198,9 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
       }).toList();
     }
     
+    // Appliquer le tri
+    _sortFilteredList();
+    
     _calculateTotals();
   }
 
@@ -193,6 +218,8 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
       
       await _dataService.togglePlaisirPointing(realIndex);
       await _loadPlaisirs();
+      // Réappliquer le tri après le rechargement
+      _sortFilteredList();
       
       if (!mounted) return;
       final isPointed = plaisirToToggle['isPointed'] == true;
@@ -985,7 +1012,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                 RawAutocomplete<String>(
                   textEditingController: tagController,
                   optionsBuilder: (TextEditingValue value) {
-                    if (value.text.trim().isEmpty) return const Iterable<String>.empty();
+                    if (value.text.isEmpty) return const Iterable<String>.empty();
                     final lower = value.text.toLowerCase();
                     return existingTags.where((t) => t.toLowerCase().contains(lower));
                   },
@@ -993,6 +1020,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
                     return TextField(
                       controller: controller,
                       focusNode: focusNode,
+                      keyboardType: TextInputType.text,
                       decoration: const InputDecoration(
                         labelText: 'Catégorie',
                         border: OutlineInputBorder(),
@@ -1135,7 +1163,7 @@ class _PlaisirsTabState extends State<PlaisirsTab> {
             ),
             FilledButton(
               onPressed: () {
-                final tagValue = tagController.text.trim();
+                final tagValue = tagController.text;
                 final montantValue = montantController.text.trim();
                 if (montantValue.isEmpty) return; // montant requis
                 Navigator.pop(context, {
